@@ -1,5 +1,6 @@
 import Navigation from "@/components/Navigation";
 import Hero from "@/components/Hero";
+import TabSection from "@/components/TabSection";
 import Features from "@/components/Features";
 import CodeDemo from "@/components/CodeDemo";
 import CTA from "@/components/CTA";
@@ -10,6 +11,36 @@ const Index = () => {
     <div className="min-h-screen bg-background">
       <Navigation />
       <Hero />
+      <TabSection
+        title="Tab Tab Tab…Ship"
+        description="A single keystroke, limitless power, complete flow. The full power of Windsurf Tab is exclusive to the Windsurf Editor. Our IDE plugins include only the autocomplete action."
+        imageSrc="/placeholder.svg"
+        imageAlt="Code editor demo"
+        subheading="Windsurf Tab: Many Actions, One Effortless Flow"
+        subdescription="Tab to move your cursor. Tab to import your dependencies. Tab to glory."
+        linkHref="#"
+        linkText="Tab Features →"
+      />
+      <TabSection
+        title="Command Palette: All Actions, One Place"
+        description="Access every feature and setting with a single shortcut. The command palette brings the full power of Windsurf to your fingertips, so you never have to leave your flow."
+        imageSrc="/placeholder.svg"
+        imageAlt="Command palette demo"
+        subheading="Windsurf Command Palette: Fast, Universal, Customizable"
+        subdescription="Open files, run commands, change settings, and more—all from one place."
+        linkHref="#"
+        linkText="Palette Features →"
+      />
+      <TabSection
+        title="Instant Search: Find Anything, Instantly"
+        description="Lightning-fast search across files, symbols, and documentation. Never lose your place or your focus—just search and go."
+        imageSrc="/placeholder.svg"
+        imageAlt="Instant search demo"
+        subheading="Windsurf Search: Blazing Fast, Context Aware"
+        subdescription="Search code, docs, and more with zero lag and full context."
+        linkHref="#"
+        linkText="Search Features →"
+      />
       <Features />
       <CodeDemo />
       <CTA />

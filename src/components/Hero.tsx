@@ -64,6 +64,37 @@ const Hero = () => {
             </Button>
           </div>
 
+          {/* VS Code 5-star review */}
+          <div className="flex justify-center mb-8">
+            <div className="flex items-center gap-4 bg-slate-800/80 px-6 py-3 rounded-xl shadow-lg border border-white/10">
+              {/* VS Code Logo from provided SVG URL */}
+              <img
+                src="https://xraquejellmoyrpqcirs.supabase.co/storage/v1/object/public/softcodes-logo/vscode.svg"
+                alt="VS Code Logo"
+                className="w-10 h-10"
+                style={{ minWidth: 40, minHeight: 40 }}
+              />
+              <div className="flex flex-col items-start">
+                <div className="flex items-center mb-1">
+                  {/* 5 Stars */}
+                  <span className="flex items-center text-yellow-400">
+                    {[...Array(5)].map((_, i) => (
+                      <svg key={i} width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                        <polygon points="10,1.5 12.6,7.3 18.9,7.8 14,12.2 15.4,18.4 10,15.1 4.6,18.4 6,12.2 1.1,7.8 7.4,7.3" />
+                      </svg>
+                    ))}
+                  </span>
+                  <span className="text-white text-base font-semibold ml-2">
+                    4.8/5.0
+                  </span>
+                </div>
+                <span className="text-gray-300 text-xs font-medium">
+                  on VS Code Marketplace
+                </span>
+              </div>
+            </div>
+          </div>
+
           {/* Hero image container */}
           <div className="flex justify-center items-center my-4">
             <div className="rounded-2xl overflow-hidden shadow-lg border border-white/10 bg-white/5 backdrop-blur-sm max-w-3xl w-full">
