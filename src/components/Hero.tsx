@@ -17,7 +17,7 @@ const Hero = () => {
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }}></div>
       </div>
       
-      <div className="container mx-auto px-6 relative z-10 flex items-center justify-center min-h-full mt-24">
+      <div className="container mx-auto px-6 relative z-10 flex items-center justify-center min-h-full mt-8">
         <div className="text-center max-w-4xl mx-auto">
           {/* Welcome badge */}
           <div className="inline-block mb-8">
@@ -65,7 +65,7 @@ const Hero = () => {
           </div>
 
           {/* Hero image container */}
-          <div className="flex justify-center items-center my-8">
+          <div className="flex justify-center items-center my-4">
             <div className="rounded-2xl overflow-hidden shadow-lg border border-white/10 bg-white/5 backdrop-blur-sm max-w-3xl w-full">
               <img
                 src="/placeholder.svg"
