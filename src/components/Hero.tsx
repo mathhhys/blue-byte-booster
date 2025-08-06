@@ -57,10 +57,8 @@ const Hero = () => {
               variant="outline" 
               className="border-white/30 text-white hover:bg-white/10 px-8 py-4 text-lg font-medium rounded-lg transition-all duration-300 hover:scale-105 backdrop-blur-sm"
               size="lg"
-              onClick={() => scrollToSection("demo")}
             >
-              <Play className="w-5 h-5 mr-2" />
-              Watch Demo
+              Explore Features
             </Button>
           </div>
 
