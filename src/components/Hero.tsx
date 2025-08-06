@@ -1,103 +1,94 @@
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Play } from "lucide-react";
 
 const Hero = () => {
+  const scrollToSection = (sectionId: string) => {
+    const element = document.getElementById(sectionId);
+    if (element) {
+      element.scrollIntoView({ behavior: "smooth" });
+    }
+  };
+
   return (
-    <section className="min-h-screen flex items-center justify-center hero-gradient relative overflow-hidden">
+    <section className="min-h-screen flex items-center justify-center bg-slate-900 relative overflow-hidden pt-24">
       {/* Background decorative elements */}
-      <div className="absolute inset-0 gradient-mesh opacity-30"></div>
-      <div className="absolute top-20 left-10 w-64 h-64 bg-primary/10 rounded-full blur-3xl animate-float"></div>
-      <div className="absolute bottom-20 right-10 w-96 h-96 bg-accent/10 rounded-full blur-3xl animate-float" style={{ animationDelay: '3s' }}></div>
+      <div className="absolute inset-0">
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }}></div>
+      </div>
       
-      <div className="container mx-auto px-6 relative z-10">
-        <div className="grid lg:grid-cols-2 gap-12 items-center">
-          {/* Left side - Hero content */}
-          <div className="text-center lg:text-left">
-            <div className="inline-block mb-6">
-              <span className="glass px-4 py-2 rounded-full text-sm font-medium text-accent">
-                ✨ Now with AI Agent Mode
-              </span>
-            </div>
-            
-            <h1 className="text-5xl lg:text-7xl font-bold mb-6 leading-tight">
-              <span className="bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-                The AI Code
-              </span>
-              <br />
-              <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                Copilot
-              </span>
-            </h1>
-            
-            <p className="text-xl text-muted-foreground mb-8 max-w-2xl">
-              Built to make you extraordinarily productive. Experience the next generation 
-              of AI-powered coding with intelligent suggestions, seamless collaboration, and 
-              lightning-fast development.
-            </p>
-            
-            <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
-              <Button variant="hero" size="lg" className="text-lg px-8 py-6">
-                🍎 Download for macOS
-              </Button>
-              <Button variant="glass" size="lg" className="text-lg px-8 py-6">
-                Explore Features
-              </Button>
-            </div>
-            
-            <div className="mt-8">
-              <p className="text-sm text-muted-foreground mb-4">
-                Already have Visual Studio Code? 
-                <a href="#" className="text-primary hover:text-accent transition-colors ml-1 underline">
-                  Install Extension
-                </a>
-              </p>
+      <div className="container mx-auto px-6 relative z-10 flex items-center justify-center min-h-full">
+        <div className="text-center max-w-4xl mx-auto">
+          {/* Welcome badge */}
+          <div className="inline-block mb-8">
+            <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 px-4 py-2 rounded-full">
+              <div className="w-3 h-3 bg-green-400 rounded-full shadow-lg shadow-green-400/50 animate-pulse"></div>
+              <span className="text-white text-sm font-medium">Welcome to the Future of Coding</span>
             </div>
           </div>
           
-          {/* Right side - Code editor preview placeholder */}
-          <div className="relative">
-            <Card className="bg-card/50 border-border/50 backdrop-blur-sm">
-              <div className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex space-x-2">
-                    <div className="w-3 h-3 bg-destructive rounded-full"></div>
-                    <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-                    <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                  </div>
-                  <span className="text-xs text-muted-foreground">main.py</span>
-                </div>
-                
-                {/* Code preview placeholder */}
-                <div className="space-y-3 font-mono text-sm">
-                  <div className="text-muted-foreground"># AI-powered code suggestions</div>
-                  <div className="text-foreground">
-                    <span className="text-purple-400">def</span>{" "}
-                    <span className="text-blue-400">analyze_data</span>
-                    <span className="text-yellow-400">(</span>
-                    <span className="text-orange-400">dataset</span>
-                    <span className="text-yellow-400">):</span>
-                  </div>
-                  <div className="text-muted-foreground pl-4"># AI suggests optimal implementation</div>
-                  <div className="pl-4 bg-primary/10 p-2 rounded border-l-2 border-primary">
-                    <div className="text-sm text-primary mb-1">💡 AI Suggestion</div>
-                    <div className="text-xs text-muted-foreground">
-                      Analyzing your dataset... Suggesting pandas optimization
-                    </div>
-                  </div>
-                  <div className="text-foreground pl-4">
-                    <span className="text-purple-400">return</span>{" "}
-                    <span className="text-green-400">optimized_result</span>
-                  </div>
-                </div>
-                
-                <div className="mt-6 p-3 bg-primary/5 rounded-lg border border-primary/20">
-                  <div className="flex items-center space-x-2 text-xs">
-                    <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
-                    <span className="text-muted-foreground">AI is analyzing your code...</span>
-                  </div>
-                </div>
+          {/* Main heading */}
+          <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold mb-8 leading-tight text-center">
+            <span className="text-white">
+              Introducing
+            </span>
+            <br />
+            <span className="bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">
+              Softcodes
+            </span>
+          </h1>
+          
+          {/* Description */}
+          <p className="text-xl md:text-2xl text-gray-300 mb-12 max-w-3xl mx-auto leading-relaxed">
+            Experience the next generation of windsurfing. Book sessions, 
+            learn from experts, and enjoy premium equipment at stunning 
+            locations.
+          </p>
+          
+          {/* CTA Buttons */}
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16">
+            <Button
+              className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-4 text-lg font-medium rounded-lg transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-xl"
+              size="lg"
+            >
+              Get Started
+            </Button>
+            <Button 
+              variant="outline" 
+              className="border-white/30 text-white hover:bg-white/10 px-8 py-4 text-lg font-medium rounded-lg transition-all duration-300 hover:scale-105 backdrop-blur-sm"
+              size="lg"
+              onClick={() => scrollToSection("demo")}
+            >
+              <Play className="w-5 h-5 mr-2" />
+              Watch Demo
+            </Button>
+          </div>
+
+          {/* Feature highlights */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto">
+            <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-6 hover:bg-white/10 transition-all duration-300">
+              <div className="w-12 h-12 bg-green-500/20 rounded-lg flex items-center justify-center mb-4 mx-auto">
+                <div className="w-6 h-6 bg-green-500 rounded-full"></div>
               </div>
-            </Card>
+              <h3 className="text-white font-semibold mb-2">Intelligent AI</h3>
+              <p className="text-gray-400 text-sm">Advanced code understanding and context-aware suggestions</p>
+            </div>
+            
+            <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-6 hover:bg-white/10 transition-all duration-300">
+              <div className="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center mb-4 mx-auto">
+                <div className="w-6 h-6 bg-blue-500 rounded-full"></div>
+              </div>
+              <h3 className="text-white font-semibold mb-2">Lightning Fast</h3>
+              <p className="text-gray-400 text-sm">Sub-50ms response times for seamless coding flow</p>
+            </div>
+            
+            <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-6 hover:bg-white/10 transition-all duration-300">
+              <div className="w-12 h-12 bg-purple-500/20 rounded-lg flex items-center justify-center mb-4 mx-auto">
+                <div className="w-6 h-6 bg-purple-500 rounded-full"></div>
+              </div>
+              <h3 className="text-white font-semibold mb-2">Privacy First</h3>
+              <p className="text-gray-400 text-sm">Your code stays secure with local processing</p>
+            </div>
           </div>
         </div>
       </div>
