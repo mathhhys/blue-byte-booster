@@ -1,10 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Menu, X, ChevronDown, User } from "lucide-react";
 
 const Navigation = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -16,6 +17,61 @@ const Navigation = () => {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  // Handle keyboard navigation and focus management
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!isMobileMenuOpen) return;
+
+      switch (event.key) {
+        case 'Escape':
+          setIsMobileMenuOpen(false);
+          break;
+        case 'Tab':
+          handleTabNavigation(event);
+          break;
+      }
+    };
+
+    const handleTabNavigation = (event: KeyboardEvent) => {
+      if (!menuRef.current) return;
+
+      const focusableElements = menuRef.current.querySelectorAll(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+
+      if (focusableElements.length === 0) return;
+
+      const firstElement = focusableElements[0] as HTMLElement;
+      const lastElement = focusableElements[focusableElements.length - 1] as HTMLElement;
+
+      if (event.shiftKey && document.activeElement === firstElement) {
+        event.preventDefault();
+        lastElement.focus();
+      } else if (!event.shiftKey && document.activeElement === lastElement) {
+        event.preventDefault();
+        firstElement.focus();
+      }
+    };
+
+    if (isMobileMenuOpen) {
+      document.addEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = 'hidden';
+      
+      // Focus first interactive element after animation
+      setTimeout(() => {
+        const firstButton = menuRef.current?.querySelector('button') as HTMLElement;
+        firstButton?.focus();
+      }, 100);
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = 'unset';
+    };
+  }, [isMobileMenuOpen]);
+
   const scrollToSection = (sectionId: string) => {
     const element = document.getElementById(sectionId);
     if (element) {
@@ -24,12 +80,16 @@ const Navigation = () => {
     }
   };
 
+  const closeMobileMenu = () => {
+    setIsMobileMenuOpen(false);
+  };
+
   return (
     <>
       <nav
         className={`fixed top-0 w-full z-50 transition-all duration-300 ${
           isScrolled
-            ? "bg-white/95 backdrop-blur-md border-b border-gray-200/50 shadow-sm"
+            ? "navbar-scrolled-bg backdrop-blur-md border-b border-gray-200/50 shadow-sm"
             : "bg-slate-900"
         }`}
       >
@@ -119,15 +179,19 @@ const Navigation = () => {
 
             {/* Mobile Menu Button */}
             <button
-              className="md:hidden p-2"
+              className="md:hidden p-2 min-h-[44px] min-w-[44px] flex items-center justify-center"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              aria-label="Toggle mobile menu"
+              aria-label={isMobileMenuOpen ? "Close mobile menu" : "Open mobile menu"}
+              aria-expanded={isMobileMenuOpen}
+              aria-controls="mobile-menu"
             >
-              {isMobileMenuOpen ? (
-                <X className={`w-6 h-6 ${isScrolled ? "text-gray-700" : "text-white"}`} />
-              ) : (
-                <Menu className={`w-6 h-6 ${isScrolled ? "text-gray-700" : "text-white"}`} />
-              )}
+              <div className="relative w-6 h-6 flex items-center justify-center">
+                <div className={`hamburger-icon ${isMobileMenuOpen ? 'open' : ''}`}>
+                  <span className={`hamburger-line ${isScrolled ? "bg-gray-700" : "bg-white"}`}></span>
+                  <span className={`hamburger-line ${isScrolled ? "bg-gray-700" : "bg-white"}`}></span>
+                  <span className={`hamburger-line ${isScrolled ? "bg-gray-700" : "bg-white"}`}></span>
+                </div>
+              </div>
             </button>
           </div>
         </div>
@@ -135,49 +199,86 @@ const Navigation = () => {
 
       {/* Mobile Menu Overlay */}
       {isMobileMenuOpen && (
-        <div className="fixed inset-0 z-40 md:hidden">
+        <div
+          ref={menuRef}
+          className={`fixed inset-0 z-50 md:hidden mobile-menu-overlay ${isMobileMenuOpen ? 'animate-in' : 'animate-out'}`}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="mobile-menu-title"
+          aria-describedby="mobile-menu-description"
+          id="mobile-menu"
+        >
+          <h2 id="mobile-menu-title" className="sr-only">
+            Navigation Menu
+          </h2>
+          <p id="mobile-menu-description" className="sr-only">
+            Main navigation menu with links to different sections
+          </p>
+          
+          {/* Backdrop */}
           <div
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-            onClick={() => setIsMobileMenuOpen(false)}
+            className="absolute inset-0 bg-[#101828] transition-none"
+            onClick={closeMobileMenu}
+            aria-hidden="true"
           />
-          <div className="absolute top-0 right-0 w-80 h-full bg-white shadow-xl">
-            <div className="flex flex-col p-6 pt-20 space-y-8">
-              <div className="space-y-6">
-                <button
-                  onClick={() => scrollToSection("features")}
-                  className="block text-left text-lg font-medium text-gray-700 hover:text-blue-600 transition-colors"
-                >
-                  FEATURES
-                </button>
-                <button
-                  onClick={() => scrollToSection("pricing")}
-                  className="block text-left text-lg font-medium text-gray-700 hover:text-blue-600 transition-colors"
-                >
-                  PRICING
-                </button>
-                <button
-                  onClick={() => scrollToSection("blog")}
-                  className="block text-left text-lg font-medium text-gray-700 hover:text-blue-600 transition-colors"
-                >
-                  BLOG
-                </button>
-                <button className="block text-left text-lg font-medium text-gray-700 hover:text-blue-600 transition-colors">
-                  RESOURCES
-                </button>
-                <button className="block text-left text-lg font-medium text-gray-700 hover:text-blue-600 transition-colors">
-                  COMPANY
-                </button>
-              </div>
-              
-              <div className="pt-6 border-t border-gray-200 space-y-4">
-                <button className="flex items-center justify-center w-full p-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-                  <User className="w-5 h-5 text-gray-600 mr-2" />
-                  Sign In
-                </button>
-                <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground py-3 rounded-lg font-medium">
-                  GET STARTED
-                </Button>
-              </div>
+          
+          {/* Menu Content */}
+          <div className={`mobile-menu-content ${isMobileMenuOpen ? 'slide-in' : 'slide-out'} flex flex-col h-full justify-start pt-12 px-8`}>
+            {/* Close Button */}
+            <button
+              className="absolute top-6 right-6 p-2 text-gray-300 min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors duration-200 hover:text-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-[#101828] rounded-lg"
+              onClick={closeMobileMenu}
+              aria-label="Close mobile menu"
+            >
+              <X className="w-7 h-7" />
+            </button>
+
+            {/* Navigation Items */}
+            <nav role="navigation" aria-label="Mobile navigation" className="flex flex-col items-center justify-center space-y-10 mt-2 w-full">
+              <button
+                onClick={() => scrollToSection("features")}
+                className="w-full flex justify-center text-2xl font-semibold tracking-wide text-gray-200 hover:text-white transition-colors focus:outline-none text-center"
+                style={{ letterSpacing: "0.02em" }}
+              >
+                FEATURES
+              </button>
+              <button
+                onClick={() => scrollToSection("pricing")}
+                className="w-full flex justify-center text-2xl font-semibold tracking-wide text-gray-200 hover:text-white transition-colors focus:outline-none text-center"
+                style={{ letterSpacing: "0.02em" }}
+              >
+                PRICING
+              </button>
+              <button
+                onClick={() => scrollToSection("blog")}
+                className="w-full flex justify-center text-2xl font-semibold tracking-wide text-gray-200 hover:text-white transition-colors focus:outline-none text-center"
+                style={{ letterSpacing: "0.02em" }}
+              >
+                BLOG
+              </button>
+              <button className="w-full flex justify-center items-center text-2xl font-semibold tracking-wide text-gray-200 hover:text-white transition-colors focus:outline-none text-center"
+                style={{ letterSpacing: "0.02em" }}>
+                RESOURCES
+                <ChevronDown className="ml-2 w-6 h-6 text-gray-400" />
+              </button>
+              <button className="w-full flex justify-center items-center text-2xl font-semibold tracking-wide text-gray-200 hover:text-white transition-colors focus:outline-none text-center"
+                style={{ letterSpacing: "0.02em" }}>
+                COMPANY
+                <ChevronDown className="ml-2 w-6 h-6 text-gray-400" />
+              </button>
+            </nav>
+
+            {/* Divider */}
+            <div className="w-full border-t border-gray-700 my-10" />
+
+            {/* Action Buttons */}
+            <div className="flex flex-col w-full space-y-4">
+              <button className="w-full border border-blue-600 text-blue-600 bg-transparent rounded-xl py-3 text-lg font-medium transition-colors hover:bg-blue-950 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-[#101828]">
+                Sign In
+              </button>
+              <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl py-3 text-lg font-semibold transition-colors shadow-none focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-[#101828]">
+                GET STARTED
+              </Button>
             </div>
           </div>
         </div>
