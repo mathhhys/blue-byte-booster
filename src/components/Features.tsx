@@ -7,11 +7,13 @@ const Features = () => {
       className="w-full bg-[#101624] py-24 px-4 md:px-0"
       style={{ minHeight: "80vh" }}
     >
+      {/* Major Provider Supported section */}
+      <ModelProvidersSection />
       <div className="max-w-6xl mx-auto flex flex-col gap-14">
         {/* Top row: Heading, Subheading, Button */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-8 mb-12">
           <div>
-            <h2 className="text-4xl md:text-5xl font-bold text-white mb-4">
+            <h2 className="text-4xl md:text-5xl font-bold text-white mb-4 mt-20">
               Build software faster
             </h2>
             <p className="text-lg md:text-xl text-gray-300">
@@ -134,12 +136,4 @@ export const ModelProvidersSection = () => (
   </section>
 );
 
-// Append the new section after Features
-const FeaturesWithProviders = () => (
-  <>
-    <Features />
-    <ModelProvidersSection />
-  </>
-);
-
-export default FeaturesWithProviders;
+export default Features;
