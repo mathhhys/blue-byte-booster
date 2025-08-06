@@ -125,7 +125,7 @@ const Navigation = () => {
                   isScrolled ? "text-gray-700" : "text-white"
                 }`}
               >
-                FEATURES
+                PRICING
               </button>
               <button
                 onClick={() => scrollToSection("pricing")}
@@ -133,7 +133,15 @@ const Navigation = () => {
                   isScrolled ? "text-gray-700" : "text-white"
                 }`}
               >
-                PRICING
+                FEATURES
+              </button>
+              <button
+                onClick={() => scrollToSection("blog")}
+                className={`text-sm font-medium transition-colors hover:text-blue-600 ${
+                  isScrolled ? "text-gray-700" : "text-white"
+                }`}
+              >
+                ENTERPRISE
               </button>
               <button
                 onClick={() => scrollToSection("blog")}
@@ -149,18 +157,7 @@ const Navigation = () => {
                     isScrolled ? "text-gray-700" : "text-white"
                   }`}
                 >
-                  RESOURCES
-                  <ChevronDown className="ml-1 w-4 h-4" />
-                </button>
-              </div>
-              <div className="relative group">
-                <button
-                  className={`flex items-center text-sm font-medium transition-colors hover:text-blue-600 ${
-                    isScrolled ? "text-gray-700" : "text-white"
-                  }`}
-                >
-                  COMPANY
-                  <ChevronDown className="ml-1 w-4 h-4" />
+                  DOCS
                 </button>
               </div>
             </div>
@@ -234,37 +231,41 @@ const Navigation = () => {
             </button>
 
             {/* Navigation Items */}
-            <nav role="navigation" aria-label="Mobile navigation" className="flex flex-col items-center justify-center space-y-10 mt-2 w-full">
-              <button
-                onClick={() => scrollToSection("features")}
-                className="w-full flex justify-center text-2xl font-semibold tracking-wide text-gray-200 hover:text-white transition-colors focus:outline-none text-center"
-                style={{ letterSpacing: "0.02em" }}
-              >
-                FEATURES
-              </button>
+            <nav role="navigation" aria-label="Mobile navigation" className="flex flex-col items-center justify-center space-y-8 mt-10 w-full min-h-[40vh]">
               <button
                 onClick={() => scrollToSection("pricing")}
-                className="w-full flex justify-center text-2xl font-semibold tracking-wide text-gray-200 hover:text-white transition-colors focus:outline-none text-center"
+                className="w-full flex justify-center text-xl font-bold tracking-wide text-gray-200 hover:text-white transition-colors focus:outline-none text-center"
                 style={{ letterSpacing: "0.02em" }}
               >
                 PRICING
               </button>
               <button
+                onClick={() => scrollToSection("features")}
+                className="w-full flex justify-center text-xl font-bold tracking-wide text-gray-200 hover:text-white transition-colors focus:outline-none text-center"
+                style={{ letterSpacing: "0.02em" }}
+              >
+                FEATURES
+              </button>
+              <button
+                onClick={() => scrollToSection("enterprise")}
+                className="w-full flex justify-center text-xl font-bold tracking-wide text-gray-200 hover:text-white transition-colors focus:outline-none text-center"
+                style={{ letterSpacing: "0.02em" }}
+              >
+                ENTERPRISE
+              </button>
+              <button
                 onClick={() => scrollToSection("blog")}
-                className="w-full flex justify-center text-2xl font-semibold tracking-wide text-gray-200 hover:text-white transition-colors focus:outline-none text-center"
+                className="w-full flex justify-center text-xl font-bold tracking-wide text-gray-200 hover:text-white transition-colors focus:outline-none text-center"
                 style={{ letterSpacing: "0.02em" }}
               >
                 BLOG
               </button>
-              <button className="w-full flex justify-center items-center text-2xl font-semibold tracking-wide text-gray-200 hover:text-white transition-colors focus:outline-none text-center"
-                style={{ letterSpacing: "0.02em" }}>
-                RESOURCES
-                <ChevronDown className="ml-2 w-6 h-6 text-gray-400" />
-              </button>
-              <button className="w-full flex justify-center items-center text-2xl font-semibold tracking-wide text-gray-200 hover:text-white transition-colors focus:outline-none text-center"
-                style={{ letterSpacing: "0.02em" }}>
-                COMPANY
-                <ChevronDown className="ml-2 w-6 h-6 text-gray-400" />
+              <button
+                onClick={() => scrollToSection("documentation")}
+                className="w-full flex justify-center text-xl font-bold tracking-wide text-gray-200 hover:text-white transition-colors focus:outline-none text-center"
+                style={{ letterSpacing: "0.02em" }}
+              >
+                DOCUMENTATION
               </button>
             </nav>
 
