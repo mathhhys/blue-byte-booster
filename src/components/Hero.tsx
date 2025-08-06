@@ -17,7 +17,7 @@ const Hero = () => {
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }}></div>
       </div>
       
-      <div className="container mx-auto px-6 relative z-10 flex items-center justify-center min-h-full">
+      <div className="container mx-auto px-6 relative z-10 flex items-center justify-center min-h-full mt-24">
         <div className="text-center max-w-4xl mx-auto">
           {/* Welcome badge */}
           <div className="inline-block mb-8">
@@ -33,7 +33,7 @@ const Hero = () => {
               Introducing
             </span>
             <br />
-            <span className="bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">
+            <span className="text-white mt-0">
               Softcodes
             </span>
           </h1>
@@ -64,30 +64,14 @@ const Hero = () => {
             </Button>
           </div>
 
-          {/* Feature highlights */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto">
-            <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-6 hover:bg-white/10 transition-all duration-300">
-              <div className="w-12 h-12 bg-green-500/20 rounded-lg flex items-center justify-center mb-4 mx-auto">
-                <div className="w-6 h-6 bg-green-500 rounded-full"></div>
-              </div>
-              <h3 className="text-white font-semibold mb-2">Intelligent AI</h3>
-              <p className="text-gray-400 text-sm">Advanced code understanding and context-aware suggestions</p>
-            </div>
-            
-            <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-6 hover:bg-white/10 transition-all duration-300">
-              <div className="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center mb-4 mx-auto">
-                <div className="w-6 h-6 bg-blue-500 rounded-full"></div>
-              </div>
-              <h3 className="text-white font-semibold mb-2">Lightning Fast</h3>
-              <p className="text-gray-400 text-sm">Sub-50ms response times for seamless coding flow</p>
-            </div>
-            
-            <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-6 hover:bg-white/10 transition-all duration-300">
-              <div className="w-12 h-12 bg-purple-500/20 rounded-lg flex items-center justify-center mb-4 mx-auto">
-                <div className="w-6 h-6 bg-purple-500 rounded-full"></div>
-              </div>
-              <h3 className="text-white font-semibold mb-2">Privacy First</h3>
-              <p className="text-gray-400 text-sm">Your code stays secure with local processing</p>
+          {/* Hero image container */}
+          <div className="flex justify-center items-center my-8">
+            <div className="rounded-2xl overflow-hidden shadow-lg border border-white/10 bg-white/5 backdrop-blur-sm max-w-3xl w-full">
+              <img
+                src="/placeholder.svg"
+                alt="Windsurfing Hero"
+                className="w-full h-80 object-cover"
+              />
             </div>
           </div>
         </div>
