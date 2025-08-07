@@ -2,6 +2,7 @@ import Navigation from "@/components/Navigation";
 import Hero from "@/components/Hero";
 import TabSection from "@/components/TabSection";
 import Features from "@/components/Features";
+import FeatureShowcase from "@/components/FeatureShowcase";
 import CodeDemo from "@/components/CodeDemo";
 import CTA from "@/components/CTA";
 import Footer from "@/components/Footer";
@@ -42,6 +43,7 @@ const Index = () => {
         linkText="Search Features →"
       />
       <Features />
+      <FeatureShowcase />
       <Footer />
     </div>
   );
