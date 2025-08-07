@@ -42,8 +42,6 @@ const Index = () => {
         linkText="Search Features →"
       />
       <Features />
-      <CodeDemo />
-      <CTA />
       <Footer />
     </div>
   );

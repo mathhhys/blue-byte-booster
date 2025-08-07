@@ -6,7 +6,7 @@ const Footer = () => {
           <div className="space-y-4">
             <div className="flex items-center space-x-2">
               <div className="w-8 h-8 bg-primary rounded-lg animate-glow"></div>
-              <span className="text-xl font-bold text-foreground">AICode</span>
+              <span className="text-xl font-bold text-foreground">Softcodes</span>
             </div>
             <p className="text-muted-foreground text-sm">
               The next generation AI coding copilot that makes you extraordinarily productive.
@@ -46,7 +46,7 @@ const Footer = () => {
         
         <div className="border-t border-border mt-12 pt-8 flex flex-col md:flex-row justify-between items-center">
           <p className="text-sm text-muted-foreground">
-            © 2024 AICode. All rights reserved.
+            © 2025 Softcodes. All rights reserved.
           </p>
           <div className="flex space-x-6 mt-4 md:mt-0">
             <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
