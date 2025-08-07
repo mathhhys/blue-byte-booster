@@ -312,4 +312,27 @@ All colors MUST be HSL.
 /* Smooth transitions for all interactive elements */
 .feature-card * {
   transition: all 0.3s ease;
+/* Vibrant halo effect for the most popular pricing card */
+.pricing-halo {
+  position: relative;
+  z-index: 0;
+}
+.pricing-halo::before {
+  content: "";
+  position: absolute;
+  top: -18px;
+  left: -18px;
+  right: -18px;
+  bottom: -18px;
+  border-radius: 1.25rem;
+  background: radial-gradient(circle, #0052cc 0%, #0052cc33 60%, transparent 100%);
+  filter: blur(8px);
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.85;
+  transition: opacity 0.3s;
+}
+.pricing-halo:hover::before {
+  opacity: 1;
+}
 }

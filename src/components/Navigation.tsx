@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Menu, X, ChevronDown, User } from "lucide-react";
 
@@ -119,14 +120,15 @@ const Navigation = () => {
 
             {/* Desktop Navigation */}
             <div className="hidden md:flex items-center space-x-8">
-              <button
-                onClick={() => scrollToSection("features")}
+              <Link
+                to="/pricing"
                 className={`text-sm font-medium transition-colors hover:text-blue-600 ${
                   isScrolled ? "text-gray-700" : "text-white"
                 }`}
+                style={{ textDecoration: "none" }}
               >
                 PRICING
-              </button>
+              </Link>
               <button
                 onClick={() => scrollToSection("pricing")}
                 className={`text-sm font-medium transition-colors hover:text-blue-600 ${
@@ -232,13 +234,14 @@ const Navigation = () => {
 
             {/* Navigation Items */}
             <nav role="navigation" aria-label="Mobile navigation" className="flex flex-col items-center justify-center space-y-8 mt-10 w-full min-h-[40vh]">
-              <button
-                onClick={() => scrollToSection("pricing")}
+              <Link
+                to="/pricing"
                 className="w-full flex justify-center text-xl font-bold tracking-wide text-gray-200 hover:text-white transition-colors focus:outline-none text-center"
-                style={{ letterSpacing: "0.02em" }}
+                style={{ letterSpacing: "0.02em", textDecoration: "none" }}
+                onClick={closeMobileMenu}
               >
                 PRICING
-              </button>
+              </Link>
               <button
                 onClick={() => scrollToSection("features")}
                 className="w-full flex justify-center text-xl font-bold tracking-wide text-gray-200 hover:text-white transition-colors focus:outline-none text-center"
