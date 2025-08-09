@@ -98,7 +98,7 @@ const Navigation = () => {
           <div className="flex items-center justify-between">
             {/* Logo */}
             <div className="flex items-center">
-              <div className="relative w-auto h-6 overflow-hidden">
+              <Link to="/" className="relative w-auto h-6 overflow-hidden" style={{ display: "inline-block" }}>
                 <img
                   src="https://xraquejellmoyrpqcirs.supabase.co/storage/v1/object/public/softcodes-logo/softcodes%20logo%20navbar%20desktop%20not%20scrolled.svg"
                   alt="Softcodes Logo"
@@ -115,7 +115,7 @@ const Navigation = () => {
                   }`}
                   loading="eager"
                 />
-              </div>
+              </Link>
             </div>
 
             {/* Desktop Navigation */}

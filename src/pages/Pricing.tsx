@@ -241,27 +241,27 @@ export default function Pricing() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="text-left py-4 px-6 font-semibold text-foreground">Features</th>
-                  <th className="text-center py-4 px-6 font-semibold text-foreground">Pro</th>
-                  <th className="text-center py-4 px-6 font-semibold text-foreground">Teams</th>
-                  <th className="text-center py-4 px-6 font-semibold text-foreground">Enterprise</th>
+            <table className="w-full border border-gray-700 border-collapse shadow-lg">
+              <thead className="bg-gray-800">
+                <tr className="border-b border-gray-700">
+                  <th className="text-left py-4 px-6 font-bold text-white uppercase tracking-wide border-r border-gray-700">Features</th>
+                  <th className="text-center py-4 px-6 font-bold text-white uppercase tracking-wide border-r border-gray-700">Pro</th>
+                  <th className="text-center py-4 px-6 font-bold text-white uppercase tracking-wide border-r border-gray-700">Teams</th>
+                  <th className="text-center py-4 px-6 font-bold text-white uppercase tracking-wide">Enterprise</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="bg-gray-900 divide-y divide-gray-700">
                 {comparisonFeatures.map((category) => (
                   <React.Fragment key={category.category}>
-                    <tr className="bg-muted/50">
-                      <td colSpan={4} className="py-3 px-6 font-semibold text-foreground text-sm uppercase tracking-wide">
-                        {category.category}
-                      </td>
-                    </tr>
+                    <tr className="bg-gray-800/70">
+                              <td colSpan={4} className="py-3 px-6 font-semibold text-white text-sm uppercase tracking-wide border-b border-gray-700">
+                                {category.category}
+                              </td>
+                            </tr>
                     {category.features.map((feature, index) => (
                       <tr key={index} className="border-b border-border/50">
-                        <td className="py-4 px-6 text-foreground">{feature.name}</td>
-                        <td className="py-4 px-6 text-center">
+                        <td className="py-4 px-6 text-gray-200 border-r border-gray-700">{feature.name}</td>
+                        <td className="py-4 px-6 text-center border-r border-gray-700">
                           {typeof feature.pro === 'boolean' ? (
                             feature.pro ? (
                               <Check className="w-5 h-5 text-primary mx-auto" />
@@ -272,7 +272,7 @@ export default function Pricing() {
                             <span className="text-foreground">{feature.pro}</span>
                           )}
                         </td>
-                        <td className="py-4 px-6 text-center">
+                        <td className="py-4 px-6 text-center border-r border-gray-700">
                           {typeof feature.teams === 'boolean' ? (
                             feature.teams ? (
                               <Check className="w-5 h-5 text-primary mx-auto" />

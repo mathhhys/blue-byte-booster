@@ -32,17 +32,20 @@ export const PricingSection = () => {
         "Access to Bugbot", 
         "Access to maximum context windows"
       ],
-      buttonText: "Get Pro",
+      buttonText: "Get Softcodes Pro",
       buttonIcon: ArrowRight,
       buttonVariant: "default" as const,
       isPopular: true
     },
     {
       name: "Teams",
-      price: { monthly: 200, yearly: 160 },
+      price: { monthly: 30, yearly: 24 },
       description: "20x usage on all OpenAI/Claude/Gemini models",
       features: [
-        "Priority access to new features"
+        "Automated zero data retention",
+        "Centralized Billing",
+        "Admin dashboard with analytics",
+        "Priority support"
       ],
       buttonText: "Get Softcodes for Teams",
       buttonIcon: ArrowRight,
