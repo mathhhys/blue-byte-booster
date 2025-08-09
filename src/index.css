@@ -335,4 +335,88 @@ All colors MUST be HSL.
 .pricing-halo:hover::before {
   opacity: 1;
 }
+
+/* Enhanced Feature Showcase Styles */
+.endless-capabilities-section {
+  background: #0F1629;
+}
+
+.feature-card-enhanced {
+  background: #F5F1E8;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.feature-card-enhanced:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+}
+
+.carousel-navigation-button {
+  background: white;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transition: all 0.2s ease;
+}
+
+.carousel-navigation-button:hover {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  transform: translateY(-1px);
+}
+
+.carousel-navigation-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.slide-indicator {
+  transition: all 0.2s ease;
+}
+
+.slide-indicator.active {
+  background: white;
+}
+
+.slide-indicator.inactive {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Code demo syntax highlighting */
+.code-demo {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+/* Smooth carousel transitions */
+.carousel-wrapper {
+  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Focus styles for accessibility */
+.feature-card-enhanced:focus {
+  outline: 2px solid #4FFFDF;
+  outline-offset: 2px;
+}
+
+/* Responsive carousel adjustments */
+@media (max-width: 768px) {
+  .endless-capabilities-section h2 {
+    font-size: 2.5rem;
+  }
+  
+  .feature-card-enhanced {
+    height: 450px !important;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+  .endless-capabilities-section h2 {
+    font-size: 3rem;
+  }
+}
+
+@media (min-width: 1025px) {
+  .endless-capabilities-section h2 {
+    font-size: 3.75rem;
+  }
+}
 }
