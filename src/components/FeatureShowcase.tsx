@@ -1,13 +1,21 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { 
-  AlertTriangle, 
-  Layers3, 
-  ArrowRight, 
-  Sparkles, 
+import {
+  AlertTriangle,
+  Layers3,
+  ArrowRight,
+  Sparkles,
   Edit3,
   ChevronLeft,
-  ChevronRight 
+  ChevronRight
 } from 'lucide-react';
+import {
+  EnhancedCard,
+  EnhancedCardHeader,
+  EnhancedCardTitle,
+  EnhancedCardDescription,
+  EnhancedCardDemo,
+  EnhancedCardIcon
+} from './ui/enhanced-card';
 
 interface FeatureData {
   id: string;
@@ -16,42 +24,25 @@ interface FeatureData {
   description: string;
   codeDemo: React.ReactNode;
 }
-
-const enhancedFeatures: FeatureData[] = [
+ 
+const baseFeatures: FeatureData[] = [
   {
     id: 'linter-integration',
     icon: AlertTriangle,
     title: 'Linter Integration',
     description: 'If Cascade generates code that doesn\'t pass a linter, then Cascade will automatically fix the errors',
     codeDemo: (
-      <div className="bg-[#1a1a1a] rounded-lg p-4 text-xs font-mono">
-        <div className="flex items-center gap-2 mb-2">
-          <div className="w-3 h-3 rounded-full bg-red-500"></div>
-          <span className="text-white">Edited</span>
-          <span className="text-gray-400">panel.ts</span>
-          <span className="text-green-400 ml-auto">+21 -12</span>
-          <span className="text-blue-400">Open diff</span>
-        </div>
-        <div className="flex items-center gap-2 mb-2">
-          <AlertTriangle size={12} className="text-yellow-400" />
-          <span className="text-yellow-400">1 new lint error</span>
-          <span className="bg-blue-600 text-white px-2 py-1 rounded text-xs ml-auto">Auto-fix on</span>
-        </div>
-        <div className="text-gray-400 text-xs">
-          I notice there's a syntax error in the panel.ts changes.<br/>
-          Let me fix that and then explain the theming function.
-        </div>
-        <div className="flex items-center gap-2 mt-2">
-          <div className="w-3 h-3 rounded-full bg-green-500"></div>
-          <span className="text-white">Edited</span>
-          <span className="text-gray-400">panel.ts</span>
-          <span className="text-green-400 ml-auto">+13</span>
-          <span className="text-blue-400">Open diff</span>
-        </div>
-        <div className="text-gray-400 text-xs mt-2">
-          No credits consumed by purely lint-fixing edit
-        </div>
-      </div>
+      <img
+        alt="An image for a fake blog post titled Linter Integration"
+        loading="lazy"
+        width="666"
+        height="496"
+        decoding="async"
+        data-nimg="1"
+        className="-mb-3 h-auto w-full pl-5"
+        src="/linter-integration.png"
+        style={{ color: 'transparent' }}
+      />
     )
   },
   {
@@ -60,24 +51,17 @@ const enhancedFeatures: FeatureData[] = [
     title: 'Model Context Protocol (MCP)',
     description: 'Enhance your AI workflows by connecting to custom tools and services',
     codeDemo: (
-      <div className="bg-[#1a1a1a] rounded-lg p-4 text-xs">
-        <div className="flex items-center gap-2 mb-3">
-          <div className="w-2 h-2 rounded-full bg-green-400"></div>
-          <span className="text-white font-medium">google-maps</span>
-          <span className="text-gray-400">2 tools</span>
-        </div>
-        <div className="flex items-center gap-2 mb-2">
-          <div className="w-6 h-6 bg-blue-600 rounded flex items-center justify-center">
-            <span className="text-white text-xs">🗺</span>
-          </div>
-          <span className="text-blue-400">1 available MCP server</span>
-          <span className="text-gray-400 ml-auto">Refresh</span>
-          <span className="text-blue-400">Configure</span>
-        </div>
-        <div className="bg-gray-800 rounded p-2 text-gray-300 text-xs">
-          MCP Server (MCP) is providing tools: places
-        </div>
-      </div>
+      <img
+        alt="An image for a fake blog post titled MCP Protocol"
+        loading="lazy"
+        width="666"
+        height="496"
+        decoding="async"
+        data-nimg="1"
+        className="-mb-3 h-auto w-full pl-5"
+        src="/linter-integration.png"
+        style={{ color: 'transparent' }}
+      />
     )
   },
   {
@@ -86,50 +70,36 @@ const enhancedFeatures: FeatureData[] = [
     title: 'Tab to Jump',
     description: 'Predicts the next location of your cursor to seamlessly navigate through the file',
     codeDemo: (
-      <div className="bg-[#1a1a1a] rounded-lg p-4 text-xs font-mono">
-        <div className="text-gray-400 mb-2">
-          <span className="text-blue-400">const</span> <span className="text-white">columnMapping</span> = {'{'}
-        </div>
-        <div className="text-gray-400 ml-4 mb-1">
-          <span className="text-green-400">'user_id'</span>: <span className="text-green-400">'userId'</span>,
-        </div>
-        <div className="text-gray-400 ml-4 mb-1">
-          <span className="text-green-400">'created_at'</span>: <span className="text-green-400">'createdAt'</span>,
-        </div>
-        <div className="text-gray-400 ml-4 mb-1">
-          <span className="text-green-400">'updated_at'</span>: <span className="text-green-400">'updatedAt'</span>,
-        </div>
-        <div className="text-gray-400">{'}'}</div>
-        <div className="flex items-center gap-2 mt-4 bg-blue-900/30 rounded px-2 py-1">
-          <ArrowRight size={12} className="text-blue-400" />
-          <span className="text-blue-400 font-medium">tab to jump</span>
-        </div>
-      </div>
+      <img
+        alt="An image for a fake blog post titled Tab to Jump"
+        loading="lazy"
+        width="666"
+        height="496"
+        decoding="async"
+        data-nimg="1"
+        className="-mb-3 h-auto w-full pl-5"
+        src="/linter-integration.png"
+        style={{ color: 'transparent' }}
+      />
     )
   },
   {
     id: 'supercomplete',
     icon: Sparkles,
     title: 'Supercomplete',
-    description: 'Supercomplete analyzes what your next action might be, beyond just inserting the next code snippet',
+    description: 'Supercomplete analyzes what your next action might be, beyond just inserting a code snippet',
     codeDemo: (
-      <div className="bg-[#1a1a1a] rounded-lg p-4 text-xs font-mono">
-        <div className="text-gray-400 mb-2">
-          <span className="text-purple-400">created_at</span> = <span className="text-blue-400">Column</span>(<span className="text-blue-400">DateTime</span>, <span className="text-orange-400">default</span>=<span className="text-orange-400">datetime.utcnow</span>)
-        </div>
-        <div className="text-gray-400 mb-2">
-          <span className="text-purple-400">updated_at</span> = <span className="text-blue-400">Column</span>(<span className="text-blue-400">DateTime</span>, <span className="text-orange-400">default</span>=<span className="text-orange-400">datetime.utcnow</span>)
-        </div>
-        <div className="text-gray-400 mb-4">
-          # Add relationships
-        </div>
-        <div className="text-gray-400 mb-2">
-          <span className="text-purple-400">user</span> = <span className="text-blue-400">relationship</span>(<span className="text-green-400">"User"</span>, <span className="text-orange-400">back_populates</span>=<span className="text-green-400">"email"</span>: <span className="text-orange-400">self.email</span>,
-        </div>
-        <div className="text-gray-400 ml-8">
-          <span className="text-green-400">"created_at"</span>: <span className="text-orange-400">self.created_at</span>
-        </div>
-      </div>
+      <img
+        alt="An image for a fake blog post titled Supercomplete"
+        loading="lazy"
+        width="666"
+        height="496"
+        decoding="async"
+        data-nimg="1"
+        className="-mb-3 h-auto w-full pl-5"
+        src="/linter-integration.png"
+        style={{ color: 'transparent' }}
+      />
     )
   },
   {
@@ -138,29 +108,25 @@ const enhancedFeatures: FeatureData[] = [
     title: 'In-line Edit',
     description: 'Precise inline editing capabilities for seamless code modifications',
     codeDemo: (
-      <div className="bg-[#1a1a1a] rounded-lg p-4 text-xs font-mono">
-        <div className="text-gray-400 mb-2">
-          <span className="text-blue-400">function</span> <span className="text-yellow-400">processData</span>(<span className="text-orange-400">data</span>) {'{'}
-        </div>
-        <div className="text-gray-400 ml-4 mb-1">
-          <span className="text-blue-400">return</span> <span className="text-orange-400">data</span>.<span className="text-yellow-400">map</span>(<span className="text-orange-400">item</span> =&gt; {'{'})
-        </div>
-        <div className="text-gray-400 ml-8 mb-1">
-          <span className="text-blue-400">return</span> {'{'}
-        </div>
-        <div className="text-gray-400 ml-12 mb-1">
-          <span className="text-green-400">id</span>: <span className="text-orange-400">item</span>.<span className="text-green-400">id</span>,
-        </div>
-        <div className="text-gray-400 ml-12 mb-1">
-          <span className="text-green-400">name</span>: <span className="text-orange-400">item</span>.<span className="text-green-400">name</span>.<span className="text-yellow-400">toUpperCase</span>(),
-        </div>
-        <div className="text-gray-400 ml-8 mb-1">{'}'}</div>
-        <div className="text-gray-400 ml-4 mb-1">{'}'});</div>
-        <div className="text-gray-400">{'}'}</div>
-      </div>
+      <img
+        alt="An image for a fake blog post titled In-line Edit"
+        loading="lazy"
+        width="666"
+        height="496"
+        decoding="async"
+        data-nimg="1"
+        className="-mb-3 h-auto w-full pl-5"
+        src="/linter-integration.png"
+        style={{ color: 'transparent' }}
+      />
     )
   }
 ];
+
+const enhancedFeatures: FeatureData[] = Array.from({ length: 9 }).map((_, i) => {
+  const feature = baseFeatures[i % baseFeatures.length];
+  return { ...feature, id: `${feature.id}-${i}` };
+});
 
 const EnhancedFeatureShowcase: React.FC = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -169,14 +135,15 @@ const EnhancedFeatureShowcase: React.FC = () => {
   // Update visible cards based on screen size
   useEffect(() => {
     const updateVisibleCards = () => {
-      if (window.innerWidth < 768) {
+      if (window.innerWidth < 640) {
         setVisibleCards(1);
       } else if (window.innerWidth < 1024) {
         setVisibleCards(2);
       } else {
-        setVisibleCards(5);
+        setVisibleCards(3);
       }
     };
+    // Ensure fluid scaling of card widths with breakpoints
 
     updateVisibleCards();
     window.addEventListener('resize', updateVisibleCards);
@@ -197,6 +164,43 @@ const EnhancedFeatureShowcase: React.FC = () => {
     });
   }, [visibleCards]);
 
+  // Swipe gesture support
+  useEffect(() => {
+    let startX: number | null = null;
+    let endX: number | null = null;
+    const handleTouchStart = (e: TouchEvent) => {
+      startX = e.touches[0].clientX;
+    };
+    const handleTouchMove = (e: TouchEvent) => {
+      endX = e.touches[0].clientX;
+    };
+    const handleTouchEnd = () => {
+      if (startX !== null && endX !== null) {
+        const deltaX = startX - endX;
+        if (deltaX > 50) {
+          nextSlide();
+        } else if (deltaX < -50) {
+          prevSlide();
+        }
+      }
+      startX = null;
+      endX = null;
+    };
+    const carousel = document.querySelector('.carousel-wrapper');
+    if (carousel) {
+      carousel.addEventListener('touchstart', handleTouchStart);
+      carousel.addEventListener('touchmove', handleTouchMove);
+      carousel.addEventListener('touchend', handleTouchEnd);
+    }
+    return () => {
+      if (carousel) {
+        carousel.removeEventListener('touchstart', handleTouchStart);
+        carousel.removeEventListener('touchmove', handleTouchMove);
+        carousel.removeEventListener('touchend', handleTouchEnd);
+      }
+    };
+  }, [nextSlide, prevSlide]);
+
   // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -211,7 +215,8 @@ const EnhancedFeatureShowcase: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [nextSlide, prevSlide]);
 
-  const cardWidth = 100 / visibleCards;
+  // Show partial next card by reducing width slightly
+  const cardWidth = 95 / visibleCards;
   const translateX = -(currentIndex * cardWidth);
 
   return (
@@ -225,9 +230,9 @@ const EnhancedFeatureShowcase: React.FC = () => {
         <div className="text-center mb-16">
           <p 
             className="text-sm font-medium uppercase tracking-wider mb-6"
-            style={{ color: '#4FFFDF' }}
+            style={{ color: '#0052CC' }}
           >
-            NOT JUST THE BEST AI-POWERED EDITOR, BUT THE BEST EDITOR — PERIOD
+            NOT JUST THE BEST AI-POWERED PLUGIN, BUT THE BEST COPILOT
           </p>
           <h2 
             id="endless-capabilities-title"
@@ -252,43 +257,35 @@ const EnhancedFeatureShowcase: React.FC = () => {
                   key={feature.id}
                   className="flex-shrink-0 px-3"
                   style={{ width: `${cardWidth}%` }}
-                  role="article"
-                  aria-label={`Feature: ${feature.title}`}
                 >
-                  <div 
-                    className="rounded-2xl p-6 h-[500px] flex flex-col shadow-xl feature-card-enhanced"
-                    style={{ backgroundColor: '#F5F1E8' }}
-                    tabIndex={0}
+                  <div
+                    className="relative flex w-[320px] shrink-0 flex-col md:w-[380px]"
+                    style={{ marginRight: 20 }}
                   >
-                    {/* Icon */}
-                    <div className="mb-4">
-                      <feature.icon 
-                        size={24} 
-                        style={{ color: '#1A1A1A' }}
-                        aria-hidden="true"
-                      />
-                    </div>
-                    
-                    {/* Title */}
-                    <h3 
-                      className="text-xl font-bold mb-3"
-                      style={{ color: '#1A1A1A' }}
+                    <EnhancedCard
+                      variant="primary"
+                      size="standard"
+                      className="h-full"
+                      aria-label={`Feature: ${feature.title}`}
                     >
-                      {feature.title}
-                    </h3>
-                    
-                    {/* Description */}
-                    <p 
-                      className="text-sm mb-6 leading-relaxed"
-                      style={{ color: '#6B7280' }}
-                    >
-                      {feature.description}
-                    </p>
-                    
-                    {/* Code Demo */}
-                    <div className="flex-1 flex items-end">
-                      {feature.codeDemo}
-                    </div>
+                      <EnhancedCardHeader>
+                        <EnhancedCardIcon size="small" variant="primary">
+                          <feature.icon
+                            size={24}
+                            aria-hidden="true"
+                          />
+                        </EnhancedCardIcon>
+                        <EnhancedCardTitle variant="primary">
+                          {feature.title}
+                        </EnhancedCardTitle>
+                        <EnhancedCardDescription variant="primary" className="text-sk-black/70">
+                          {feature.description}
+                        </EnhancedCardDescription>
+                      </EnhancedCardHeader>
+                      <EnhancedCardDemo className="flex flex-col justify-end">
+                        {feature.codeDemo}
+                      </EnhancedCardDemo>
+                    </EnhancedCard>
                   </div>
                 </div>
               ))}

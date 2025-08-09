@@ -1,4 +1,11 @@
 import { Button } from "@/components/ui/button";
+import {
+  EnhancedCard,
+  EnhancedCardHeader,
+  EnhancedCardTitle,
+  EnhancedCardDescription,
+  EnhancedCardIcon
+} from "@/components/ui/enhanced-card";
 
 const Features = () => {
   return (
@@ -32,53 +39,79 @@ const Features = () => {
           {/* Feature cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {/* Card 1 */}
-            <div className="bg-[#181f33] rounded-2xl p-8 flex flex-col items-start shadow-2xl border border-white/10 min-h-[370px] transition hover:shadow-3xl hover:-translate-y-1">
-              <img
-                src="/placeholder.svg"
-                alt="Frontier Intelligence"
-                className="w-24 h-24 mb-8 object-contain bg-white/10 rounded-xl p-2"
-                draggable={false}
-                style={{ filter: "drop-shadow(0 4px 16px rgba(0,0,0,0.10))" }}
-              />
-              <h3 className="text-2xl font-bold text-white mb-3">
-                Frontier Intelligence
-              </h3>
-              <p className="text-base text-gray-300">
-                Powered by a mix of purpose-built and frontier models, Softcodes is smart and fast.
-              </p>
-            </div>
+            <EnhancedCard
+              variant="secondary"
+              size="feature"
+              aria-label="Feature: Frontier Intelligence"
+            >
+              <EnhancedCardHeader>
+                <EnhancedCardIcon size="large" variant="secondary">
+                  <img
+                    src="/placeholder.svg"
+                    alt=""
+                    className="w-full h-full object-contain"
+                    draggable={false}
+                    style={{ filter: "drop-shadow(0 4px 16px rgba(0,0,0,0.10))" }}
+                  />
+                </EnhancedCardIcon>
+                <EnhancedCardTitle variant="secondary">
+                  Frontier Intelligence
+                </EnhancedCardTitle>
+                <EnhancedCardDescription variant="secondary">
+                  Powered by a mix of purpose-built and frontier models, Softcodes is smart and fast.
+                </EnhancedCardDescription>
+              </EnhancedCardHeader>
+            </EnhancedCard>
+
             {/* Card 2 */}
-            <div className="bg-[#181f33] rounded-2xl p-8 flex flex-col items-start shadow-2xl border border-white/10 min-h-[370px] transition hover:shadow-3xl hover:-translate-y-1">
-              <img
-                src="/placeholder.svg"
-                alt="Feels Familiar"
-                className="w-24 h-24 mb-8 object-contain bg-white/10 rounded-xl p-2"
-                draggable={false}
-                style={{ filter: "drop-shadow(0 4px 16px rgba(0,0,0,0.10))" }}
-              />
-              <h3 className="text-2xl font-bold text-white mb-3">
-                Feels Familiar
-              </h3>
-              <p className="text-base text-gray-300">
-                Import all your extensions, themes, and keybindings in one click.
-              </p>
-            </div>
+            <EnhancedCard
+              variant="secondary"
+              size="feature"
+              aria-label="Feature: Feels Familiar"
+            >
+              <EnhancedCardHeader>
+                <EnhancedCardIcon size="large" variant="secondary">
+                  <img
+                    src="/placeholder.svg"
+                    alt=""
+                    className="w-full h-full object-contain"
+                    draggable={false}
+                    style={{ filter: "drop-shadow(0 4px 16px rgba(0,0,0,0.10))" }}
+                  />
+                </EnhancedCardIcon>
+                <EnhancedCardTitle variant="secondary">
+                  Feels Familiar
+                </EnhancedCardTitle>
+                <EnhancedCardDescription variant="secondary">
+                  Import all your extensions, themes, and keybindings in one click.
+                </EnhancedCardDescription>
+              </EnhancedCardHeader>
+            </EnhancedCard>
+
             {/* Card 3 */}
-            <div className="bg-[#181f33] rounded-2xl p-8 flex flex-col items-start shadow-2xl border border-white/10 min-h-[370px] transition hover:shadow-3xl hover:-translate-y-1">
-              <img
-                src="/placeholder.svg"
-                alt="Privacy Options"
-                className="w-24 h-24 mb-8 object-contain bg-white/10 rounded-xl p-2"
-                draggable={false}
-                style={{ filter: "drop-shadow(0 4px 16px rgba(0,0,0,0.10))" }}
-              />
-              <h3 className="text-2xl font-bold text-white mb-3">
-                Privacy Options
-              </h3>
-              <p className="text-base text-gray-300">
-                If you enable Privacy Mode, your code is never stored remotely without your consent. Softcodes is SOC 2 certified.
-              </p>
-            </div>
+            <EnhancedCard
+              variant="secondary"
+              size="feature"
+              aria-label="Feature: Privacy Options"
+            >
+              <EnhancedCardHeader>
+                <EnhancedCardIcon size="large" variant="secondary">
+                  <img
+                    src="/placeholder.svg"
+                    alt=""
+                    className="w-full h-full object-contain"
+                    draggable={false}
+                    style={{ filter: "drop-shadow(0 4px 16px rgba(0,0,0,0.10))" }}
+                  />
+                </EnhancedCardIcon>
+                <EnhancedCardTitle variant="secondary">
+                  Privacy Options
+                </EnhancedCardTitle>
+                <EnhancedCardDescription variant="secondary">
+                  If you enable Privacy Mode, your code is never stored remotely without your consent. Softcodes is SOC 2 certified.
+                </EnhancedCardDescription>
+              </EnhancedCardHeader>
+            </EnhancedCard>
           </div>
         </div>
       </section>

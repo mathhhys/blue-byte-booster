@@ -312,6 +312,8 @@ All colors MUST be HSL.
 /* Smooth transitions for all interactive elements */
 .feature-card * {
   transition: all 0.3s ease;
+}
+
 /* Vibrant halo effect for the most popular pricing card */
 .pricing-halo {
   position: relative;
@@ -419,4 +421,145 @@ All colors MUST be HSL.
     font-size: 3.75rem;
   }
 }
+
+/* Card Design System Utilities */
+
+/* Background colors */
+.bg-sk-black {
+  background-color: #0D0E0F;
+}
+
+.bg-sk-sand {
+  background-color: #F9F3E9;
+}
+
+.bg-sk-placeholder {
+  background-color: #0B100F;
+}
+
+/* Text colors */
+.text-sk-black {
+  color: #0D0E0F;
+}
+
+.text-sk-sand {
+  color: #F9F3E9;
+}
+
+/* Text with opacity */
+.text-sk-black\/50 {
+  color: rgba(13, 14, 15, 0.5);
+}
+
+.text-sk-sand\/50 {
+  color: rgba(249, 243, 233, 0.5);
+}
+
+/* Card Typography */
+.card-title-primary {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #0D0E0F;
+  margin-bottom: 0.75rem;
+}
+
+.card-title-secondary {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: white;
+  margin-bottom: 0.75rem;
+}
+
+.card-description-primary {
+  font-size: 0.875rem;
+  color: #0D0E0F;
+  line-height: 1.625;
+}
+
+.card-description-secondary {
+  font-size: 1rem;
+  color: #d1d5db;
+  line-height: 1.625;
+}
+
+/* Card Interactive States */
+.card-hover {
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.card-hover:hover {
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  transform: translateY(-0.25rem);
+  z-index: 10;
+}
+
+.card-hover-enhanced {
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.card-hover-enhanced:hover {
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  transform: translateY(-0.25rem);
+  z-index: 10;
+}
+
+.card-focus {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+}
+
+.card-focus:focus {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px #3b82f6;
+}
+
+/* Card Shadows */
+.shadow-card-light {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.shadow-card-dark {
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+.shadow-card-hover {
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+}
+
+/* Card Borders */
+.border-card-light {
+  border: 1px solid rgba(229, 231, 235, 0.2);
+}
+
+.border-card-dark {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.border-card-placeholder {
+  border: 1px solid rgba(75, 85, 99, 0.2);
+}
+
+/* Responsive Card Adjustments */
+@media (max-width: 768px) {
+  .card-responsive {
+    padding: 1rem;
+    min-height: 350px;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+  .card-responsive {
+    padding: 1.5rem;
+    min-height: 380px;
+  }
+}
+
+@media (min-width: 1025px) {
+  .card-responsive {
+    padding: 1.5rem;
+    min-height: 400px;
+  }
 }
