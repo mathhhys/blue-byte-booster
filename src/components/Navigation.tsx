@@ -119,7 +119,7 @@ const Navigation = () => {
             </div>
 
             {/* Desktop Navigation */}
-            <div className="hidden md:flex items-center space-x-8">
+            <div className="hidden md:flex items-center justify-center space-x-8">
               <Link
                 to="/pricing"
                 className={`text-sm font-medium transition-colors hover:text-blue-600 ${
@@ -138,20 +138,12 @@ const Navigation = () => {
                 FEATURES
               </button>
               <button
-                onClick={() => scrollToSection("blog")}
+                onClick={() => scrollToSection("enterprise")}
                 className={`text-sm font-medium transition-colors hover:text-blue-600 ${
                   isScrolled ? "text-gray-700" : "text-white"
                 }`}
               >
                 ENTERPRISE
-              </button>
-              <button
-                onClick={() => scrollToSection("blog")}
-                className={`text-sm font-medium transition-colors hover:text-blue-600 ${
-                  isScrolled ? "text-gray-700" : "text-white"
-                }`}
-              >
-                BLOG
               </button>
               <div className="relative group">
                 <button
@@ -255,13 +247,6 @@ const Navigation = () => {
                 style={{ letterSpacing: "0.02em" }}
               >
                 ENTERPRISE
-              </button>
-              <button
-                onClick={() => scrollToSection("blog")}
-                className="w-full flex justify-center text-xl font-bold tracking-wide text-gray-200 hover:text-white transition-colors focus:outline-none text-center"
-                style={{ letterSpacing: "0.02em" }}
-              >
-                BLOG
               </button>
               <button
                 onClick={() => scrollToSection("documentation")}

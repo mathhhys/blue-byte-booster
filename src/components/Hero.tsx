@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Play } from "lucide-react";
+import GradientBackground from "@/components/GradientBackground";
 
 const Hero = () => {
   const scrollToSection = (sectionId: string) => {
@@ -10,102 +11,98 @@ const Hero = () => {
   };
 
   return (
-    <section className="min-h-screen flex items-center justify-center bg-slate-900 relative overflow-hidden pt-24">
-      {/* Background decorative elements */}
-      <div className="absolute inset-0">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }}></div>
-      </div>
-      
-      <div className="container mx-auto px-6 relative z-10 flex items-center justify-center min-h-full mt-8">
-        <div className="text-center max-w-4xl mx-auto">
-          {/* Welcome badge */}
-          <div className="inline-block mb-8">
-            <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 px-4 py-2 rounded-full">
-              <div className="w-3 h-3 bg-green-400 rounded-full shadow-lg shadow-green-400/50 animate-pulse"></div>
-              <span className="text-white text-sm font-medium">Welcome to the Future of Coding</span>
+    <GradientBackground>
+      <section className="min-h-screen flex items-center justify-center pt-24">
+        <div className="container mx-auto px-6 flex items-center justify-center min-h-full mt-8">
+          <div className="text-center max-w-4xl mx-auto">
+            {/* Welcome badge */}
+            <div className="inline-block mb-8">
+              <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 px-4 py-2 rounded-full">
+                <div className="w-3 h-3 bg-green-400 rounded-full shadow-lg shadow-green-400/50 animate-pulse"></div>
+                <span className="text-white text-sm font-medium">Welcome to the Future of Coding</span>
+              </div>
             </div>
-          </div>
-          
-          {/* Main heading */}
-          <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold mb-8 leading-tight text-center">
-            <span className="text-white">
-              Introducing
-            </span>
-            <br />
-            <span className="text-white mt-0">
-              Softcodes
-            </span>
-          </h1>
-          
-          {/* Description */}
-          <p className="text-xl md:text-2xl text-gray-300 mb-12 max-w-3xl mx-auto leading-relaxed">
-            Experience the next generation of windsurfing. Book sessions, 
-            learn from experts, and enjoy premium equipment at stunning 
-            locations.
-          </p>
-          
-          {/* CTA Buttons */}
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16">
-            <Button
-              className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-4 text-lg font-medium rounded-lg transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-xl"
-              size="lg"
-            >
-              Get Started
-            </Button>
-            <Button 
-              variant="outline" 
-              className="border-white/30 text-white hover:bg-white/10 px-8 py-4 text-lg font-medium rounded-lg transition-all duration-300 hover:scale-105 backdrop-blur-sm"
-              size="lg"
-            >
-              Explore Features
-            </Button>
-          </div>
+            
+            {/* Main heading */}
+            <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold mb-8 leading-tight text-center">
+              <span className="text-white">
+                Introducing
+              </span>
+              <br />
+              <span className="text-white mt-0">
+                Softcodes
+              </span>
+            </h1>
+            
+            {/* Description */}
+            <p className="text-xl md:text-2xl text-gray-300 mb-12 max-w-3xl mx-auto leading-relaxed">
+              Experience the next generation of windsurfing. Book sessions,
+              learn from experts, and enjoy premium equipment at stunning
+              locations.
+            </p>
+            
+            {/* CTA Buttons */}
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16">
+              <Button
+                className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-4 text-lg font-medium rounded-lg transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-xl"
+                size="lg"
+              >
+                Get Started
+              </Button>
+              <Button
+                variant="outline"
+                className="border-white/30 text-white hover:bg-white/10 px-8 py-4 text-lg font-medium rounded-lg transition-all duration-300 hover:scale-105 backdrop-blur-sm"
+                size="lg"
+              >
+                Explore Features
+              </Button>
+            </div>
 
-          {/* VS Code 5-star review */}
-          <div className="flex justify-center mb-8">
-            <div className="flex items-center gap-4 bg-slate-800/80 px-6 py-3 rounded-xl shadow-lg border border-white/10">
-              {/* VS Code Logo from provided SVG URL */}
-              <img
-                src="https://xraquejellmoyrpqcirs.supabase.co/storage/v1/object/public/softcodes-logo/vscode.svg"
-                alt="VS Code Logo"
-                className="w-10 h-10"
-                style={{ minWidth: 40, minHeight: 40 }}
-              />
-              <div className="flex flex-col items-start">
-                <div className="flex items-center mb-1">
-                  {/* 5 Stars */}
-                  <span className="flex items-center text-yellow-400">
-                    {[...Array(5)].map((_, i) => (
-                      <svg key={i} width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-                        <polygon points="10,1.5 12.6,7.3 18.9,7.8 14,12.2 15.4,18.4 10,15.1 4.6,18.4 6,12.2 1.1,7.8 7.4,7.3" />
-                      </svg>
-                    ))}
-                  </span>
-                  <span className="text-white text-base font-semibold ml-2">
-                    4.8/5.0
+            {/* VS Code 5-star review */}
+            <div className="flex justify-center mb-8">
+              <div className="flex items-center gap-4 bg-slate-800/80 px-6 py-3 rounded-xl shadow-lg border border-white/10">
+                {/* VS Code Logo from provided SVG URL */}
+                <img
+                  src="https://xraquejellmoyrpqcirs.supabase.co/storage/v1/object/public/softcodes-logo/vscode.svg"
+                  alt="VS Code Logo"
+                  className="w-10 h-10"
+                  style={{ minWidth: 40, minHeight: 40 }}
+                />
+                <div className="flex flex-col items-start">
+                  <div className="flex items-center mb-1">
+                    {/* 5 Stars */}
+                    <span className="flex items-center text-yellow-400">
+                      {[...Array(5)].map((_, i) => (
+                        <svg key={i} width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                          <polygon points="10,1.5 12.6,7.3 18.9,7.8 14,12.2 15.4,18.4 10,15.1 4.6,18.4 6,12.2 1.1,7.8 7.4,7.3" />
+                        </svg>
+                      ))}
+                    </span>
+                    <span className="text-white text-base font-semibold ml-2">
+                      4.8/5.0
+                    </span>
+                  </div>
+                  <span className="text-gray-300 text-xs font-medium">
+                    on VS Code Marketplace
                   </span>
                 </div>
-                <span className="text-gray-300 text-xs font-medium">
-                  on VS Code Marketplace
-                </span>
+              </div>
+            </div>
+
+            {/* Hero image container */}
+            <div className="flex justify-center items-center my-4">
+              <div className="rounded-2xl overflow-hidden shadow-lg border border-white/10 bg-white/5 backdrop-blur-sm max-w-3xl w-full">
+                <img
+                  src="/placeholder.svg"
+                  alt="Windsurfing Hero"
+                  className="w-full h-80 object-cover"
+                />
               </div>
             </div>
           </div>
-
-          {/* Hero image container */}
-          <div className="flex justify-center items-center my-4">
-            <div className="rounded-2xl overflow-hidden shadow-lg border border-white/10 bg-white/5 backdrop-blur-sm max-w-3xl w-full">
-              <img
-                src="/placeholder.svg"
-                alt="Windsurfing Hero"
-                className="w-full h-80 object-cover"
-              />
-            </div>
-          </div>
         </div>
-      </div>
-    </section>
+      </section>
+    </GradientBackground>
   );
 };
 

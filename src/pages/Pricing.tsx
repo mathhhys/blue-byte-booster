@@ -2,10 +2,12 @@ import React, { useState } from "react";
 import Navigation from "../components/Navigation";
 import Footer from "../components/Footer";
 import { ModelProvidersSection } from "../components/Features";
+import { PricingSection } from "@/components/PricingSection";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Check, X, ChevronDown, ChevronUp, Star, Apple, ArrowRight } from "lucide-react";
+import GradientBackground from "@/components/GradientBackground";
 
 // Pricing data structure
 const pricingPlans = [
@@ -197,16 +199,16 @@ export default function Pricing() {
 
   return (
     <>
-    <div className="min-h-screen bg-slate-900 mt-8">
+    <GradientBackground className="mt-8">
       <Navigation />
       
       {/* Hero Section */}
-      <section className="pt-24 pb-16 px-4 bg-slate-900">
+      <section className="pt-24 pb-16 px-4 bg-transparent">
         <div className="max-w-6xl mx-auto text-center">
           <div className="inline-block mb-6">
             <div className="flex items-center gap-2 bg-primary/10 border border-primary/20 px-4 py-2 rounded-full">
               <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
-              <span className="text-sm font-medium" style={{ color: '#f9f9f9' }}>Special Launch Pricing</span>
+              <span className="text-sm font-medium" style={{ color: '#f9f9f9' }}>Choose the perfect plan for you</span>
             </div>
           </div>
           
@@ -217,136 +219,13 @@ export default function Pricing() {
             Choose the perfect plan for your coding journey. All plans include access to our powerful AI coding assistant.
           </p>
 
-          {/* Monthly/Annual Toggle */}
-          <div className="flex items-center justify-center gap-4 mb-16">
-            <span className={`text-sm font-medium ${!isAnnual ? 'text-white' : 'text-gray-400'}`}>
-              Monthly
-            </span>
-            <Switch
-              checked={isAnnual}
-              onCheckedChange={setIsAnnual}
-              className="data-[state=checked]:bg-primary"
-            />
-            <span className={`text-sm font-medium ${isAnnual ? 'text-white' : 'text-gray-400'}`}>
-              Annual
-            </span>
-            {isAnnual && (
-              <span className="bg-primary text-primary-foreground px-3 py-1 rounded-full text-sm font-medium">
-                Save 20%
-              </span>
-            )}
-          </div>
+          {/* Monthly/Annual Toggle removed here; will use the one from PricingSection */}
         </div>
       </section>
 
-      {/* Pricing Cards - Custom Section */}
-      <section className="bg-black py-20 px-4">
-        <div className="max-w-6xl mx-auto">
-          {/* Header */}
-          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-16 gap-8">
-            <h2 className="text-4xl lg:text-5xl font-semibold text-white">
-              Individual Plans
-            </h2>
-            <div className="flex items-center bg-gray-800 rounded-lg p-1 border border-gray-600">
-              <button
-                onClick={() => setIsAnnual(false)}
-                className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 ${
-                  !isAnnual
-                    ? "bg-white text-black"
-                    : "text-gray-300 hover:text-white"
-                }`}
-              >
-                MONTHLY
-              </button>
-              <button
-                onClick={() => setIsAnnual(true)}
-                className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 ${
-                  isAnnual
-                    ? "bg-white text-black"
-                    : "text-gray-300 hover:text-white"
-                }`}
-              >
-                YEARLY <span className="text-gray-400">(SAVE 20%)</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Pricing Cards */}
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 h-full items-stretch">
-            {pricingPlans.map((plan, idx) => (
-              <div
-                key={plan.id}
-                className={`${
-                  plan.popular
-                    ? "bg-gray-900 rounded-2xl p-8 border border-gray-700 h-full flex flex-col"
-                    : "bg-gray-900 rounded-2xl p-8 border border-gray-700 h-full flex flex-col"
-                }`}
-              >
-                {plan.popular && (
-                  <>
-                    <div className="absolute top-4 right-4 bg-primary text-primary-foreground px-3 py-1 rounded-full text-xs font-semibold z-10">
-                      Most Popular
-                    </div>
-                  </>
-                )}
-                <div className="flex flex-col flex-1">
-                  <div className="mb-8">
-                    <h3 className="text-xl font-medium text-white mb-6">{plan.name}</h3>
-                    <div className="text-5xl font-bold text-white mb-2">
-                      {plan.monthlyPrice === 0 && plan.annualPrice === 0
-                        ? "Free"
-                        : plan.monthlyPrice === null && plan.annualPrice === null
-                        ? "Custom"
-                        : `$${isAnnual ? plan.annualPrice : plan.monthlyPrice}`}
-                      {plan.monthlyPrice !== 0 && plan.annualPrice !== 0 && plan.monthlyPrice !== null && plan.annualPrice !== null && (
-                        <span className="text-lg font-normal text-white/80 ml-1">/mo</span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="mb-10 flex-1">
-                    <h4 className="text-gray-300 font-medium mb-6">
-                      {plan.id === "free"
-                        ? "Includes"
-                        : plan.id === "pro"
-                        ? "Everything in Free, plus"
-                        : plan.id === "teams"
-                        ? "Everything in Pro, plus"
-                        : "Everything in Teams, plus"}
-                    </h4>
-                    <ul className="space-y-4">
-                      {plan.features.map((feature, index) => (
-                        <li key={index} className="flex items-start gap-3">
-                          <Check className="w-5 h-5 text-green-400 mt-0.5 flex-shrink-0" />
-                          <span className="text-white text-sm leading-relaxed">{feature}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                  <div className="space-y-4 mt-auto">
-                    <Button
-                      className={`w-full font-medium py-3 h-12 rounded-lg ${
-                        plan.buttonVariant === "default"
-                          ? "bg-white text-black hover:bg-gray-100"
-                          : "bg-transparent border-gray-600 text-white hover:bg-gray-800"
-                      }`}
-                      variant={plan.buttonVariant}
-                    >
-                      {plan.buttonText}
-                    </Button>
-                    {plan.id === "pro" && (
-                      <button className="flex items-center gap-2 text-white hover:text-white/80 text-sm font-medium group transition-colors">
-                        More info
-                        <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-200" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-        </div>
+      {/* Replaced Pricing Cards Section with new PricingSection */}
+      <PricingSection />
+    </GradientBackground>
 
 
       {/* Feature Comparison Table */}
