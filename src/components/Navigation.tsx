@@ -143,7 +143,7 @@ const Navigation = () => {
                   isScrolled ? "text-gray-700" : "text-white"
                 }`}
               >
-                ENTERPRISE
+                TEAMS & ENTERPRISE
               </button>
               <div className="relative group">
                 <button

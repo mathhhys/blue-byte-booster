@@ -88,17 +88,6 @@ const Hero = () => {
                 </div>
               </div>
             </div>
-
-            {/* Hero image container */}
-            <div className="flex justify-center items-center my-4">
-              <div className="rounded-2xl overflow-hidden shadow-lg border border-white/10 bg-white/5 backdrop-blur-sm max-w-3xl w-full">
-                <img
-                  src="/placeholder.svg"
-                  alt="Windsurfing Hero"
-                  className="w-full h-80 object-cover"
-                />
-              </div>
-            </div>
           </div>
         </div>
       </section>
