@@ -1,7 +1,11 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { SignedIn, SignedOut, useUser } from '@clerk/clerk-react';
+import { useNavigate } from 'react-router-dom';
 
 const CTA = () => {
+  const navigate = useNavigate();
+  const { isLoaded, isSignedIn } = useUser();
   return (
     <section className="py-24 bg-background">
       <div className="container mx-auto px-6">
@@ -21,10 +25,31 @@ const CTA = () => {
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button variant="glass" size="lg" className="text-lg px-8 py-6 bg-white/20 hover:bg-white/30 text-white border-white/30">
-                🚀 Start Free Trial
-              </Button>
-              <Button variant="outline" size="lg" className="text-lg px-8 py-6 border-white/30 text-white hover:bg-white/10">
+              {!isLoaded || !isSignedIn ? (
+                <Button
+                  onClick={() => navigate('/sign-up')}
+                  variant="glass"
+                  size="lg"
+                  className="text-lg px-8 py-6 bg-white/20 hover:bg-white/30 text-white border-white/30"
+                >
+                  🚀 Start Free Trial
+                </Button>
+              ) : (
+                <Button
+                  onClick={() => navigate('/dashboard')}
+                  variant="glass"
+                  size="lg"
+                  className="text-lg px-8 py-6 bg-white/20 hover:bg-white/30 text-white border-white/30"
+                >
+                  🚀 Go to Dashboard
+                </Button>
+              )}
+              <Button
+                onClick={() => navigate('/pricing')}
+                variant="outline"
+                size="lg"
+                className="text-lg px-8 py-6 border-white/30 text-white hover:bg-white/10"
+              >
                 View Pricing
               </Button>
             </div>

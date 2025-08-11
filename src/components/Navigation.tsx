@@ -1,13 +1,17 @@
 import { useState, useEffect, useRef } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Menu, X, ChevronDown, User } from "lucide-react";
+import { SignedIn, SignedOut, UserButton, useUser } from '@clerk/clerk-react';
+import { dark } from '@clerk/themes';
 
 const Navigation = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showResources, setShowResources] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
+  const { isLoaded, isSignedIn } = useUser();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -204,14 +208,42 @@ const Navigation = () => {
 
             {/* Desktop CTA Buttons */}
             <div className="hidden md:flex items-center space-x-4">
-              <button className="p-2 rounded-full border border-gray-300 hover:bg-gray-50 transition-colors">
-                <User className="w-5 h-5 text-gray-600" />
-              </button>
-              <Button
-                className="bg-primary hover:bg-primary/90 text-primary-foreground px-6 py-2 rounded-lg font-medium transition-colors"
-              >
-                GET STARTED
-              </Button>
+              {!isLoaded || !isSignedIn ? (
+                <>
+                  <button
+                    onClick={() => navigate('/sign-in')}
+                    className="p-2 rounded-full border border-gray-300 hover:bg-gray-50 transition-colors"
+                  >
+                    <User className="w-5 h-5 text-gray-600" />
+                  </button>
+                  <Button
+                    onClick={() => navigate('/sign-up')}
+                    className="bg-primary hover:bg-primary/90 text-primary-foreground px-6 py-2 rounded-lg font-medium transition-colors"
+                  >
+                    GET STARTED
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button
+                    onClick={() => navigate('/dashboard')}
+                    variant="ghost"
+                    className={`text-sm font-medium transition-colors hover:text-blue-600 ${
+                      isScrolled ? "text-gray-700" : "text-white"
+                    }`}
+                  >
+                    Dashboard
+                  </Button>
+                  <UserButton
+                    appearance={{
+                      baseTheme: isScrolled ? undefined : dark,
+                      elements: {
+                        avatarBox: 'w-8 h-8',
+                      },
+                    }}
+                  />
+                </>
+              )}
             </div>
 
             {/* Mobile Menu Button */}
@@ -360,12 +392,38 @@ const Navigation = () => {
 
             {/* Action Buttons */}
             <div className="flex flex-col w-full max-w-[420px] mx-auto space-y-4 items-center pb-6">
-              <button className="w-full border border-blue-600 text-blue-600 bg-transparent rounded-xl py-3 text-lg font-medium transition-colors hover:bg-blue-950 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-[#101828]">
-                Sign In
-              </button>
-              <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl py-3 text-lg font-semibold transition-colors shadow-none focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-[#101828]">
-                GET STARTED
-              </Button>
+              {!isLoaded || !isSignedIn ? (
+                <>
+                  <button
+                    onClick={() => {
+                      navigate('/sign-in');
+                      closeMobileMenu();
+                    }}
+                    className="w-full border border-blue-600 text-blue-600 bg-transparent rounded-xl py-3 text-lg font-medium transition-colors hover:bg-blue-950 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-[#101828]"
+                  >
+                    Sign In
+                  </button>
+                  <Button
+                    onClick={() => {
+                      navigate('/sign-up');
+                      closeMobileMenu();
+                    }}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl py-3 text-lg font-semibold transition-colors shadow-none focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-[#101828]"
+                  >
+                    GET STARTED
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  onClick={() => {
+                    navigate('/dashboard');
+                    closeMobileMenu();
+                  }}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl py-3 text-lg font-semibold transition-colors shadow-none focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-[#101828]"
+                >
+                  Dashboard
+                </Button>
+              )}
             </div>
           </div>
         </div>

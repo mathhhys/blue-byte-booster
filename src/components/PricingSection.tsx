@@ -4,13 +4,17 @@ import { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Check, Download, ArrowRight, Users } from "lucide-react";
+import { SignedIn, SignedOut, useUser } from '@clerk/clerk-react';
+import { useNavigate } from 'react-router-dom';
 
 export const PricingSection = () => {
   const [isYearly, setIsYearly] = useState(false);
+  const navigate = useNavigate();
+  const { isLoaded, isSignedIn } = useUser();
 
   const plans = [
     {
-      name: "Hobby",
+      name: "Starter",
       price: { monthly: 0, yearly: 0 },
       description: "Pro two-week trial",
       features: [
@@ -30,7 +34,8 @@ export const PricingSection = () => {
         "Unlimited Tab completions",
         "Access to Background Agents",
         "Access to Bugbot", 
-        "Access to maximum context windows"
+        "Access to maximum context windows",
+        "Add more credits at API Price - No extra costs"
       ],
       buttonText: "Get Softcodes Pro",
       buttonIcon: ArrowRight,
@@ -65,7 +70,7 @@ export const PricingSection = () => {
     <section className="bg-transparent">
       <div className="max-w-7xl mx-auto px-6">
         {/* Header - Toggle Only, Centered */}
-        <div className="flex justify-center items-center mb-12">
+        <div className="flex justify-center items-center -mt-8 md:mt-0 mb-12">
           <div className="flex items-center bg-gray-800 rounded-lg p-1 border border-gray-600">
             <button
               onClick={() => setIsYearly(false)}
@@ -136,19 +141,43 @@ export const PricingSection = () => {
                 </div>
 
                 {/* Button */}
-                <Button
-                  variant={plan.buttonVariant}
-                  className={`w-full group ${
-                    plan.isPopular 
-                      ? 'bg-white text-black hover:bg-gray-100' 
-                      : (plan.buttonVariant as string) === 'outline'
-                      ? 'border-gray-600 text-white hover:bg-gray-800'
-                      : ''
-                  }`}
-                >
-                  <plan.buttonIcon className="w-4 h-4 mr-2 group-hover:translate-x-0.5 transition-transform" />
-                  {plan.buttonText}
-                </Button>
+                {!isLoaded || !isSignedIn ? (
+                  <Button
+                    onClick={() => {
+                      if (plan.name === 'Starter') {
+                        navigate('/sign-up');
+                      } else {
+                        navigate(`/sign-up?plan=${plan.name.toLowerCase()}`);
+                      }
+                    }}
+                    variant={plan.buttonVariant}
+                    className={`w-full group ${
+                      plan.isPopular
+                        ? 'bg-white text-black hover:bg-gray-100'
+                        : (plan.buttonVariant as string) === 'outline'
+                        ? 'border-gray-600 text-white hover:bg-gray-800'
+                        : ''
+                    }`}
+                  >
+                    <plan.buttonIcon className="w-4 h-4 mr-2 group-hover:translate-x-0.5 transition-transform" />
+                    {plan.buttonText}
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={() => navigate('/dashboard')}
+                    variant={plan.buttonVariant}
+                    className={`w-full group ${
+                      plan.isPopular
+                        ? 'bg-white text-black hover:bg-gray-100'
+                        : (plan.buttonVariant as string) === 'outline'
+                        ? 'border-gray-600 text-white hover:bg-gray-800'
+                        : ''
+                    }`}
+                  >
+                    <plan.buttonIcon className="w-4 h-4 mr-2 group-hover:translate-x-0.5 transition-transform" />
+                    Go to Dashboard
+                  </Button>
+                )}
               </div>
             </Card>
           ))}

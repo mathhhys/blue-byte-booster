@@ -1,8 +1,13 @@
 import { Button } from "@/components/ui/button";
 import { Play } from "lucide-react";
 import GradientBackground from "@/components/GradientBackground";
+import { SignedIn, SignedOut, useUser } from '@clerk/clerk-react';
+import { useNavigate } from 'react-router-dom';
 
 const Hero = () => {
+  const navigate = useNavigate();
+  const { isLoaded, isSignedIn } = useUser();
+  
   const scrollToSection = (sectionId: string) => {
     const element = document.getElementById(sectionId);
     if (element) {
@@ -43,14 +48,26 @@ const Hero = () => {
             
             {/* CTA Buttons */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16">
-              <Button
-                className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-4 text-lg font-medium rounded-lg transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-xl"
-                size="lg"
-              >
-                Get Started
-              </Button>
+              {!isLoaded || !isSignedIn ? (
+                <Button
+                  onClick={() => navigate('/sign-up')}
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-4 text-lg font-medium rounded-lg transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-xl"
+                  size="lg"
+                >
+                  Get Started
+                </Button>
+              ) : (
+                <Button
+                  onClick={() => navigate('/dashboard')}
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-4 text-lg font-medium rounded-lg transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-xl"
+                  size="lg"
+                >
+                  Go to Dashboard
+                </Button>
+              )}
               <Button
                 variant="outline"
+                onClick={() => scrollToSection('features')}
                 className="border-white/30 text-white hover:bg-white/10 px-8 py-4 text-lg font-medium rounded-lg transition-all duration-300 hover:scale-105 backdrop-blur-sm"
                 size="lg"
               >
