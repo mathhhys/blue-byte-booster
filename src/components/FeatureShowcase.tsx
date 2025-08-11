@@ -7,7 +7,10 @@ import {
   Edit3,
   ChevronLeft,
   ChevronRight,
-  Blend
+  Blend,
+  SquareLibrary,
+  GalleryVerticalEnd,
+  SquareTerminal,
 } from 'lucide-react';
 import {
   EnhancedCard,
@@ -128,9 +131,9 @@ const baseFeatures: FeatureData[] = [
     )
   },
   {
-    id: 'intelligent-completions',
-    icon: ArrowRight,
-    title: 'Intelligent Completions',
+    id: 'multi-file-edits',
+    icon: GalleryVerticalEnd,
+    title: 'Multi-file Edits',
     description: 'Context-aware completions that respect your project, dependencies, and coding style.',
     codeDemo: (
       <img
@@ -147,8 +150,8 @@ const baseFeatures: FeatureData[] = [
   },
   {
     id: 'contextual-search',
-    icon: Layers3,
-    title: 'Contextual Search',
+    icon: SquareLibrary,
+    title: 'Deep Codebase Knowledge',
     description: 'Search across your codebase and docs with semantic understanding, returning precise results.',
     codeDemo: (
       <img
@@ -164,9 +167,9 @@ const baseFeatures: FeatureData[] = [
     )
   },
   {
-    id: 'team-collaboration',
-    icon: AlertTriangle,
-    title: 'Team Collaboration',
+    id: 'terminal-command',
+    icon: SquareTerminal,
+    title: 'Runs Command in the Terminal',
     description: 'Share suggestions, comments, and AI sessions with teammates for faster reviews and onboarding.',
     codeDemo: (
       <img
