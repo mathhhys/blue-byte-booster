@@ -30,8 +30,14 @@ const Index = () => {
         imageSrc="/placeholder.svg"
         imageAlt="Instant search demo"
       />
-      <Features />
+      <TabSection
+        title="Instant Search: Find Anything, Instantly"
+        description="Lightning-fast search across files, symbols, and documentation. Never lose your place or your focus—just search and go."
+        imageSrc="/placeholder.svg"
+        imageAlt="Instant search demo"
+      />
       <FeatureShowcase />
+      <Features />
       <Footer />
     </div>
   );

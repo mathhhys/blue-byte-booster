@@ -6,7 +6,8 @@ import {
   Sparkles,
   Edit3,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Blend
 } from 'lucide-react';
 import {
   EnhancedCard,
@@ -24,21 +25,30 @@ interface FeatureData {
   description: string;
   codeDemo: React.ReactNode;
 }
+
+interface EnhancedFeatureShowcaseProps {
+  /**
+   * Pass custom card elements as children in the exact order you want them displayed.
+   * The component renders `cardCount` slots (default 9). For any slot that does not
+   * have a provided child, the showcase will render a default card.
+   */
+  children?: React.ReactNode;
+  cardCount?: number;
+}
  
 const baseFeatures: FeatureData[] = [
   {
     id: 'linter-integration',
     icon: AlertTriangle,
-    title: 'Linter Integration',
-    description: 'If Cascade generates code that doesn\'t pass a linter, then Cascade will automatically fix the errors',
+    title: 'Loops on Errors',
+    description: 'If Softcodes produces code that fails a linter check, it will automatically correct the issues',
     codeDemo: (
       <img
-        alt="An image for a fake blog post titled Linter Integration"
+        alt="Linter integration preview"
         loading="lazy"
         width="666"
         height="496"
         decoding="async"
-        data-nimg="1"
         className="-mb-3 h-auto w-full pl-5"
         src="/linter-integration.png"
         style={{ color: 'transparent' }}
@@ -49,15 +59,14 @@ const baseFeatures: FeatureData[] = [
     id: 'mcp-protocol',
     icon: Layers3,
     title: 'Model Context Protocol (MCP)',
-    description: 'Enhance your AI workflows by connecting to custom tools and services',
+    description: 'Supercharge your AI workflows by seamlessly integrating with tailored tools and services',
     codeDemo: (
       <img
-        alt="An image for a fake blog post titled MCP Protocol"
+        alt="MCP protocol preview"
         loading="lazy"
         width="666"
         height="496"
         decoding="async"
-        data-nimg="1"
         className="-mb-3 h-auto w-full pl-5"
         src="/linter-integration.png"
         style={{ color: 'transparent' }}
@@ -65,18 +74,17 @@ const baseFeatures: FeatureData[] = [
     )
   },
   {
-    id: 'tab-to-jump',
-    icon: ArrowRight,
-    title: 'Tab to Jump',
-    description: 'Predicts the next location of your cursor to seamlessly navigate through the file',
+    id: 'mode-switching',
+    icon: Blend,
+    title: 'Mode Switching',
+    description: 'Switch between modes like Architect, Code, or Debug to get the right tool for the job.',
     codeDemo: (
       <img
-        alt="An image for a fake blog post titled Tab to Jump"
+        alt="Mode switching preview"
         loading="lazy"
         width="666"
         height="496"
         decoding="async"
-        data-nimg="1"
         className="-mb-3 h-auto w-full pl-5"
         src="/linter-integration.png"
         style={{ color: 'transparent' }}
@@ -87,15 +95,14 @@ const baseFeatures: FeatureData[] = [
     id: 'supercomplete',
     icon: Sparkles,
     title: 'Supercomplete',
-    description: 'Supercomplete analyzes what your next action might be, beyond just inserting a code snippet',
+    description: 'Anticipates your next action and offers full-featured suggestions beyond plain snippets.',
     codeDemo: (
       <img
-        alt="An image for a fake blog post titled Supercomplete"
+        alt="Supercomplete preview"
         loading="lazy"
         width="666"
         height="496"
         decoding="async"
-        data-nimg="1"
         className="-mb-3 h-auto w-full pl-5"
         src="/linter-integration.png"
         style={{ color: 'transparent' }}
@@ -106,15 +113,86 @@ const baseFeatures: FeatureData[] = [
     id: 'in-line-edit',
     icon: Edit3,
     title: 'In-line Edit',
-    description: 'Precise inline editing capabilities for seamless code modifications',
+    description: 'Precise inline editing capabilities for seamless code modifications inside your editor.',
     codeDemo: (
       <img
-        alt="An image for a fake blog post titled In-line Edit"
+        alt="Inline edit preview"
         loading="lazy"
         width="666"
         height="496"
         decoding="async"
-        data-nimg="1"
+        className="-mb-3 h-auto w-full pl-5"
+        src="/linter-integration.png"
+        style={{ color: 'transparent' }}
+      />
+    )
+  },
+  {
+    id: 'intelligent-completions',
+    icon: ArrowRight,
+    title: 'Intelligent Completions',
+    description: 'Context-aware completions that respect your project, dependencies, and coding style.',
+    codeDemo: (
+      <img
+        alt="Intelligent completions preview"
+        loading="lazy"
+        width="666"
+        height="496"
+        decoding="async"
+        className="-mb-3 h-auto w-full pl-5"
+        src="/linter-integration.png"
+        style={{ color: 'transparent' }}
+      />
+    )
+  },
+  {
+    id: 'contextual-search',
+    icon: Layers3,
+    title: 'Contextual Search',
+    description: 'Search across your codebase and docs with semantic understanding, returning precise results.',
+    codeDemo: (
+      <img
+        alt="Contextual search preview"
+        loading="lazy"
+        width="666"
+        height="496"
+        decoding="async"
+        className="-mb-3 h-auto w-full pl-5"
+        src="/linter-integration.png"
+        style={{ color: 'transparent' }}
+      />
+    )
+  },
+  {
+    id: 'team-collaboration',
+    icon: AlertTriangle,
+    title: 'Team Collaboration',
+    description: 'Share suggestions, comments, and AI sessions with teammates for faster reviews and onboarding.',
+    codeDemo: (
+      <img
+        alt="Team collaboration preview"
+        loading="lazy"
+        width="666"
+        height="496"
+        decoding="async"
+        className="-mb-3 h-auto w-full pl-5"
+        src="/linter-integration.png"
+        style={{ color: 'transparent' }}
+      />
+    )
+  },
+  {
+    id: 'security-compliance',
+    icon: Sparkles,
+    title: 'Security & Compliance',
+    description: 'Enterprise-grade security, audit logs, and controls to keep your code and data safe.',
+    codeDemo: (
+      <img
+        alt="Security and compliance preview"
+        loading="lazy"
+        width="666"
+        height="496"
+        decoding="async"
         className="-mb-3 h-auto w-full pl-5"
         src="/linter-integration.png"
         style={{ color: 'transparent' }}
@@ -123,14 +201,14 @@ const baseFeatures: FeatureData[] = [
   }
 ];
 
-const enhancedFeatures: FeatureData[] = Array.from({ length: 9 }).map((_, i) => {
-  const feature = baseFeatures[i % baseFeatures.length];
-  return { ...feature, id: `${feature.id}-${i}` };
-});
+const enhancedFeatures: FeatureData[] = baseFeatures;
 
-const EnhancedFeatureShowcase: React.FC = () => {
+const EnhancedFeatureShowcase: React.FC<EnhancedFeatureShowcaseProps> = ({ children, cardCount = 9 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [visibleCards, setVisibleCards] = useState(5);
+
+  // Normalize children into an array for slot mapping
+  const childrenArray = React.Children.toArray(children);
 
   // Update visible cards based on screen size
   useEffect(() => {
@@ -143,26 +221,27 @@ const EnhancedFeatureShowcase: React.FC = () => {
         setVisibleCards(3);
       }
     };
-    // Ensure fluid scaling of card widths with breakpoints
 
     updateVisibleCards();
     window.addEventListener('resize', updateVisibleCards);
     return () => window.removeEventListener('resize', updateVisibleCards);
   }, []);
 
+  const totalItems = Math.max(cardCount, enhancedFeatures.length);
+
   const nextSlide = useCallback(() => {
     setCurrentIndex((prev) => {
-      const maxIndex = enhancedFeatures.length - visibleCards;
+      const maxIndex = totalItems - visibleCards;
       return prev >= maxIndex ? 0 : prev + 1;
     });
-  }, [visibleCards]);
+  }, [visibleCards, totalItems]);
 
   const prevSlide = useCallback(() => {
     setCurrentIndex((prev) => {
-      const maxIndex = enhancedFeatures.length - visibleCards;
+      const maxIndex = totalItems - visibleCards;
       return prev <= 0 ? maxIndex : prev - 1;
     });
-  }, [visibleCards]);
+  }, [visibleCards, totalItems]);
 
   // Swipe gesture support
   useEffect(() => {
@@ -219,8 +298,39 @@ const EnhancedFeatureShowcase: React.FC = () => {
   const cardWidth = 95 / visibleCards;
   const translateX = -(currentIndex * cardWidth);
 
+  // Helper to render the default card for a given index
+  const renderDefaultCard = (index: number) => {
+    const feature = enhancedFeatures[index % enhancedFeatures.length];
+    return (
+      <EnhancedCard
+        variant="primary"
+        size="standard"
+        className="h-full"
+        aria-label={`Feature: ${feature.title}`}
+      >
+        <EnhancedCardHeader>
+          <EnhancedCardIcon size="small" variant="primary">
+            <feature.icon
+              size={24}
+              aria-hidden="true"
+            />
+          </EnhancedCardIcon>
+          <EnhancedCardTitle variant="primary">
+            {feature.title}
+          </EnhancedCardTitle>
+          <EnhancedCardDescription variant="primary" className="text-sk-black/70">
+            {feature.description}
+          </EnhancedCardDescription>
+        </EnhancedCardHeader>
+        <EnhancedCardDemo className="flex flex-col justify-end">
+          {feature.codeDemo}
+        </EnhancedCardDemo>
+      </EnhancedCard>
+    );
+  };
+
   return (
-    <section 
+    <section
       className="w-full py-24 px-4 overflow-hidden endless-capabilities-section"
       style={{ backgroundColor: '#0F1629' }}
       aria-labelledby="endless-capabilities-title"
@@ -228,13 +338,13 @@ const EnhancedFeatureShowcase: React.FC = () => {
       <div className="max-w-7xl mx-auto">
         {/* Header Section */}
         <div className="text-center mb-16">
-          <p 
+          <p
             className="text-sm font-medium uppercase tracking-wider mb-6"
             style={{ color: '#0052CC' }}
           >
             NOT JUST THE BEST AI-POWERED PLUGIN, BUT THE BEST COPILOT
           </p>
-          <h2 
+          <h2
             id="endless-capabilities-title"
             className="text-4xl md:text-5xl lg:text-6xl font-bold text-white leading-tight"
           >
@@ -246,49 +356,37 @@ const EnhancedFeatureShowcase: React.FC = () => {
         <div className="relative">
           {/* Feature Cards Container */}
           <div className="overflow-hidden">
-            <div 
+            <div
               className="flex transition-transform duration-500 ease-in-out carousel-wrapper"
               style={{
                 transform: `translateX(${translateX}%)`,
               }}
             >
-              {enhancedFeatures.map((feature, index) => (
-                <div
-                  key={feature.id}
-                  className="flex-shrink-0 px-3"
-                  style={{ width: `${cardWidth}%` }}
-                >
+              {Array.from({ length: cardCount }).map((_, index) => {
+                const custom = childrenArray[index];
+                return (
                   <div
-                    className="relative flex w-[320px] shrink-0 flex-col md:w-[380px]"
-                    style={{ marginRight: 20 }}
+                    key={`feature-slot-${index}`}
+                    className="flex-shrink-0 px-3"
+                    style={{ width: `${cardWidth}%` }}
                   >
-                    <EnhancedCard
-                      variant="primary"
-                      size="standard"
-                      className="h-full"
-                      aria-label={`Feature: ${feature.title}`}
+                    <div
+                      className="relative flex w-full flex-col"
+                      style={{ marginRight: 20 }}
                     >
-                      <EnhancedCardHeader>
-                        <EnhancedCardIcon size="small" variant="primary">
-                          <feature.icon
-                            size={24}
-                            aria-hidden="true"
-                          />
-                        </EnhancedCardIcon>
-                        <EnhancedCardTitle variant="primary">
-                          {feature.title}
-                        </EnhancedCardTitle>
-                        <EnhancedCardDescription variant="primary" className="text-sk-black/70">
-                          {feature.description}
-                        </EnhancedCardDescription>
-                      </EnhancedCardHeader>
-                      <EnhancedCardDemo className="flex flex-col justify-end">
-                        {feature.codeDemo}
-                      </EnhancedCardDemo>
-                    </EnhancedCard>
+                      {/* If the user provided a custom child for this slot, render it (full control).
+                          Otherwise render the default card for this index. */}
+                      {custom ? (
+                        <div className="h-full">
+                          {custom}
+                        </div>
+                      ) : (
+                        renderDefaultCard(index)
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
@@ -313,7 +411,7 @@ const EnhancedFeatureShowcase: React.FC = () => {
 
           {/* Slide Indicators */}
           <div className="flex justify-center gap-2 mt-6">
-            {Array.from({ length: enhancedFeatures.length - visibleCards + 1 }).map((_, index) => (
+            {Array.from({ length: Math.max(1, cardCount - visibleCards + 1) }).map((_, index) => (
               <button
                 key={index}
                 onClick={() => setCurrentIndex(index)}

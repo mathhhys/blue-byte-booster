@@ -21,15 +21,15 @@ const Features = () => {
           {/* Top row: Heading, Subheading, Button */}
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-8 mb-12">
             <div>
-              <h2 className="text-4xl md:text-5xl font-bold text-white mb-4 mt-20">
+              <h2 className="text-5xl md:text-6xl font-bold text-white mb-4 mt-20">
                 Build software faster
               </h2>
-              <p className="text-lg md:text-xl text-gray-300">
+              <p className="text-xl md:text-2xl text-gray-300">
                 Intelligent, fast, and familiar, Softcodes is the best way to code with AI.
               </p>
             </div>
             <Button
-              className="self-start md:self-center bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-4 text-lg font-medium rounded-lg transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-xl"
+              className="self-start md:self-center bg-primary hover:bg-primary/90 text-primary-foreground px-10 py-5 text-xl font-semibold rounded-lg transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-xl"
               size="lg"
             >
               See more features
@@ -149,21 +149,21 @@ const PROVIDER_LOGOS = [
 export const ModelProvidersSection = () => (
   <section className="w-full bg-white py-16 px-4">
     <div className="max-w-6xl mx-auto flex flex-col items-center w-full">
-      <h3 className="text-base md:text-lg font-medium text-slate-900 text-center mb-8">
+      <h3 className="text-lg md:text-xl font-medium text-slate-900 text-center mb-8">
         First-class support for every major model provider
       </h3>
-      <div className="w-full flex flex-wrap justify-center items-center gap-8 md:gap-12">
+      <div className="w-full flex flex-wrap justify-center items-center gap-12 md:gap-20 my-8 md:my-12">
         {PROVIDER_LOGOS.map((logo) => (
           <img
             key={logo.name}
             src={logo.url}
             alt={logo.name}
-            className="h-12 md:h-14 w-auto object-contain max-w-[100px] md:max-w-[140px]"
+            className="h-16 md:h-20 w-auto object-contain max-w-[140px] md:max-w-[200px]"
             draggable={false}
           />
         ))}
       </div>
-      <p className="text-slate-900 text-sm text-center mt-8 font-bold">
+      <p className="text-lg md:text-xl text-slate-900 text-center mt-8 font-medium">
         + 30 additional providers supported
       </p>
     </div>
