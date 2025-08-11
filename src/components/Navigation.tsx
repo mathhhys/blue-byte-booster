@@ -130,14 +130,6 @@ const Navigation = () => {
                 PRICING
               </Link>
               <button
-                onClick={() => scrollToSection("pricing")}
-                className={`text-sm font-medium transition-colors hover:text-blue-600 ${
-                  isScrolled ? "text-gray-700" : "text-white"
-                }`}
-              >
-                FEATURES
-              </button>
-              <button
                 onClick={() => scrollToSection("enterprise")}
                 className={`text-sm font-medium transition-colors hover:text-blue-600 ${
                   isScrolled ? "text-gray-700" : "text-white"
@@ -153,6 +145,32 @@ const Navigation = () => {
                 >
                   DOCS
                 </button>
+              </div>
+              <div className="relative group">
+                <button
+                  className={`flex items-center text-sm font-medium transition-colors hover:text-blue-600 ${
+                    isScrolled ? "text-gray-700" : "text-white"
+                  }`}
+                >
+                  RESSOURCES
+                  <ChevronDown className="ml-1 h-4 w-4" />
+                </button>
+                <div className="absolute left-0 mt-2 w-48 bg-white shadow-lg rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-50">
+                  <Link
+                    to="/updates"
+                    className="block px-4 py-2 text-gray-700 hover:bg-gray-100"
+                    style={{ textDecoration: "none" }}
+                  >
+                    Updates
+                  </Link>
+                  <Link
+                    to="/feature-requests"
+                    className="block px-4 py-2 text-gray-700 hover:bg-gray-100"
+                    style={{ textDecoration: "none" }}
+                  >
+                    Feature Requests
+                  </Link>
+                </div>
               </div>
             </div>
 
@@ -234,13 +252,6 @@ const Navigation = () => {
               >
                 PRICING
               </Link>
-              <button
-                onClick={() => scrollToSection("features")}
-                className="w-full flex justify-center text-xl font-bold tracking-wide text-gray-200 hover:text-white transition-colors focus:outline-none text-center"
-                style={{ letterSpacing: "0.02em" }}
-              >
-                FEATURES
-              </button>
               <button
                 onClick={() => scrollToSection("enterprise")}
                 className="w-full flex justify-center text-xl font-bold tracking-wide text-gray-200 hover:text-white transition-colors focus:outline-none text-center"
