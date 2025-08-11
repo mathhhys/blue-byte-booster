@@ -104,7 +104,21 @@ All colors MUST be HSL.
   }
 /* Custom navbar scrolled background */
 .navbar-scrolled-bg {
-  background-color: #F9F3E9 !important;
+  background-color: #FFFFFF !important;
+}
+
+/* When the page is scrolled we add a `scrolled` class to the document body.
+   Override card 'sand' backgrounds so cards match the white navbar when scrolled. */
+.scrolled .bg-sk-sand,
+.scrolled .feature-card-enhanced,
+.scrolled .card-hover {
+  background-color: #FFFFFF !important;
+  color: #0D0E0F !important;
+}
+
+/* Slightly darker, subtle borders on white cards when scrolled */
+.scrolled .border-card-light {
+  border-color: rgba(13, 14, 15, 0.06) !important;
 }
 }
 

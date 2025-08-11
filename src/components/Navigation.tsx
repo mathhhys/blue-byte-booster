@@ -12,11 +12,22 @@ const Navigation = () => {
   useEffect(() => {
     const handleScroll = () => {
       const scrollPosition = window.scrollY;
-      setIsScrolled(scrollPosition > 50);
+      const scrolled = scrollPosition > 50;
+      setIsScrolled(scrolled);
+      if (scrolled) {
+        document.body.classList.add('scrolled');
+      } else {
+        document.body.classList.remove('scrolled');
+      }
     };
-
+  
+    // Run once to sync initial state (useful on refresh or anchor navigation)
+    handleScroll();
     window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      document.body.classList.remove('scrolled');
+    };
   }, []);
 
   // Handle keyboard navigation and focus management
