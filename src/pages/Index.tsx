@@ -12,12 +12,14 @@ const Index = () => {
     <div className="min-h-screen bg-background">
       <Navigation />
       <Hero />
-      <TabSection
-        title="Tab Tab Tab…Ship"
-        description="A single keystroke, limitless power, complete flow. The full power of Windsurf Tab is exclusive to the Windsurf Editor. Our IDE plugins include only the autocomplete action."
-        imageSrc="/placeholder.svg"
-        imageAlt="Code editor demo"
+      <section id="features">
+        <TabSection
+          title="Tab Tab Tab…Ship"
+          description="A single keystroke, limitless power, complete flow. The full power of Windsurf Tab is exclusive to the Windsurf Editor. Our IDE plugins include only the autocomplete action."
+          imageSrc="/placeholder.svg"
+          imageAlt="Code editor demo"
         />
+      </section>
       <TabSection
         title="Command Palette: All Actions, One Place"
         description="Access every feature and setting with a single shortcut. The command palette brings the full power of Windsurf to your fingertips, so you never have to leave your flow."

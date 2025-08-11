@@ -6,6 +6,7 @@ import { Menu, X, ChevronDown, User } from "lucide-react";
 const Navigation = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [showResources, setShowResources] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -129,14 +130,20 @@ const Navigation = () => {
               >
                 PRICING
               </Link>
-              <button
-                onClick={() => scrollToSection("pricing")}
+              <Link
+                to="/#features"
                 className={`text-sm font-medium transition-colors hover:text-blue-600 ${
                   isScrolled ? "text-gray-700" : "text-white"
                 }`}
+                style={{ textDecoration: "none" }}
+                onClick={() => {
+                  if (window.location.pathname === "/") {
+                    scrollToSection("features");
+                  }
+                }}
               >
                 FEATURES
-              </button>
+              </Link>
               <button
                 onClick={() => scrollToSection("enterprise")}
                 className={`text-sm font-medium transition-colors hover:text-blue-600 ${
@@ -171,13 +178,15 @@ const Navigation = () => {
                   >
                     Updates
                   </Link>
-                  <Link
-                    to="/feature-requests"
+                  <a
+                    href="https://softcodes.discourse.group/c/feature-requests/5"
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="block px-4 py-2 text-gray-700 hover:bg-gray-100"
                     style={{ textDecoration: "none" }}
                   >
                     Feature Requests
-                  </Link>
+                  </a>
                 </div>
               </div>
             </div>
@@ -240,7 +249,7 @@ const Navigation = () => {
           />
           
           {/* Menu Content */}
-          <div className={`mobile-menu-content ${isMobileMenuOpen ? 'slide-in' : 'slide-out'} flex flex-col h-full justify-start pt-12 px-8`}>
+          <div className={`mobile-menu-content ${isMobileMenuOpen ? 'slide-in' : 'slide-out'} flex flex-col h-full justify-center items-center px-6 py-8`}>
             {/* Close Button */}
             <button
               className="absolute top-6 right-6 p-2 text-gray-300 min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors duration-200 hover:text-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-[#101828] rounded-lg"
@@ -251,7 +260,7 @@ const Navigation = () => {
             </button>
 
             {/* Navigation Items */}
-            <nav role="navigation" aria-label="Mobile navigation" className="flex flex-col items-center justify-center space-y-8 mt-10 w-full min-h-[40vh]">
+            <nav role="navigation" aria-label="Mobile navigation" className="flex flex-col items-center justify-center space-y-6 w-full min-h-[40vh] max-w-[420px] mx-auto py-4">
               <Link
                 to="/pricing"
                 className="w-full flex justify-center text-xl font-bold tracking-wide text-gray-200 hover:text-white transition-colors focus:outline-none text-center"
@@ -260,34 +269,86 @@ const Navigation = () => {
               >
                 PRICING
               </Link>
-              <button
-                onClick={() => scrollToSection("features")}
+
+              <Link
+                to="/#features"
                 className="w-full flex justify-center text-xl font-bold tracking-wide text-gray-200 hover:text-white transition-colors focus:outline-none text-center"
-                style={{ letterSpacing: "0.02em" }}
+                style={{ letterSpacing: "0.02em", textDecoration: "none" }}
+                onClick={() => {
+                  if (window.location.pathname === "/") {
+                    scrollToSection("features");
+                  }
+                  closeMobileMenu();
+                }}
               >
                 FEATURES
-              </button>
+              </Link>
+
               <button
-                onClick={() => scrollToSection("enterprise")}
+                onClick={() => {
+                  scrollToSection("enterprise");
+                }}
                 className="w-full flex justify-center text-xl font-bold tracking-wide text-gray-200 hover:text-white transition-colors focus:outline-none text-center"
                 style={{ letterSpacing: "0.02em" }}
               >
-                ENTERPRISE
+                TEAMS & ENTERPRISE
               </button>
+
               <button
-                onClick={() => scrollToSection("documentation")}
+                onClick={() => {
+                  scrollToSection("documentation");
+                }}
                 className="w-full flex justify-center text-xl font-bold tracking-wide text-gray-200 hover:text-white transition-colors focus:outline-none text-center"
                 style={{ letterSpacing: "0.02em" }}
               >
-                DOCUMENTATION
+                DOCS
               </button>
+
+              {/* Resources (matches desktop dropdown) */}
+              <div className="w-full flex flex-col items-center">
+                <button
+                  onClick={() => setShowResources((s) => !s)}
+                  aria-expanded={showResources}
+                  className="w-full flex justify-center text-xl font-bold tracking-wide text-gray-200 hover:text-white transition-colors focus:outline-none text-center"
+                  style={{ letterSpacing: "0.02em" }}
+                >
+                  RESSOURCES
+                </button>
+
+                {showResources && (
+                  <div className="mt-4 w-full flex flex-col items-center space-y-4">
+                    <Link
+                      to="/updates"
+                      className="w-full text-base text-gray-300 hover:text-white text-center px-2"
+                      style={{ textDecoration: "none" }}
+                      onClick={() => {
+                        closeMobileMenu();
+                      }}
+                    >
+                      Updates
+                    </Link>
+                    <a
+                      href="https://softcodes.discourse.group/c/feature-requests/5"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full text-base text-gray-300 hover:text-white text-center px-2"
+                      onClick={() => {
+                        closeMobileMenu();
+                      }}
+                      style={{ textDecoration: "none" }}
+                    >
+                      Feature Requests
+                    </a>
+                  </div>
+                )}
+              </div>
             </nav>
 
             {/* Divider */}
             <div className="w-full border-t border-gray-700 my-10" />
 
             {/* Action Buttons */}
-            <div className="flex flex-col w-full space-y-4">
+            <div className="flex flex-col w-full max-w-[420px] mx-auto space-y-4 items-center pb-6">
               <button className="w-full border border-blue-600 text-blue-600 bg-transparent rounded-xl py-3 text-lg font-medium transition-colors hover:bg-blue-950 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-[#101828]">
                 Sign In
               </button>
