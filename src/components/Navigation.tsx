@@ -130,6 +130,14 @@ const Navigation = () => {
                 PRICING
               </Link>
               <button
+                onClick={() => scrollToSection("pricing")}
+                className={`text-sm font-medium transition-colors hover:text-blue-600 ${
+                  isScrolled ? "text-gray-700" : "text-white"
+                }`}
+              >
+                FEATURES
+              </button>
+              <button
                 onClick={() => scrollToSection("enterprise")}
                 className={`text-sm font-medium transition-colors hover:text-blue-600 ${
                   isScrolled ? "text-gray-700" : "text-white"
@@ -252,6 +260,13 @@ const Navigation = () => {
               >
                 PRICING
               </Link>
+              <button
+                onClick={() => scrollToSection("features")}
+                className="w-full flex justify-center text-xl font-bold tracking-wide text-gray-200 hover:text-white transition-colors focus:outline-none text-center"
+                style={{ letterSpacing: "0.02em" }}
+              >
+                FEATURES
+              </button>
               <button
                 onClick={() => scrollToSection("enterprise")}
                 className="w-full flex justify-center text-xl font-bold tracking-wide text-gray-200 hover:text-white transition-colors focus:outline-none text-center"
