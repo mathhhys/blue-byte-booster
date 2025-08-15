@@ -1,12 +1,37 @@
 import { SignIn as ClerkSignIn } from '@clerk/clerk-react';
+import { useSearchParams } from 'react-router-dom';
 import { dark } from '@clerk/themes';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { setAuthPageMeta } from '@/utils/seo';
 
 const SignIn = () => {
+  const [searchParams] = useSearchParams();
+  const plan = searchParams.get('plan');
+  const billing = searchParams.get('billing');
+  const seats = searchParams.get('seats');
+  const redirectUrl = searchParams.get('redirect_url');
+
   useEffect(() => {
     setAuthPageMeta('signIn');
   }, []);
+
+  // Build the redirect URL based on plan selection
+  const dynamicRedirectUrl = useMemo(() => {
+    if (plan && plan !== 'starter') {
+      // For paid plans, redirect to a checkout handler
+      const params = new URLSearchParams();
+      params.set('plan', plan);
+      if (billing) params.set('billing', billing);
+      if (seats) params.set('seats', seats);
+      if (redirectUrl) params.set('original_redirect', redirectUrl);
+      
+      return `/auth/post-signup?${params.toString()}`;
+    }
+    
+    // For starter plan or no plan, redirect to dashboard or original URL
+    return redirectUrl ? decodeURIComponent(redirectUrl) : '/dashboard';
+  }, [plan, billing, seats, redirectUrl]);
+  
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
       <div className="w-full max-w-md">
@@ -22,9 +47,18 @@ const SignIn = () => {
           <p className="text-gray-300">
             Sign in to continue coding with AI
           </p>
+          {plan && (
+            <div className="mt-4 px-4 py-2 bg-blue-600/20 border border-blue-500/30 rounded-lg">
+              <p className="text-blue-300 text-sm">
+                Selected plan: <span className="font-semibold capitalize">{plan}</span>
+                {billing && <span className="ml-2">({billing})</span>}
+                {seats && seats !== '1' && <span className="ml-2">- {seats} seats</span>}
+              </p>
+            </div>
+          )}
         </div>
         
-        <ClerkSignIn 
+        <ClerkSignIn
           appearance={{
             baseTheme: dark,
             variables: {
@@ -45,7 +79,7 @@ const SignIn = () => {
               footerActionLink: 'text-blue-400 hover:text-blue-300',
             },
           }}
-          redirectUrl="/dashboard"
+          redirectUrl={dynamicRedirectUrl}
           signUpUrl="/sign-up"
         />
       </div>

@@ -159,14 +159,15 @@ const Navigation = () => {
               >
                 FEATURES
               </Link>
-              <button
-                onClick={() => scrollToSection("enterprise")}
+              <Link
+                to="/teams"
                 className={`text-sm font-medium transition-colors hover:text-blue-600 ${
                   isScrolled ? "text-gray-700" : "text-white"
                 }`}
+                style={{ textDecoration: "none" }}
               >
                 TEAMS & ENTERPRISE
-              </button>
+              </Link>
               <div className="relative group">
                 <button
                   className={`flex items-center text-sm font-medium transition-colors hover:text-blue-600 ${
@@ -327,15 +328,14 @@ const Navigation = () => {
                 FEATURES
               </Link>
 
-              <button
-                onClick={() => {
-                  scrollToSection("enterprise");
-                }}
+              <Link
+                to="/teams"
                 className="w-full flex justify-center text-xl font-bold tracking-wide text-gray-200 hover:text-white transition-colors focus:outline-none text-center"
-                style={{ letterSpacing: "0.02em" }}
+                style={{ letterSpacing: "0.02em", textDecoration: "none" }}
+                onClick={closeMobileMenu}
               >
                 TEAMS & ENTERPRISE
-              </button>
+              </Link>
 
               <button
                 onClick={() => {

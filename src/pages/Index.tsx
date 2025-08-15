@@ -5,6 +5,7 @@ import Features from "@/components/Features";
 import FeatureShowcase from "@/components/FeatureShowcase";
 import CodeDemo from "@/components/CodeDemo";
 import CTA from "@/components/CTA";
+import StatsSection from "@/components/StatsSection";
 import Footer from "@/components/Footer";
 
 const Index = () => {
@@ -40,6 +41,7 @@ const Index = () => {
       />
       <FeatureShowcase />
       <Features />
+      <StatsSection />
       <Footer />
     </div>
   );
