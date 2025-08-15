@@ -1,16 +1,34 @@
 import { SignUp as ClerkSignUp } from '@clerk/clerk-react';
 import { useSearchParams } from 'react-router-dom';
 import { dark } from '@clerk/themes';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { setAuthPageMeta } from '@/utils/seo';
 
 const SignUp = () => {
   const [searchParams] = useSearchParams();
   const plan = searchParams.get('plan');
+  const billing = searchParams.get('billing');
+  const seats = searchParams.get('seats');
+  const redirectUrl = searchParams.get('redirect_url');
 
   useEffect(() => {
     setAuthPageMeta('signUp');
   }, []);
+
+  // Build the redirect URL based on plan selection
+  const dynamicRedirectUrl = useMemo(() => {
+    // Always redirect to post-signup to ensure user is created in database
+    const params = new URLSearchParams();
+    
+    // Set plan (default to starter if not specified)
+    params.set('plan', plan || 'starter');
+    
+    if (billing) params.set('billing', billing);
+    if (seats) params.set('seats', seats);
+    if (redirectUrl) params.set('original_redirect', redirectUrl);
+    
+    return `/auth/post-signup?${params.toString()}`;
+  }, [plan, billing, seats, redirectUrl]);
   
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
@@ -31,12 +49,14 @@ const SignUp = () => {
             <div className="mt-4 px-4 py-2 bg-blue-600/20 border border-blue-500/30 rounded-lg">
               <p className="text-blue-300 text-sm">
                 Selected plan: <span className="font-semibold capitalize">{plan}</span>
+                {billing && <span className="ml-2">({billing})</span>}
+                {seats && seats !== '1' && <span className="ml-2">- {seats} seats</span>}
               </p>
             </div>
           )}
         </div>
         
-        <ClerkSignUp 
+        <ClerkSignUp
           appearance={{
             baseTheme: dark,
             variables: {
@@ -57,7 +77,7 @@ const SignUp = () => {
               footerActionLink: 'text-blue-400 hover:text-blue-300',
             },
           }}
-          redirectUrl="/dashboard"
+          fallbackRedirectUrl={dynamicRedirectUrl}
           signInUrl="/sign-in"
         />
       </div>

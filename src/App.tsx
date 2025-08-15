@@ -7,12 +7,16 @@ import { SignedIn, SignedOut, RedirectToSignIn } from '@clerk/clerk-react';
 
 import Index from "./pages/Index";
 import Pricing from "./pages/Pricing";
+import Teams from "./pages/Teams";
 import Updates from "./pages/Updates";
 import NotFound from "./pages/NotFound";
 import SignUp from "./pages/SignUp";
 import SignIn from "./pages/SignIn";
+import PostSignup from "./pages/PostSignup";
 import Dashboard from "./pages/Dashboard";
 import Profile from "./pages/Profile";
+import PaymentSuccess from "./pages/PaymentSuccess";
+import PaymentCancelled from "./pages/PaymentCancelled";
 
 const queryClient = new QueryClient();
 
@@ -26,9 +30,15 @@ const App = () => (
           {/* Public Routes */}
           <Route path="/" element={<Index />} />
           <Route path="/pricing" element={<Pricing />} />
+          <Route path="/teams" element={<Teams />} />
           <Route path="/updates" element={<Updates />} />
           <Route path="/sign-up/*" element={<SignUp />} />
           <Route path="/sign-in/*" element={<SignIn />} />
+          <Route path="/auth/post-signup" element={<PostSignup />} />
+          
+          {/* Payment Routes */}
+          <Route path="/payment/success" element={<PaymentSuccess />} />
+          <Route path="/payment/cancelled" element={<PaymentCancelled />} />
           
           {/* Protected Routes */}
           <Route

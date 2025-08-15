@@ -6,20 +6,24 @@ import { Card } from "@/components/ui/card";
 import { Check, Download, ArrowRight, Users } from "lucide-react";
 import { SignedIn, SignedOut, useUser } from '@clerk/clerk-react';
 import { useNavigate } from 'react-router-dom';
+import { AuthFlowModal } from '@/components/auth/AuthFlowModal';
+import { useAuthFlow } from '@/hooks/useAuthFlow';
 
 export const PricingSection = () => {
   const [isYearly, setIsYearly] = useState(false);
   const navigate = useNavigate();
   const { isLoaded, isSignedIn } = useUser();
+  const { state, actions } = useAuthFlow();
 
   const plans = [
     {
       name: "Starter",
       price: { monthly: 0, yearly: 0 },
-      description: "Pro two-week trial",
       features: [
+        "2 week Pro trial",
         "Limited Agent requests",
-        "Limited Tab completions"
+        "Limited Tab completions",
+        "Zero data retention by default"
       ],
       buttonText: "Get Started For Free",
       buttonIcon: ArrowRight,
@@ -29,12 +33,11 @@ export const PricingSection = () => {
     {
       name: "Pro",
       price: { monthly: 20, yearly: 16 },
-      description: "Extended limits on Agent",
+      description: "Everything in Starter +",
       features: [
-        "Unlimited Tab completions",
-        "Access to Background Agents",
-        "Access to Bugbot", 
-        "Access to maximum context windows",
+        "Unlimited Agent Requests",
+        "Unlimited Tab Completion",
+        "500 requests per month included",
         "Add more credits at API Price - No extra costs"
       ],
       buttonText: "Get Softcodes Pro",
@@ -45,12 +48,12 @@ export const PricingSection = () => {
     {
       name: "Teams",
       price: { monthly: 30, yearly: 24 },
-      description: "20x usage on all OpenAI/Claude/Gemini models",
+      description: "Everything in Pro +",
       features: [
-        "Automated zero data retention",
+        "Privacy mode",
         "Centralized Billing",
         "Admin dashboard with analytics",
-        "Priority support"
+        "Priority support",
       ],
       buttonText: "Get Softcodes for Teams",
       buttonIcon: ArrowRight,
@@ -143,13 +146,7 @@ export const PricingSection = () => {
                 {/* Button */}
                 {!isLoaded || !isSignedIn ? (
                   <Button
-                    onClick={() => {
-                      if (plan.name === 'Starter') {
-                        navigate('/sign-up');
-                      } else {
-                        navigate(`/sign-up?plan=${plan.name.toLowerCase()}`);
-                      }
-                    }}
+                    onClick={() => actions.openModal(plan.name.toLowerCase() as 'starter' | 'pro' | 'teams')}
                     variant={plan.buttonVariant}
                     className={`w-full group ${
                       plan.isPopular
@@ -228,6 +225,13 @@ export const PricingSection = () => {
           </div>
         </Card>
       </div>
+
+      {/* Auth Flow Modal */}
+      <AuthFlowModal
+        isOpen={state.isOpen}
+        onClose={actions.closeModal}
+        triggerPlan={state.selectedPlan}
+      />
     </section>
   );
 };
