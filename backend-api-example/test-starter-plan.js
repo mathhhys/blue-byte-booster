@@ -73,7 +73,7 @@ const testStarterPlan = async () => {
 
     // Test 7: Test API endpoint
     console.log('\n7️⃣ Testing starter plan API endpoint...');
-    const response = await fetch('http://localhost:3001/api/starter/process-signup', {
+    const response = await fetch('https://api.softcodes.ai/api/starter/process-signup', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

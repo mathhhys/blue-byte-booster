@@ -4,12 +4,64 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const { createClient } = require('@supabase/supabase-js');
 const { Pool } = require('pg');
 
+// Import route modules
+const vscodeRoutes = require('./routes/vscode');
+const usersRoutes = require('./routes/users');
+
 const app = express();
 const port = process.env.PORT || 3001;
+
+// PKCE Utility Functions
+function generateRandomString(length) {
+  return crypto.randomBytes(Math.ceil(length / 2)).toString('hex').slice(0, length);
+}
+
+function sha256(plain) {
+  return crypto.createHash('sha256').update(plain).digest();
+}
+
+function base64URLEncode(buffer) {
+  return buffer.toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=/g, '');
+}
+
+function generateCodeVerifier() {
+  return base64URLEncode(crypto.randomBytes(32)); // 43-128 characters
+}
+
+async function generateCodeChallenge(code_verifier) {
+  const hashed = await sha256(code_verifier);
+  return base64URLEncode(hashed);
+}
+
+// JWT Utility Functions
+const JWT_SECRET = process.env.JWT_SECRET || generateRandomString(64); // Use a strong secret key
+const JWT_EXPIRES_IN = '1h'; // Access token expires in 1 hour
+const REFRESH_TOKEN_EXPIRES_IN = '7d'; // Refresh token expires in 7 days
+
+function generateAccessToken(clerkUserId) {
+  return jwt.sign({ clerkUserId, type: 'access' }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+}
+
+function generateRefreshToken(clerkUserId) {
+  return jwt.sign({ clerkUserId, type: 'refresh' }, JWT_SECRET, { expiresIn: REFRESH_TOKEN_EXPIRES_IN });
+}
+
+function verifyToken(token) {
+  try {
+    return jwt.verify(token, JWT_SECRET);
+  } catch (error) {
+    return null;
+  }
+}
 
 // Supabase client for auth and real-time features
 const supabase = createClient(
@@ -26,12 +78,19 @@ const pool = new Pool({
 });
 
 // Test database connection
-pool.on('connect', () => {
-  console.log('Connected to PostgreSQL database via transaction pooler');
+pool.on('connect', (client) => {
+  console.log('✅ Connected to PostgreSQL database via transaction pooler');
+  client.query('SELECT NOW()', (err, res) => {
+    if (err) {
+      console.error('❌ Error testing database connection:', err.message);
+    } else {
+      console.log('📊 Database connection test successful. Current DB time:', res.rows[0].now);
+    }
+  });
 });
 
 pool.on('error', (err) => {
-  console.error('PostgreSQL connection error:', err);
+  console.error('❌ PostgreSQL connection error:', err);
 });
 
 app.use(cors());
@@ -39,6 +98,10 @@ app.use(cors());
 // For Stripe webhooks, we need the raw body before JSON parsing
 app.use('/api/stripe/webhooks', express.raw({ type: 'application/json' }));
 app.use(express.json());
+
+// Register API routes
+app.use('/api/vscode', vscodeRoutes);
+app.use('/api/users', usersRoutes);
 
 // Create Stripe checkout session
 app.post('/api/stripe/create-checkout-session', async (req, res) => {
@@ -304,7 +367,7 @@ app.post('/api/stripe/process-payment-success', async (req, res) => {
         .from('subscriptions')
         .insert({
           user_id: user.id,
-          stripe_subscription_id: session.subscription?.id,
+          stripe_subscription_id: session.subscription,
           plan_type,
           billing_frequency,
           seats: parseInt(seats) || 1,
@@ -326,7 +389,7 @@ app.post('/api/stripe/process-payment-success', async (req, res) => {
         p_clerk_id: clerkUserId,
         p_amount: totalCredits,
         p_description: `${plan_type} plan credits (${seats || 1} seat${(seats || 1) > 1 ? 's' : ''})`,
-        p_reference_id: session.subscription?.id,
+        p_reference_id: session.subscription,
       });
 
       if (creditError) throw creditError;
@@ -448,6 +511,211 @@ app.post('/api/starter/process-signup', async (req, res) => {
     res.status(500).json({ error: 'Failed to process starter signup' });
   }
 });
+// Initiate VSCode authentication flow
+app.get('/api/auth/initiate-vscode-auth', async (req, res) => {
+  try {
+    const { redirect_uri } = req.query;
+
+    if (!redirect_uri) {
+      return res.status(400).json({ error: 'Missing redirect_uri parameter' });
+    }
+
+    const code_verifier = generateCodeVerifier();
+    const code_challenge = await generateCodeChallenge(code_verifier);
+    const state = generateRandomString(32); // Generate a random state for CSRF protection
+
+    // Store the code_verifier, code_challenge, state, and redirect_uri in the database
+    const { data, error } = await supabase
+      .from('oauth_codes')
+      .insert([
+        {
+          clerk_user_id: 'temp', // Will be updated after Clerk auth
+          code_verifier,
+          code_challenge,
+          state,
+          redirect_uri,
+          expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(), // Expires in 10 minutes
+        },
+      ])
+      .select();
+
+    if (error) {
+      console.error('Error storing OAuth code:', error);
+      return res.status(500).json({ error: 'Failed to initiate authentication' });
+    }
+
+    // The frontend will redirect the user to Clerk's sign-in/sign-up page
+    // The redirect_uri for Clerk will be the frontend's /auth/vscode-callback
+    // This callback will then redirect to the VSCode extension's custom URI
+    res.json({
+      success: true,
+      code_challenge,
+      state,
+      auth_url: `/sign-in?redirect_url=/auth/vscode-callback?state=${state}&code_challenge=${code_challenge}&vscode_redirect_uri=${encodeURIComponent(redirect_uri)}`,
+    });
+
+  } catch (error) {
+    console.error('Error initiating VSCode authentication:', error);
+    res.status(500).json({ error: 'Failed to initiate VSCode authentication' });
+  }
+});
+
+// Exchange authorization code for tokens
+app.post('/api/auth/token', async (req, res) => {
+  try {
+    const { code, code_verifier, state, redirect_uri } = req.body;
+
+    if (!code || !code_verifier || !state || !redirect_uri) {
+      return res.status(400).json({ error: 'Missing required parameters' });
+    }
+
+    // 1. Retrieve and validate the stored OAuth code
+    const { data: oauthCode, error: fetchError } = await supabase
+      .from('oauth_codes')
+      .select('*')
+      .eq('state', state)
+      .single();
+
+    if (fetchError || !oauthCode || oauthCode.expires_at < new Date().toISOString()) {
+      console.error('Invalid or expired OAuth state:', state, fetchError);
+      return res.status(400).json({ error: 'Invalid or expired authorization code' });
+    }
+
+    // 2. Verify code_challenge
+    const expectedCodeChallenge = await generateCodeChallenge(code_verifier);
+    if (oauthCode.code_challenge !== expectedCodeChallenge) {
+      console.error('Code challenge mismatch for state:', state);
+      return res.status(400).json({ error: 'Invalid code verifier' });
+    }
+
+    // 3. Verify redirect_uri
+    if (oauthCode.redirect_uri !== redirect_uri) {
+      console.error('Redirect URI mismatch for state:', state);
+      return res.status(400).json({ error: 'Invalid redirect URI' });
+    }
+
+    // 4. Use Clerk's backend API to verify the code and get user info
+    // This step assumes the 'code' received here is a Clerk session token or similar
+    // For a full OAuth flow, Clerk would typically redirect to the frontend with an auth code,
+    // and the frontend would then exchange that with the backend.
+    // For simplicity, we'll assume the 'code' here is a Clerk user ID for direct token generation.
+    // This is a simplification and should be replaced with proper Clerk backend verification.
+    const clerkUserId = code; // TEMPORARY: Replace with actual Clerk token verification
+
+    // 5. Generate access and refresh tokens
+    const accessToken = generateAccessToken(clerkUserId);
+    const refreshToken = generateRefreshToken(clerkUserId);
+    const refreshTokenExpiresAt = new Date(Date.now() + (7 * 24 * 60 * 60 * 1000)).toISOString(); // 7 days
+
+    // 6. Store refresh token in the database
+    const { error: refreshError } = await supabase
+      .from('refresh_tokens')
+      .insert([
+        {
+          clerk_user_id: clerkUserId,
+          token: refreshToken,
+          expires_at: refreshTokenExpiresAt,
+        },
+      ]);
+
+    if (refreshError) {
+      console.error('Error storing refresh token:', refreshError);
+      return res.status(500).json({ error: 'Failed to issue tokens' });
+    }
+
+    // 7. Delete the used oauth_code
+    await supabase.from('oauth_codes').delete().eq('id', oauthCode.id);
+
+    res.json({
+      success: true,
+      access_token: accessToken,
+      refresh_token: refreshToken,
+      expires_in: 3600, // 1 hour
+    });
+
+  } catch (error) {
+    console.error('Error exchanging code for tokens:', error);
+    res.status(500).json({ error: 'Failed to exchange code for tokens' });
+  }
+});
+
+// Refresh access token using refresh token
+app.post('/api/auth/refresh-token', async (req, res) => {
+  try {
+    const { refresh_token: oldRefreshToken } = req.body;
+
+    if (!oldRefreshToken) {
+      return res.status(400).json({ error: 'Refresh token is required' });
+    }
+
+    // 1. Verify the refresh token's signature
+    const decoded = verifyToken(oldRefreshToken);
+    if (!decoded || decoded.type !== 'refresh') {
+      return res.status(401).json({ error: 'Invalid refresh token' });
+    }
+
+    const { clerkUserId } = decoded;
+
+    // 2. Check if the refresh token exists in the database and is not revoked/expired
+    const { data: storedRefreshToken, error: fetchError } = await supabase
+      .from('refresh_tokens')
+      .select('*')
+      .eq('token', oldRefreshToken)
+      .eq('clerk_user_id', clerkUserId)
+      .is('revoked_at', null)
+      .single();
+
+    if (fetchError || !storedRefreshToken || new Date(storedRefreshToken.expires_at) < new Date()) {
+      // If token is invalid, revoked, or expired, revoke all tokens for this user for security
+      await supabase
+        .from('refresh_tokens')
+        .update({ revoked_at: new Date().toISOString() })
+        .eq('clerk_user_id', clerkUserId)
+        .is('revoked_at', null); // Only revoke active tokens
+      
+      console.error('Invalid, revoked, or expired refresh token for user:', clerkUserId, fetchError);
+      return res.status(401).json({ error: 'Invalid or expired refresh token' });
+    }
+
+    // 3. Revoke the old refresh token (one-time use)
+    await supabase
+      .from('refresh_tokens')
+      .update({ revoked_at: new Date().toISOString() })
+      .eq('id', storedRefreshToken.id);
+
+    // 4. Generate new access and refresh tokens
+    const newAccessToken = generateAccessToken(clerkUserId);
+    const newRefreshToken = generateRefreshToken(clerkUserId);
+    const newRefreshTokenExpiresAt = new Date(Date.now() + (7 * 24 * 60 * 60 * 1000)).toISOString(); // 7 days
+
+    // 5. Store the new refresh token in the database
+    const { error: insertError } = await supabase
+      .from('refresh_tokens')
+      .insert([
+        {
+          clerk_user_id: clerkUserId,
+          token: newRefreshToken,
+          expires_at: newRefreshTokenExpiresAt,
+        },
+      ]);
+
+    if (insertError) {
+      console.error('Error storing new refresh token:', insertError);
+      return res.status(500).json({ error: 'Failed to issue new tokens' });
+    }
+
+    res.json({
+      success: true,
+      access_token: newAccessToken,
+      refresh_token: newRefreshToken,
+      expires_in: 3600, // 1 hour
+    });
+
+  } catch (error) {
+    console.error('Error refreshing token:', error);
+    res.status(500).json({ error: 'Failed to refresh token' });
+  }
+});
 
 // Clerk webhook handler for user creation
 app.post('/api/clerk/webhooks', express.raw({ type: 'application/json' }), async (req, res) => {
@@ -540,7 +808,7 @@ async function handleCheckoutSessionCompleted(session) {
       console.error('Missing required metadata in checkout session:', session.metadata);
       return;
     }
-
+ 
     // Get user first
     const { data: userData, error: userFetchError } = await supabase
       .from('users')
@@ -614,8 +882,12 @@ async function handleSubscriptionDeleted(subscription) {
   // Handle subscription cancellation
 }
 
-app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
-});
+
+// Start server (only if not being imported as a module)
+if (require.main === module) {
+  app.listen(port, () => {
+    console.log(`Server running on port ${port}`);
+  });
+}
 
 module.exports = app;
