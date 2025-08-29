@@ -1,7 +1,7 @@
 import { getStripe, getPriceConfig, calculateTotalAmount } from './client';
 import { StripeCheckoutData } from '@/types/database';
 
-const API_BASE = import.meta.env.VITE_API_URL || ''; // set VITE_API_URL in your .env (e.g. http://localhost:3001) or leave empty to use relative paths
+const API_BASE = import.meta.env.VITE_API_URL || ''; // set VITE_API_URL in your .env (e.g. https://api.softcodes.ai) or leave empty to use relative paths
 
 // Checkout session creation using backend API
 export const createCheckoutSession = async (checkoutData: StripeCheckoutData) => {

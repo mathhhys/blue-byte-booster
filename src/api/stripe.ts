@@ -5,7 +5,7 @@ import { StripeCheckoutData } from '@/types/database';
 import { STRIPE_PRODUCTS } from '@/utils/stripe/client';
 
 // API base URL - use environment variable or fallback to localhost
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://api.softcodes.ai';
 
 // Create Stripe checkout session
 export const createStripeCheckoutSession = async (checkoutData: StripeCheckoutData) => {

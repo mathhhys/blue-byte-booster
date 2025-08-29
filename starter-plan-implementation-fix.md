@@ -205,7 +205,7 @@ const testStarterPlan = async () => {
   try {
     // Test 1: Create starter user via API
     console.log('1️⃣ Testing starter plan API endpoint...');
-    const response = await fetch('http://localhost:3001/api/starter/process-signup', {
+    const response = await fetch('https://api.softcodes.ai/api/starter/process-signup', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -299,7 +299,7 @@ const testStarterPlan = async () => {
 
     // Test 5: Test duplicate user creation (should return existing)
     console.log('\n5️⃣ Testing duplicate user creation...');
-    const duplicateResponse = await fetch('http://localhost:3001/api/starter/process-signup', {
+    const duplicateResponse = await fetch('https://api.softcodes.ai/api/starter/process-signup', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
