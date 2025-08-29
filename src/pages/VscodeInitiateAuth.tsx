@@ -21,9 +21,11 @@ export const VscodeInitiateAuth: React.FC = () => {
         const data = await response.json();
 
         if (data.success && data.auth_url) {
+          console.log('VSCode Auth: Redirecting to Clerk auth_url:', data.auth_url);
           // Redirect to Clerk's sign-in/sign-up page via the backend-provided URL
           window.location.href = data.auth_url;
         } else {
+          console.error('VSCode Auth: Failed to initiate auth flow. Error:', data.error);
           setError(data.error || 'Failed to initiate authentication flow.');
         }
       } catch (err) {

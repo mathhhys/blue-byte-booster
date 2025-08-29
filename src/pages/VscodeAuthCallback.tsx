@@ -48,6 +48,8 @@ export const VscodeAuthCallback: React.FC = () => {
         finalVscodeRedirect.searchParams.set('code', authorizationCode);
         finalVscodeRedirect.searchParams.set('state', state);
 
+        console.log('VSCode Auth Callback: Authorization Code (Clerk User ID):', authorizationCode);
+        console.log('VSCode Auth Callback: Final VSCode Redirect URL:', finalVscodeRedirect.toString());
         // Redirect to the VSCode custom URI
         window.location.href = finalVscodeRedirect.toString();
 

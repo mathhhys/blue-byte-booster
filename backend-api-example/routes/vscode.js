@@ -14,6 +14,9 @@ router.post('/session/validate', authenticateClerkToken, rateLimitMiddleware, as
   try {
     const { sessionToken, extensionVersion } = req.body;
     const { clerkUserId } = req.auth;
+    console.log('VSCode Session Validate: Received sessionToken:', sessionToken);
+    console.log('VSCode Session Validate: Received extensionVersion:', extensionVersion);
+    console.log('VSCode Session Validate: Authenticated Clerk User ID:', clerkUserId);
 
     if (!sessionToken || !extensionVersion) {
       return res.status(400).json({
@@ -24,6 +27,7 @@ router.post('/session/validate', authenticateClerkToken, rateLimitMiddleware, as
 
     // Get or create VS Code session
     let session = await getOrCreateVSCodeSession(clerkUserId, sessionToken, extensionVersion);
+    console.log('VSCode Session Validate: Retrieved/Created Session:', session);
     
     // Get user profile
     const { data: userData, error: userError } = await supabase
