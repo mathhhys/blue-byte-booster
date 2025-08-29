@@ -14,12 +14,10 @@ export const VscodeAuthCallback: React.FC = () => {
   useEffect(() => {
     const handleCallback = async () => {
       if (!isLoaded) {
-        // Clerk is still loading, wait for it
         return;
       }
 
       if (!isSignedIn || !user) {
-        // User is not signed in, redirect to sign-in page with a message
         setError('You must be signed in to complete VSCode authentication. Redirecting to sign-in...');
         setTimeout(() => {
           navigate(`/sign-in?redirect_url=${encodeURIComponent(window.location.pathname + window.location.search)}`);
@@ -28,10 +26,9 @@ export const VscodeAuthCallback: React.FC = () => {
       }
 
       const state = searchParams.get('state');
-      const codeChallenge = searchParams.get('code_challenge');
       const vscodeRedirectUri = searchParams.get('vscode_redirect_uri');
 
-      if (!state || !codeChallenge || !vscodeRedirectUri) {
+      if (!state || !vscodeRedirectUri) {
         setError('Missing required parameters for VSCode callback.');
         return;
       }
@@ -39,18 +36,23 @@ export const VscodeAuthCallback: React.FC = () => {
       setStatus('Completing authentication handshake...');
 
       try {
-        // The backend's /api/auth/token endpoint expects the 'code' to be the Clerk user ID for now.
-        // In a more robust OAuth flow, Clerk would provide an authorization code here that the backend would exchange.
-        const authorizationCode = user.id; 
+        const response = await fetch('/api/auth/update-auth-code', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ state, clerk_user_id: user.id }),
+        });
 
-        // Construct the final redirect URL for the VSCode extension
+        if (!response.ok) {
+          throw new Error('Failed to update authentication code.');
+        }
+
+        const authorizationCode = user.id;
         const finalVscodeRedirect = new URL(decodeURIComponent(vscodeRedirectUri));
         finalVscodeRedirect.searchParams.set('code', authorizationCode);
         finalVscodeRedirect.searchParams.set('state', state);
 
-        console.log('VSCode Auth Callback: Authorization Code (Clerk User ID):', authorizationCode);
-        console.log('VSCode Auth Callback: Final VSCode Redirect URL:', finalVscodeRedirect.toString());
-        // Redirect to the VSCode custom URI
         window.location.href = finalVscodeRedirect.toString();
 
       } catch (err) {

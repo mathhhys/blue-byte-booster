@@ -13,6 +13,7 @@ const { Pool } = require('pg');
 // Import route modules
 const vscodeRoutes = require('./routes/vscode');
 const usersRoutes = require('./routes/users');
+const authRoutes = require('./routes/auth');
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -102,6 +103,7 @@ app.use(express.json());
 // Register API routes
 app.use('/api/vscode', vscodeRoutes);
 app.use('/api/users', usersRoutes);
+app.use('/api/auth', authRoutes);
 
 // Create Stripe checkout session
 app.post('/api/stripe/create-checkout-session', async (req, res) => {
