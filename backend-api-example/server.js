@@ -547,11 +547,17 @@ app.get('/api/auth/initiate-vscode-auth', async (req, res) => {
     // The frontend will redirect the user to Clerk's sign-in/sign-up page
     // The redirect_uri for Clerk will be the frontend's /auth/vscode-callback
     // This callback will then redirect to the VSCode extension's custom URI
+    console.log('VSCode Auth Initiate: Generated code_verifier:', code_verifier);
+    console.log('VSCode Auth Initiate: Generated code_challenge:', code_challenge);
+    console.log('VSCode Auth Initiate: Generated state:', state);
+    const authUrl = `/sign-in?redirect_url=/auth/vscode-callback?state=${state}&code_challenge=${code_challenge}&vscode_redirect_uri=${encodeURIComponent(redirect_uri)}`;
+    console.log('VSCode Auth Initiate: Generated auth_url:', authUrl);
+
     res.json({
       success: true,
       code_challenge,
       state,
-      auth_url: `/sign-in?redirect_url=/auth/vscode-callback?state=${state}&code_challenge=${code_challenge}&vscode_redirect_uri=${encodeURIComponent(redirect_uri)}`,
+      auth_url: authUrl,
     });
 
   } catch (error) {
@@ -601,11 +607,14 @@ app.post('/api/auth/token', async (req, res) => {
     // For simplicity, we'll assume the 'code' here is a Clerk user ID for direct token generation.
     // This is a simplification and should be replaced with proper Clerk backend verification.
     const clerkUserId = code; // TEMPORARY: Replace with actual Clerk token verification
+    console.log('VSCode Auth Token: Received Clerk User ID (code):', clerkUserId);
 
     // 5. Generate access and refresh tokens
     const accessToken = generateAccessToken(clerkUserId);
     const refreshToken = generateRefreshToken(clerkUserId);
     const refreshTokenExpiresAt = new Date(Date.now() + (7 * 24 * 60 * 60 * 1000)).toISOString(); // 7 days
+    console.log('VSCode Auth Token: Generated Access Token:', accessToken);
+    console.log('VSCode Auth Token: Generated Refresh Token:', refreshToken);
 
     // 6. Store refresh token in the database
     const { error: refreshError } = await supabase
@@ -703,6 +712,10 @@ app.post('/api/auth/refresh-token', async (req, res) => {
       console.error('Error storing new refresh token:', insertError);
       return res.status(500).json({ error: 'Failed to issue new tokens' });
     }
+
+    console.log('VSCode Auth Refresh Token: Clerk User ID:', clerkUserId);
+    console.log('VSCode Auth Refresh Token: Generated New Access Token:', newAccessToken);
+    console.log('VSCode Auth Refresh Token: Generated New Refresh Token:', newRefreshToken);
 
     res.json({
       success: true,
