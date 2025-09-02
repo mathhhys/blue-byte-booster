@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { SignedIn, SignedOut, SignInButton, useUser } from '@clerk/clerk-react';
+import { SignedIn, SignedOut, useUser } from '@clerk/clerk-react';
 import { Spinner } from '@/components/ui/spinner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -68,6 +68,16 @@ export const ExtensionSignIn: React.FC = () => {
     }
   };
 
+  const handleSignInClick = () => {
+    // Store the current extension sign-in state and redirect to the correct sign-in URL
+    const returnUrl = window.location.href;
+    sessionStorage.setItem('vscode-auth-return-url', returnUrl);
+    
+    // Redirect to the main sign-in page with return URL
+    const signInUrl = `https://softcodes.ai/sign-in?redirect_url=${encodeURIComponent(returnUrl)}`;
+    window.location.href = signInUrl;
+  };
+
   if (error) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-900 p-4">
@@ -107,11 +117,27 @@ export const ExtensionSignIn: React.FC = () => {
               <p className="text-gray-300 text-sm">
                 Please sign in to continue with VSCode extension authentication.
               </p>
-              <SignInButton mode="modal">
-                <Button className="w-full">
-                  Sign In
-                </Button>
-              </SignInButton>
+              <Button 
+                className="w-full"
+                onClick={handleSignInClick}
+              >
+                Sign In with Softcodes
+              </Button>
+              <p className="text-gray-400 text-xs text-center">
+                Don't have an account? <a 
+                  href="https://softcodes.ai/sign-up" 
+                  className="text-blue-400 hover:underline"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    const returnUrl = window.location.href;
+                    sessionStorage.setItem('vscode-auth-return-url', returnUrl);
+                    const signUpUrl = `https://softcodes.ai/sign-up?redirect_url=${encodeURIComponent(returnUrl)}`;
+                    window.location.href = signUpUrl;
+                  }}
+                >
+                  Sign up
+                </a>
+              </p>
             </div>
           </SignedOut>
           
