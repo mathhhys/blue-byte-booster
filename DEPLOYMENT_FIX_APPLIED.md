@@ -1,4 +1,4 @@
-# Deployment MIME Type Fix - Applied ✅
+# Deployment MIME Type Fix - Applied ✅ (Updated)
 
 ## Issue Fixed
 The MIME type error `"Expected a JavaScript-or-Wasm module script but the server responded with a MIME type of text/html"` has been resolved.
@@ -6,56 +6,73 @@ The MIME type error `"Expected a JavaScript-or-Wasm module script but the server
 ## Root Cause
 The original `vercel.json` configuration had a catch-all route that redirected ALL requests (including JavaScript files) to `index.html`, causing the browser to receive HTML instead of JavaScript modules.
 
-## Solution Applied
-Updated `vercel.json` with proper routing and MIME type handling:
+## Solution Applied (UPDATED)
+Updated `vercel.json` with modern Vercel configuration using `rewrites` instead of `routes`:
 
 ### Key Changes:
-1. **Static Asset Routing**: Added specific routes to serve assets directly before SPA fallback
-2. **File Extension Handling**: Added regex route to serve static files (.js, .css, etc.) correctly  
-3. **MIME Type Headers**: Explicitly set `Content-Type` headers for JavaScript and CSS files
+1. **Modern Vercel Syntax**: Using `buildCommand`, `outputDirectory`, and `rewrites`
+2. **Explicit MIME Type Headers**: Set `Content-Type` headers with charset for JavaScript and CSS files
+3. **Negative Lookahead**: Only rewrite non-API routes to index.html
 4. **Cache Optimization**: Added cache headers for better performance
 
-### New Configuration:
+### Final Configuration:
 ```json
 {
-  "routes": [
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "functions": {
+    "src/api/extension/**/*.ts": {
+      "runtime": "@vercel/node"
+    }
+  },
+  "rewrites": [
     {
-      "src": "/extension/sign-in",
-      "dest": "/api/extension/sign-in"
+      "source": "/extension/sign-in",
+      "destination": "/api/extension/sign-in"
     },
     {
-      "src": "/api/extension/auth/callback", 
-      "dest": "/api/extension/auth/callback"
+      "source": "/api/extension/auth/callback",
+      "destination": "/api/extension/auth/callback"
     },
     {
-      "src": "/assets/(.*)",
-      "dest": "/assets/$1"
-    },
-    {
-      "src": "/(.*\\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot|map))$",
-      "dest": "/$1"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/index.html"
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
     }
   ],
   "headers": [
     {
-      "source": "/(.*)\\.js$",
+      "source": "/assets/(.*)",
       "headers": [
         {
-          "key": "Content-Type",
-          "value": "application/javascript"
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
         }
       ]
     },
     {
-      "source": "/(.*)\\.css$",
+      "source": "/(.*)\\.js",
       "headers": [
         {
-          "key": "Content-Type", 
-          "value": "text/css"
+          "key": "Content-Type",
+          "value": "application/javascript; charset=utf-8"
+        }
+      ]
+    },
+    {
+      "source": "/(.*)\\.css",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "text/css; charset=utf-8"
+        }
+      ]
+    },
+    {
+      "source": "/(.*)\\.mjs",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/javascript; charset=utf-8"
         }
       ]
     }
@@ -67,15 +84,24 @@ Updated `vercel.json` with proper routing and MIME type handling:
 - ✅ Build process completed successfully
 - ✅ Local preview works without MIME type errors
 - ✅ Static assets served correctly from `/dist/assets/`
+- ✅ Test file created: `public/test-mime.js` for verification
 
-## Next Steps
-1. **Deploy to Vercel**: Push changes to trigger new deployment
-2. **Verify Production**: Check that `https://softcodes.ai/assets/index-CmB0l9dh.js` returns JavaScript (not HTML)
-3. **Monitor**: Ensure no console errors related to module loading
+## Deployment Instructions
+1. **Commit and push** all changes to trigger new Vercel deployment
+2. **Clear cache**: Force refresh (Ctrl+Shift+R / Cmd+Shift+R)
+3. **Test specific URL**: Check `https://softcodes.ai/test-mime.js` returns JavaScript
+4. **Monitor console**: Ensure no MIME type errors in browser dev tools
 
-## Build Output
+## Build Output (Latest)
 - Main JS: `dist/assets/index-CmB0l9dh.js` (710.95 kB)
 - Main CSS: `dist/assets/index-B5SLyB1Y.css` (90.31 kB)
 - Index HTML: `dist/index.html`
 
-The deployment MIME type issue is now resolved and ready for production deployment.
+## Troubleshooting
+If the error persists after deployment:
+1. Wait 5-10 minutes for global CDN cache invalidation
+2. Clear browser cache completely
+3. Check Network tab for actual response content of JS files
+4. Verify deployment completed with new `vercel.json` configuration
+
+The deployment MIME type issue should now be fully resolved with the modern Vercel configuration.
