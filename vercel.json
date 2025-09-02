@@ -1,18 +1,13 @@
 {
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "functions": {
-    "api/extension/**/*.ts": {
-      "runtime": "nodejs18.x"
-    }
-  },
   "rewrites": [
     {
       "source": "/extension/sign-in",
       "destination": "/api/extension/sign-in"
     },
     {
-      "source": "/api/extension/auth/callback",
+      "source": "/extension/auth/callback",
       "destination": "/api/extension/auth/callback"
     },
     {
