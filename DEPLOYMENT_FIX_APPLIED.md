@@ -22,7 +22,7 @@ Updated `vercel.json` with modern Vercel configuration using `rewrites` instead 
   "outputDirectory": "dist",
   "functions": {
     "api/extension/**/*.ts": {
-      "runtime": "@vercel/node@18.x"
+      "runtime": "nodejs18.x"
     }
   },
   "rewrites": [
