@@ -21,8 +21,8 @@ Updated `vercel.json` with modern Vercel configuration using `rewrites` instead 
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "functions": {
-    "src/api/extension/**/*.ts": {
-      "runtime": "@vercel/node"
+    "api/extension/**/*.ts": {
+      "runtime": "@vercel/node@18.x"
     }
   },
   "rewrites": [
