@@ -40,7 +40,7 @@ const App = () => (
           <Route path="/auth/post-signup" element={<PostSignup />} />
           <Route path="/auth/vscode-initiate" element={<VscodeInitiateAuth />} />
           <Route path="/auth/vscode-callback" element={<VscodeAuthCallback />} />
-          <Route path="/extension/sign-in" element={<ExtensionSignIn />} />
+          <Route path="/extension-signin" element={<ExtensionSignIn />} />
           
           {/* Payment Routes */}
           <Route path="/payment/success" element={<PaymentSuccess />} />

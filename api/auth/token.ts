@@ -20,10 +20,6 @@ function generateCodeChallenge(codeVerifier: string): string {
   return base64URLEncode(hashed)
 }
 
-function generateRandomString(length: number): string {
-  return crypto.randomBytes(Math.ceil(length / 2)).toString('hex').slice(0, length)
-}
-
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
