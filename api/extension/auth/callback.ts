@@ -1,39 +1,33 @@
 import { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
-import crypto from 'crypto'
-import jwt from 'jsonwebtoken'
-
-// PKCE Utility Functions
-function sha256(plain: string): Buffer {
-  return crypto.createHash('sha256').update(plain).digest()
-}
-
-function base64URLEncode(buffer: Buffer): string {
-  return buffer.toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=/g, '')
-}
-
-function generateCodeChallenge(codeVerifier: string): string {
-  const hashed = sha256(codeVerifier)
-  return base64URLEncode(hashed)
-}
-
-function generateRandomString(length: number): string {
-  return crypto.randomBytes(Math.ceil(length / 2)).toString('hex').slice(0, length)
-}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // Enable CORS for VSCode extension
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end()
+  }
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
   try {
-    const { code, code_verifier, state, redirect_uri } = req.body
+    const { 
+      state, 
+      code,
+      clerk_user_id,
+      redirect_uri 
+    } = req.body
 
-    if (!code || !code_verifier || !state || !redirect_uri) {
-      return res.status(400).json({ error: 'Missing required parameters' })
+    if (!state || !code || !clerk_user_id) {
+      return res.status(400).json({ 
+        error: 'Missing required parameters',
+        details: 'state, code, and clerk_user_id are required'
+      })
     }
 
     // Initialize Supabase client
@@ -42,87 +36,58 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
 
-    // Verify the OAuth code and PKCE parameters
+    // Update the OAuth code with the authenticated user's clerk_id
     const { data: oauthData, error: oauthError } = await supabase
       .from('oauth_codes')
-      .select('*')
+      .update({ 
+        clerk_user_id: clerk_user_id 
+      })
+      .eq('code', code)
       .eq('state', state)
-      .eq('redirect_uri', redirect_uri)
       .gt('expires_at', new Date().toISOString())
+      .select()
       .single()
 
     if (oauthError || !oauthData) {
-      return res.status(400).json({ error: 'Invalid or expired authorization code' })
+      console.error('OAuth code update error:', oauthError)
+      return res.status(400).json({ 
+        error: 'Invalid or expired authorization code',
+        details: oauthError?.message
+      })
     }
 
-    // Verify code verifier matches code challenge
-    const expectedChallenge = generateCodeChallenge(code_verifier)
-    if (expectedChallenge !== oauthData.code_challenge) {
-      return res.status(400).json({ error: 'Invalid code verifier' })
-    }
-
-    // In this implementation, 'code' is the clerk user ID
-    const clerkUserId = code
-
-    // Get user data from Supabase
+    // Verify user exists in the database
     const { data: userData, error: userError } = await supabase
       .from('users')
       .select('*')
-      .eq('clerk_id', clerkUserId)
+      .eq('clerk_id', clerk_user_id)
       .single()
 
     if (userError || !userData) {
-      return res.status(400).json({ error: 'User not found' })
+      // User doesn't exist, they need to sign up first
+      return res.status(400).json({ 
+        error: 'User not found',
+        details: 'Please sign up first before authenticating with VSCode'
+      })
     }
 
-    // Generate JWT tokens
-    const jwtSecret = process.env.JWT_SECRET || 'fallback-secret-for-dev'
-    
-    const accessToken = jwt.sign(
-      { clerkUserId: clerkUserId, type: 'access' },
-      jwtSecret,
-      { expiresIn: '1h' }
-    )
+    // Build the redirect URL with authorization code
+    const redirectUrl = new URL(redirect_uri || oauthData.redirect_uri)
+    redirectUrl.searchParams.append('code', code)
+    redirectUrl.searchParams.append('state', state)
 
-    const refreshToken = jwt.sign(
-      { clerkUserId: clerkUserId, type: 'refresh' },
-      jwtSecret,
-      { expiresIn: '30d' }
-    )
-
-    // Store refresh token in database
-    await supabase
-      .from('refresh_tokens')
-      .insert([
-        {
-          clerk_user_id: clerkUserId,
-          token: refreshToken,
-          expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days
-        },
-      ])
-
-    // Clean up the used OAuth code
-    await supabase
-      .from('oauth_codes')
-      .delete()
-      .eq('state', state)
-
-    // Return success response
+    // Return success with redirect URL
     return res.status(200).json({
       success: true,
-      access_token: accessToken,
-      refresh_token: refreshToken,
-      expires_in: 3600, // 1 hour
-      user: {
-        id: userData.clerk_id,
-        email: userData.email,
-        name: userData.name || userData.email,
-        picture: userData.avatar_url
-      }
+      redirect_url: redirectUrl.toString(),
+      message: 'Authentication successful. You can now close this window.'
     })
 
   } catch (error) {
-    console.error('Token exchange error:', error)
-    return res.status(500).json({ error: 'Authentication failed' })
+    console.error('Extension auth callback error:', error)
+    return res.status(500).json({ 
+      error: 'Authentication failed',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    })
   }
 }
