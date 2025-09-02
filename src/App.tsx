@@ -19,6 +19,7 @@ import PaymentSuccess from "./pages/PaymentSuccess";
 import PaymentCancelled from "./pages/PaymentCancelled";
 import { VscodeInitiateAuth } from "./pages/VscodeInitiateAuth";
 import { VscodeAuthCallback } from "./pages/VscodeAuthCallback";
+import ExtensionSignIn from "./pages/ExtensionSignIn";
 
 const queryClient = new QueryClient();
 
@@ -39,6 +40,7 @@ const App = () => (
           <Route path="/auth/post-signup" element={<PostSignup />} />
           <Route path="/auth/vscode-initiate" element={<VscodeInitiateAuth />} />
           <Route path="/auth/vscode-callback" element={<VscodeAuthCallback />} />
+          <Route path="/extension/sign-in" element={<ExtensionSignIn />} />
           
           {/* Payment Routes */}
           <Route path="/payment/success" element={<PaymentSuccess />} />

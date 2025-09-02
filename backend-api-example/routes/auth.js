@@ -47,18 +47,24 @@ function verifyToken(token) {
   }
 }
 
-// Update the auth code with the Clerk user ID
+// Update the auth code with the Clerk user ID and authorization code
 router.post('/update-auth-code', async (req, res) => {
   try {
-    const { state, clerk_user_id } = req.body;
+    const { state, clerk_user_id, authorization_code } = req.body;
 
     if (!state || !clerk_user_id) {
       return res.status(400).json({ error: 'Missing required parameters' });
     }
 
+    // Generate authorization code if not provided
+    const authCode = authorization_code || Buffer.from(`${clerk_user_id}:${state}:${Date.now()}`).toString('base64');
+
     const { data, error } = await supabase
       .from('oauth_codes')
-      .update({ clerk_user_id })
+      .update({
+        clerk_user_id,
+        authorization_code: authCode
+      })
       .eq('state', state);
 
     if (error) {
@@ -66,7 +72,7 @@ router.post('/update-auth-code', async (req, res) => {
       return res.status(500).json({ error: 'Failed to update auth code' });
     }
 
-    res.json({ success: true });
+    res.json({ success: true, authorization_code: authCode });
 
   } catch (error) {
     console.error('Error updating auth code:', error);
@@ -83,26 +89,34 @@ router.post('/token', async (req, res) => {
       return res.status(400).json({ error: 'Missing required parameters' });
     }
 
+    // Fetch OAuth code by authorization_code AND state
     const { data: oauthCode, error: fetchError } = await supabase
       .from('oauth_codes')
       .select('*')
+      .eq('authorization_code', code) // Use authorization_code field
       .eq('state', state)
       .single();
 
     if (fetchError || !oauthCode || new Date(oauthCode.expires_at) < new Date()) {
+      console.error('Invalid or expired authorization code:', code, fetchError);
       return res.status(400).json({ error: 'Invalid or expired authorization code' });
     }
 
+    // Verify PKCE challenge
     const expectedCodeChallenge = await generateCodeChallenge(code_verifier);
     if (oauthCode.code_challenge !== expectedCodeChallenge) {
+      console.error('Code challenge mismatch for state:', state);
       return res.status(400).json({ error: 'Invalid code verifier' });
     }
 
+    // Verify redirect_uri
     if (oauthCode.redirect_uri !== redirect_uri) {
+      console.error('Redirect URI mismatch. Expected:', oauthCode.redirect_uri, 'Got:', redirect_uri);
       return res.status(400).json({ error: 'Invalid redirect URI' });
     }
 
-    const clerkUserId = code;
+    // Get the Clerk user ID from the OAuth record
+    const clerkUserId = oauthCode.clerk_user_id;
     const accessToken = generateAccessToken(clerkUserId);
     const refreshToken = generateRefreshToken(clerkUserId);
     const refreshTokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
@@ -120,6 +134,7 @@ router.post('/token', async (req, res) => {
       return res.status(500).json({ error: 'Failed to issue tokens' });
     }
 
+    // Delete the used OAuth code
     await supabase.from('oauth_codes').delete().eq('id', oauthCode.id);
 
     res.json({

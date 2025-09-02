@@ -21,7 +21,7 @@ describe('VSCode Auth Callback API', () => {
       body: JSON.stringify({
         code: 'valid_auth_code_123',
         grant_type: 'authorization_code',
-        redirect_uri: 'vscode://kilocode.kilo-code'
+        redirect_uri: 'vscode://softcodes.softcodes'
       })
     })
 
