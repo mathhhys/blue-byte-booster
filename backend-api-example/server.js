@@ -531,7 +531,7 @@ app.get('/api/auth/initiate-vscode-auth', async (req, res) => {
       .from('oauth_codes')
       .insert([
         {
-          clerk_user_id: 'temp', // Will be updated after Clerk auth
+          clerk_user_id: 'pending', // Will be updated after Clerk auth
           code_verifier,
           code_challenge,
           state,
@@ -546,20 +546,23 @@ app.get('/api/auth/initiate-vscode-auth', async (req, res) => {
       return res.status(500).json({ error: 'Failed to initiate authentication' });
     }
 
-    // The frontend will redirect the user to Clerk's sign-in/sign-up page
-    // The redirect_uri for Clerk will be the frontend's /auth/vscode-callback
-    // This callback will then redirect to the VSCode extension's custom URI
+    // Build the absolute URL for Clerk authentication
+    const baseUrl = process.env.FRONTEND_URL || 'https://softcodes.ai';
+    
+    // Encode the callback URL properly
+    const callbackUrl = `/auth/vscode-callback?state=${state}&vscode_redirect_uri=${encodeURIComponent(redirect_uri)}`;
+    const authUrl = `${baseUrl}/sign-in?redirect_url=${encodeURIComponent(callbackUrl)}`;
+    
     console.log('VSCode Auth Initiate: Generated code_verifier:', code_verifier);
     console.log('VSCode Auth Initiate: Generated code_challenge:', code_challenge);
     console.log('VSCode Auth Initiate: Generated state:', state);
-    const authUrl = `/sign-in?redirect_url=/auth/vscode-callback?state=${state}&code_challenge=${code_challenge}&vscode_redirect_uri=${encodeURIComponent(redirect_uri)}`;
     console.log('VSCode Auth Initiate: Generated auth_url:', authUrl);
 
     res.json({
       success: true,
       code_challenge,
       state,
-      auth_url: authUrl,
+      auth_url: authUrl, // Now returns absolute URL
     });
 
   } catch (error) {
@@ -577,15 +580,16 @@ app.post('/api/auth/token', async (req, res) => {
       return res.status(400).json({ error: 'Missing required parameters' });
     }
 
-    // 1. Retrieve and validate the stored OAuth code
+    // 1. Retrieve and validate the stored OAuth code by authorization_code AND state
     const { data: oauthCode, error: fetchError } = await supabase
       .from('oauth_codes')
       .select('*')
+      .eq('authorization_code', code) // Use authorization_code field
       .eq('state', state)
       .single();
 
-    if (fetchError || !oauthCode || oauthCode.expires_at < new Date().toISOString()) {
-      console.error('Invalid or expired OAuth state:', state, fetchError);
+    if (fetchError || !oauthCode || new Date(oauthCode.expires_at) < new Date()) {
+      console.error('Invalid or expired authorization code:', code, fetchError);
       return res.status(400).json({ error: 'Invalid or expired authorization code' });
     }
 
@@ -602,14 +606,9 @@ app.post('/api/auth/token', async (req, res) => {
       return res.status(400).json({ error: 'Invalid redirect URI' });
     }
 
-    // 4. Use Clerk's backend API to verify the code and get user info
-    // This step assumes the 'code' received here is a Clerk session token or similar
-    // For a full OAuth flow, Clerk would typically redirect to the frontend with an auth code,
-    // and the frontend would then exchange that with the backend.
-    // For simplicity, we'll assume the 'code' here is a Clerk user ID for direct token generation.
-    // This is a simplification and should be replaced with proper Clerk backend verification.
-    const clerkUserId = code; // TEMPORARY: Replace with actual Clerk token verification
-    console.log('VSCode Auth Token: Received Clerk User ID (code):', clerkUserId);
+    // 4. Get the Clerk user ID from the OAuth record
+    const clerkUserId = oauthCode.clerk_user_id;
+    console.log('VSCode Auth Token: Using Clerk User ID from OAuth record:', clerkUserId);
 
     // 5. Generate access and refresh tokens
     const accessToken = generateAccessToken(clerkUserId);
