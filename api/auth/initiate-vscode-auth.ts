@@ -42,11 +42,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    console.log('initiate-vscode-auth: Function started');
     const { redirect_uri, state: clientState, code_challenge, code_challenge_method } = req.query
     
     if (!redirect_uri || typeof redirect_uri !== 'string') {
+      console.error('initiate-vscode-auth: Missing redirect_uri parameter');
       return res.status(400).json({ error: 'Missing redirect_uri parameter' })
     }
+
+    console.log('initiate-vscode-auth: SUPABASE_URL:', process.env.VITE_SUPABASE_URL ? 'Loaded' : 'Not Loaded');
+    console.log('initiate-vscode-auth: SUPABASE_SERVICE_ROLE_KEY:', process.env.SUPABASE_SERVICE_ROLE_KEY ? 'Loaded' : 'Not Loaded');
 
     // Initialize Supabase client
     const supabase = createClient(
@@ -88,9 +93,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ])
 
     if (error) {
-      console.error('Error storing OAuth session:', error)
+      console.error('initiate-vscode-auth: Error storing OAuth session:', error);
       return res.status(500).json({ error: 'Failed to initiate authentication' })
     }
+    console.log('initiate-vscode-auth: OAuth session stored successfully. Authorization Code:', authorizationCode);
 
     // Generate the authentication URL that redirects to our sign-in page
     const baseUrl = process.env.VITE_APP_URL || 'http://localhost:5173'
@@ -118,7 +124,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     })
 
   } catch (error) {
-    console.error('VSCode auth initiation error:', error)
+    console.error('initiate-vscode-auth: VSCode auth initiation error:', error);
     return res.status(500).json({ error: 'Internal server error' })
   }
 }
