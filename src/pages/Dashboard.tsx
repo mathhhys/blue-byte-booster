@@ -1,18 +1,49 @@
-import { useUser, UserButton } from '@clerk/clerk-react';
+import { useUser, UserButton, useAuth } from '@clerk/clerk-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { BarChart3, Settings, CreditCard, Activity } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { BarChart3, Settings, CreditCard, Activity, Copy, RefreshCw, Code } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { dark } from '@clerk/themes';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { setAuthPageMeta } from '@/utils/seo';
 
 const Dashboard = () => {
   const { user } = useUser();
+  const { getToken } = useAuth();
+  const [extensionToken, setExtensionToken] = useState<string>('');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [copySuccess, setCopySuccess] = useState(false);
 
   useEffect(() => {
     setAuthPageMeta('dashboard');
   }, []);
+
+  const generateExtensionToken = async () => {
+    setIsGenerating(true);
+    try {
+      const token = await getToken();
+      if (token) {
+        setExtensionToken(token);
+      }
+    } catch (error) {
+      console.error('Failed to generate extension token:', error);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const copyToClipboard = async () => {
+    if (extensionToken) {
+      try {
+        await navigator.clipboard.writeText(extensionToken);
+        setCopySuccess(true);
+        setTimeout(() => setCopySuccess(false), 2000);
+      } catch (error) {
+        console.error('Failed to copy token:', error);
+      }
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800">
@@ -98,7 +129,7 @@ const Dashboard = () => {
         </div>
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
           <Card className="bg-slate-800/50 border-white/10 p-6">
             <h3 className="text-xl font-semibold text-white mb-4">Quick Actions</h3>
             <div className="space-y-3">
@@ -141,6 +172,60 @@ const Dashboard = () => {
             </div>
           </Card>
         </div>
+
+        {/* VSCode Extension Integration */}
+        <Card className="bg-slate-800/50 border-white/10 p-6 mb-8">
+          <div className="flex items-center gap-3 mb-4">
+            <Code className="w-6 h-6 text-purple-400" />
+            <h3 className="text-xl font-semibold text-white">VSCode Extension Integration</h3>
+          </div>
+          <p className="text-gray-300 mb-6">
+            Generate an authentication token to connect your VSCode extension with your account.
+          </p>
+          
+          <div className="space-y-4">
+            <div className="flex gap-3">
+              <Button
+                onClick={generateExtensionToken}
+                disabled={isGenerating}
+                className="bg-purple-600 hover:bg-purple-700 text-white"
+              >
+                {isGenerating ? (
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Code className="w-4 h-4 mr-2" />
+                )}
+                {isGenerating ? 'Generating...' : 'Generate Token'}
+              </Button>
+              
+              {extensionToken && (
+                <Button
+                  onClick={copyToClipboard}
+                  variant="outline"
+                  className="border-white/20 text-white hover:bg-white/10"
+                >
+                  <Copy className="w-4 h-4 mr-2" />
+                  {copySuccess ? 'Copied!' : 'Copy'}
+                </Button>
+              )}
+            </div>
+            
+            {extensionToken && (
+              <div className="space-y-2">
+                <label className="text-sm text-gray-400">Authentication Token:</label>
+                <Input
+                  value={extensionToken}
+                  readOnly
+                  className="bg-slate-700/50 border-white/10 text-white font-mono text-sm"
+                  placeholder="Generate a token to see it here..."
+                />
+                <p className="text-xs text-gray-400">
+                  Use this token in your VSCode extension settings to authenticate API requests.
+                </p>
+              </div>
+            )}
+          </div>
+        </Card>
 
         {/* Navigation Links */}
         <div className="mt-8 text-center">
