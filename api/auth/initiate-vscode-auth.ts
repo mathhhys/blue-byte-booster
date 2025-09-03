@@ -111,9 +111,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     return res.status(200).json({
       success: true,
-      auth_url: authUrl,
+      auth_url: authUrl, // Now guaranteed to be absolute
       state: state,
-      code_challenge: codeChallenge
+      code_challenge: codeChallenge,
+      redirect_uri: redirect_uri
     })
 
   } catch (error) {

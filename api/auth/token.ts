@@ -1,24 +1,6 @@
 import { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
-import crypto from 'crypto'
-import jwt from 'jsonwebtoken'
-
-// PKCE Utility Functions
-function sha256(plain: string): Buffer {
-  return crypto.createHash('sha256').update(plain).digest()
-}
-
-function base64URLEncode(buffer: Buffer): string {
-  return buffer.toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=/g, '')
-}
-
-function generateCodeChallenge(codeVerifier: string): string {
-  const hashed = sha256(codeVerifier)
-  return base64URLEncode(hashed)
-}
+import { generateJWT, generateRefreshToken, verifyJWT } from '../utils/jwt'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Enable CORS for VSCode extension
@@ -35,204 +17,121 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { 
-      grant_type,
-      code,
-      code_verifier,
-      redirect_uri,
-      refresh_token: refreshTokenParam
-    } = req.body
+    const { grant_type, refresh_token, authorization_code, code_verifier } = req.body
 
-    // Initialize Supabase client
     const supabase = createClient(
       process.env.VITE_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
 
-    // Handle refresh token grant
     if (grant_type === 'refresh_token') {
-      if (!refreshTokenParam) {
-        return res.status(400).json({ error: 'refresh_token is required' })
-      }
-
-      // Verify and get refresh token data
-      const { data: tokenData, error: tokenError } = await supabase
-        .from('refresh_tokens')
-        .select('*')
-        .eq('token', refreshTokenParam)
-        .gt('expires_at', new Date().toISOString())
-        .is('revoked_at', null)
-        .single()
-
-      if (tokenError || !tokenData) {
-        return res.status(401).json({ error: 'Invalid or expired refresh token' })
-      }
-
-      // Get user data
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('clerk_id', tokenData.clerk_user_id)
-        .single()
-
-      if (userError || !userData) {
-        return res.status(400).json({ error: 'User not found' })
-      }
-
-      // Generate new access token
-      const jwtSecret = process.env.JWT_SECRET || 'fallback-secret-for-dev'
-      const accessToken = jwt.sign(
-        { 
-          clerkUserId: tokenData.clerk_user_id,
-          userId: userData.id,
-          type: 'access'
-        },
-        jwtSecret,
-        { expiresIn: '1h' }
-      )
-
-      return res.status(200).json({
-        access_token: accessToken,
-        token_type: 'Bearer',
-        expires_in: 3600,
-        refresh_token: refreshTokenParam,
-        user: {
-          id: userData.clerk_id,
-          email: userData.email,
-          name: userData.name || userData.email,
-          picture: userData.avatar_url
-        }
+      return await handleRefreshToken(res, supabase, refresh_token)
+    } else if (grant_type === 'authorization_code') {
+      return await handleAuthorizationCode(res, supabase, { authorization_code, code_verifier })
+    } else {
+      return res.status(400).json({ 
+        error: 'unsupported_grant_type',
+        error_description: 'Supported grant types: refresh_token, authorization_code'
       })
     }
-
-    // Handle authorization code grant
-    if (grant_type === 'authorization_code' || !grant_type) {
-      if (!code || !code_verifier || !redirect_uri) {
-        return res.status(400).json({ 
-          error: 'Missing required parameters',
-          details: 'code, code_verifier, and redirect_uri are required'
-        })
-      }
-
-      // Verify the OAuth code exists and is valid
-      const { data: oauthData, error: oauthError } = await supabase
-        .from('oauth_codes')
-        .select('*')
-        .eq('code', code)
-        .eq('redirect_uri', redirect_uri)
-        .gt('expires_at', new Date().toISOString())
-        .single()
-
-      if (oauthError || !oauthData) {
-        console.error('OAuth code lookup error:', oauthError)
-        return res.status(400).json({ 
-          error: 'Invalid or expired authorization code',
-          details: oauthError?.message
-        })
-      }
-
-      // Verify PKCE code verifier matches code challenge
-      const expectedChallenge = generateCodeChallenge(code_verifier)
-      if (oauthData.code_challenge && expectedChallenge !== oauthData.code_challenge) {
-        return res.status(400).json({ error: 'Invalid code verifier' })
-      }
-
-      // Get the clerk_user_id from the oauth_codes table
-      const clerkUserId = oauthData.clerk_user_id
-
-      // If no clerk_user_id is stored, this means the user hasn't authenticated yet
-      if (!clerkUserId) {
-        return res.status(400).json({ 
-          error: 'Authentication incomplete',
-          details: 'User must complete authentication first'
-        })
-      }
-
-      // Get user data from Supabase
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('clerk_id', clerkUserId)
-        .single()
-
-      if (userError || !userData) {
-        console.error('User lookup error:', userError)
-        return res.status(400).json({ 
-          error: 'User not found',
-          details: 'User must sign up first'
-        })
-      }
-
-      // Generate JWT tokens
-      const jwtSecret = process.env.JWT_SECRET || 'fallback-secret-for-dev'
-      
-      const accessToken = jwt.sign(
-        { 
-          clerkUserId: clerkUserId,
-          userId: userData.id,
-          type: 'access'
-        },
-        jwtSecret,
-        { expiresIn: '1h' }
-      )
-
-      const refreshToken = jwt.sign(
-        { 
-          clerkUserId: clerkUserId,
-          userId: userData.id,
-          type: 'refresh'
-        },
-        jwtSecret,
-        { expiresIn: '30d' }
-      )
-
-      // Store refresh token in database
-      const { error: insertError } = await supabase
-        .from('refresh_tokens')
-        .insert([
-          {
-            clerk_user_id: clerkUserId,
-            token: refreshToken,
-            expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days
-          },
-        ])
-
-      if (insertError) {
-        console.error('Error storing refresh token:', insertError)
-      }
-
-      // Clean up the used OAuth code
-      await supabase
-        .from('oauth_codes')
-        .delete()
-        .eq('code', code)
-
-      // Return success response
-      return res.status(200).json({
-        access_token: accessToken,
-        token_type: 'Bearer',
-        expires_in: 3600, // 1 hour
-        refresh_token: refreshToken,
-        user: {
-          id: userData.clerk_id,
-          email: userData.email,
-          name: userData.name || userData.email,
-          picture: userData.avatar_url
-        }
-      })
-    }
-
-    // Invalid grant type
-    return res.status(400).json({ 
-      error: 'unsupported_grant_type',
-      details: 'Only authorization_code and refresh_token grants are supported'
-    })
-
   } catch (error) {
     console.error('Token exchange error:', error)
     return res.status(500).json({ 
-      error: 'Authentication failed',
-      details: error instanceof Error ? error.message : 'Unknown error'
+      error: 'server_error',
+      error_description: 'Internal server error during token exchange'
     })
   }
+}
+
+async function handleRefreshToken(res: VercelResponse, supabase: any, refreshToken: string) {
+  if (!refreshToken) {
+    return res.status(400).json({ 
+      error: 'invalid_request',
+      error_description: 'Missing refresh_token parameter'
+    })
+  }
+
+  try {
+    // Verify the refresh token
+    const payload = verifyJWT(refreshToken)
+    
+    if (payload.type !== 'refresh') {
+      return res.status(400).json({ 
+        error: 'invalid_grant',
+        error_description: 'Token is not a refresh token'
+      })
+    }
+
+    // Check if refresh token exists in database
+    const { data: tokenData, error: tokenError } = await supabase
+      .from('refresh_tokens')
+      .select('*')
+      .eq('token', refreshToken)
+      .eq('clerk_user_id', payload.sub)
+      .single()
+
+    if (tokenError || !tokenData) {
+      return res.status(401).json({ 
+        error: 'invalid_grant',
+        error_description: 'Refresh token not found or expired'
+      })
+    }
+
+    // Check if token is expired
+    if (new Date(tokenData.expires_at) < new Date()) {
+      // Clean up expired token
+      await supabase.from('refresh_tokens').delete().eq('token', refreshToken)
+      
+      return res.status(401).json({ 
+        error: 'invalid_grant',
+        error_description: 'Refresh token has expired'
+      })
+    }
+
+    // Get user data
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('clerk_id', payload.sub)
+      .single()
+
+    if (userError || !userData) {
+      return res.status(401).json({ 
+        error: 'invalid_grant',
+        error_description: 'User not found'
+      })
+    }
+
+    // Generate new access token
+    const newAccessToken = generateJWT(userData, payload.session_id)
+
+    return res.json({
+      access_token: newAccessToken,
+      token_type: 'Bearer',
+      expires_in: 86400, // 24 hours
+      scope: 'vscode-extension'
+    })
+  } catch (error) {
+    console.error('Refresh token verification failed:', error)
+    return res.status(401).json({ 
+      error: 'invalid_grant',
+      error_description: 'Invalid refresh token'
+    })
+  }
+}
+
+async function handleAuthorizationCode(res: VercelResponse, supabase: any, { authorization_code, code_verifier }: any) {
+  if (!authorization_code) {
+    return res.status(400).json({ 
+      error: 'invalid_request',
+      error_description: 'Missing authorization_code parameter'
+    })
+  }
+
+  // This is handled by the callback endpoint, but we include it for completeness
+  // Redirect to the callback endpoint for proper OAuth flow
+  return res.status(400).json({ 
+    error: 'invalid_request',
+    error_description: 'Authorization code exchange should use /api/extension/auth/callback endpoint'
+  })
 }
