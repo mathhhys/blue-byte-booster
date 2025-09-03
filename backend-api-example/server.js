@@ -1,6 +1,6 @@
 // Example Express.js server for handling Stripe checkout sessions
 // Deploy this separately or integrate with your backend framework
-
+ 
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -9,6 +9,15 @@ const jwt = require('jsonwebtoken');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const { createClient } = require('@supabase/supabase-js');
 const { Pool } = require('pg');
+
+console.log('server.js: Environment Variables Check:');
+console.log('server.js: SUPABASE_URL:', process.env.SUPABASE_URL ? 'Loaded' : 'Not Loaded');
+console.log('server.js: SUPABASE_SERVICE_ROLE_KEY:', process.env.SUPABASE_SERVICE_ROLE_KEY ? 'Loaded' : 'Not Loaded');
+console.log('server.js: JWT_SECRET:', process.env.JWT_SECRET ? 'Loaded' : 'Not Loaded');
+console.log('server.js: DATABASE_URL:', process.env.DATABASE_URL ? 'Loaded' : 'Not Loaded');
+console.log('server.js: VITE_SUPABASE_URL:', process.env.VITE_SUPABASE_URL ? 'Loaded' : 'Not Loaded');
+console.log('server.js: VITE_APP_URL:', process.env.VITE_APP_URL ? 'Loaded' : 'Not Loaded');
+console.log('server.js: FRONTEND_URL:', process.env.FRONTEND_URL ? 'Loaded' : 'Not Loaded');
 
 // Import route modules
 const vscodeRoutes = require('./routes/vscode');
@@ -900,7 +909,7 @@ async function handleSubscriptionDeleted(subscription) {
 // Start server (only if not being imported as a module)
 if (require.main === module) {
   app.listen(port, () => {
-    console.log(`Server running on port ${port}`);
+    console.log(`server.js: Server running on port ${port}`);
   });
 }
 
