@@ -4,8 +4,10 @@
 import { StripeCheckoutData } from '@/types/database';
 import { STRIPE_PRODUCTS } from '@/utils/stripe/client';
 
-// API base URL - use environment variable or fallback to localhost
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://api.softcodes.ai';
+// API base URL - use environment variable or fallback to relative paths for local dev
+const API_BASE_URL = import.meta.env.VITE_API_URL || (
+  import.meta.env.DEV ? '' : 'https://api.softcodes.ai'
+);
 
 // Create Stripe checkout session
 export const createStripeCheckoutSession = async (checkoutData: StripeCheckoutData) => {
@@ -41,6 +43,93 @@ export const createStripeCheckoutSession = async (checkoutData: StripeCheckoutDa
       error: error instanceof Error ? error.message : 'Unknown error occurred',
     };
   }
+};
+
+// Create Stripe customer portal session
+export const createStripeCustomerPortalSession = async (clerkUserId: string) => {
+  try {
+    console.log('=== STRIPE API DEBUG START ===');
+    console.log('API_BASE_URL:', API_BASE_URL);
+    console.log('Development mode:', import.meta.env.DEV);
+    console.log('Full URL:', `${API_BASE_URL}/api/stripe/create-customer-portal-session`);
+    console.log('Request payload:', { userId: clerkUserId });
+    
+    // In development mode with no API_BASE_URL, use mock implementation
+    if (import.meta.env.DEV && !API_BASE_URL) {
+      console.log('Using development mock for billing portal');
+      console.log('=== STRIPE API DEBUG END (MOCK) ===');
+      return mockCreateBillingPortalSession(clerkUserId);
+    }
+    
+    const response = await fetch(`${API_BASE_URL}/api/stripe/create-customer-portal-session`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ userId: clerkUserId }),
+    });
+
+    console.log('Response status:', response.status);
+    console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+    console.log('Response ok:', response.ok);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.log('Error response text:', errorText);
+      
+      let errorData: any = {};
+      try {
+        errorData = JSON.parse(errorText);
+      } catch (e) {
+        console.log('Failed to parse error as JSON:', e);
+      }
+      
+      console.log('=== STRIPE API DEBUG END (ERROR) ===');
+      throw new Error(errorData.error || `HTTP ${response.status}: ${errorText || 'Failed to create customer portal session'}`);
+    }
+
+    const data = await response.json();
+    console.log('Success response data:', data);
+    console.log('=== STRIPE API DEBUG END (SUCCESS) ===');
+    
+    return {
+      success: true,
+      url: data.url,
+    };
+  } catch (error) {
+    console.error('Error creating customer portal session:', error);
+    console.log('Error type:', error.constructor.name);
+    console.log('Is network error:', error instanceof TypeError);
+    
+    // Fallback to mock in development if network fails
+    if (import.meta.env.DEV && error instanceof TypeError) {
+      console.log('Network error in development, falling back to mock');
+      console.log('=== STRIPE API DEBUG END (FALLBACK TO MOCK) ===');
+      return mockCreateBillingPortalSession(clerkUserId);
+    }
+    
+    console.log('=== STRIPE API DEBUG END (EXCEPTION) ===');
+    
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error occurred',
+    };
+  }
+};
+
+// Mock implementation for development
+const mockCreateBillingPortalSession = async (clerkUserId: string) => {
+  // Simulate API delay
+  await new Promise(resolve => setTimeout(resolve, 500));
+  
+  console.log('Mock billing portal session created for user:', clerkUserId);
+  
+  // For development, we'll show an alert instead of redirecting
+  return {
+    success: true,
+    url: null, // We'll handle this differently in the dashboard
+    mock: true,
+  };
 };
 
 // Get checkout session status

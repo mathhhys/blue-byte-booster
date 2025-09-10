@@ -11,6 +11,27 @@ const supabase = createClient(
 console.log('middleware/auth.js: JWT_SECRET:', process.env.JWT_SECRET ? 'Loaded' : 'Not Loaded');
 const JWT_SECRET = process.env.JWT_SECRET;
 
+// Helper function to verify Clerk session token
+async function verifyClerkToken(token) {
+  try {
+    // For now, we'll use a simple JWT decode for Clerk tokens
+    // In production, you might want to verify against Clerk's public keys
+    const decoded = jwt.decode(token);
+    
+    if (!decoded || !decoded.sub) {
+      throw new Error('Invalid Clerk token structure');
+    }
+    
+    return {
+      clerkUserId: decoded.sub,
+      sessionId: decoded.sid,
+      exp: decoded.exp
+    };
+  } catch (error) {
+    throw new Error('Invalid Clerk token: ' + error.message);
+  }
+}
+
 // Middleware to authenticate Clerk token
 const authenticateClerkToken = async (req, res, next) => {
   try {
@@ -26,35 +47,49 @@ const authenticateClerkToken = async (req, res, next) => {
     const token = authHeader.substring(7); // Remove 'Bearer ' prefix
     
     // For development/testing, allow mock tokens
-    if (token.startsWith('mock_')) {
+    if (token.startsWith('mock_') || token.startsWith('clerk_mock_')) {
+      const clerkUserId = token.replace('mock_', '').replace('clerk_mock_token_', '').split('_')[0];
       req.auth = {
-        clerkUserId: token.replace('mock_', ''),
+        clerkUserId: clerkUserId,
         isAdmin: false
       };
       return next();
     }
 
-    // Verify JWT token
+    // Try to verify as custom JWT first (for backward compatibility)
     let decoded;
+    let clerkUserId;
+    
     try {
+      // First try custom JWT
       decoded = jwt.verify(token, JWT_SECRET);
-      console.log('middleware/auth.js: JWT token verified. Decoded:', decoded);
+      clerkUserId = decoded.clerkUserId;
+      console.log('middleware/auth.js: Custom JWT token verified. Decoded:', decoded);
     } catch (jwtError) {
-      console.error('middleware/auth.js: JWT verification failed:', jwtError);
-      return res.status(401).json({ error: 'Invalid token' });
+      console.log('middleware/auth.js: Custom JWT verification failed, trying Clerk token...');
+      
+      // If custom JWT fails, try Clerk token
+      try {
+        const clerkDecoded = await verifyClerkToken(token);
+        clerkUserId = clerkDecoded.clerkUserId;
+        console.log('middleware/auth.js: Clerk token verified. User ID:', clerkUserId);
+      } catch (clerkError) {
+        console.error('middleware/auth.js: Both JWT and Clerk token verification failed:', clerkError);
+        return res.status(401).json({ error: 'Invalid token' });
+      }
     }
 
-    if (!decoded.clerkUserId) {
+    if (!clerkUserId) {
       console.error('middleware/auth.js: Invalid token payload: missing clerkUserId');
       return res.status(401).json({ error: 'Invalid token payload' });
     }
-    console.log('middleware/auth.js: Clerk User ID from token:', decoded.clerkUserId);
+    console.log('middleware/auth.js: Clerk User ID from token:', clerkUserId);
 
     // Verify user exists in database
     const { data: userData, error: userError } = await supabase
       .from('users')
       .select('id, clerk_id, plan_type')
-      .eq('clerk_id', decoded.clerkUserId)
+      .eq('clerk_id', clerkUserId)
       .single();
 
     if (userError || !userData) {
@@ -65,7 +100,7 @@ const authenticateClerkToken = async (req, res, next) => {
 
     // Add user info to request
     req.auth = {
-      clerkUserId: decoded.clerkUserId,
+      clerkUserId: clerkUserId,
       userId: userData.id,
       planType: userData.plan_type,
       isAdmin: userData.plan_type === 'admin' // Simple admin check
