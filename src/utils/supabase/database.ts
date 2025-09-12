@@ -7,6 +7,7 @@ export interface User {
   email: string;
   first_name?: string;
   last_name?: string;
+  avatar_url?: string;
   plan_type: 'starter' | 'pro' | 'teams' | 'enterprise';
   credits: number;
   stripe_customer_id?: string;
@@ -57,6 +58,7 @@ export const userOperations = {
     email: string;
     first_name?: string;
     last_name?: string;
+    avatar_url?: string;
     plan_type?: 'starter' | 'pro' | 'teams' | 'enterprise';
   }): Promise<{ data: User | null; error: any }> {
     try {
@@ -65,6 +67,7 @@ export const userOperations = {
         p_email: userData.email,
         p_first_name: userData.first_name || null,
         p_last_name: userData.last_name || null,
+        p_avatar_url: userData.avatar_url || null,
         p_plan_type: userData.plan_type || 'starter'
       });
 

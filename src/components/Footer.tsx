@@ -6,9 +6,12 @@ const Footer = () => {
       <div className="container mx-auto px-6 py-12">
         <div className="grid md:grid-cols-4 gap-8">
           <div className="space-y-4">
-            <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-primary rounded-lg animate-glow"></div>
-              <span className="text-xl font-bold text-foreground">Softcodes</span>
+            <div className="flex items-center">
+              <img
+                src="https://xraquejellmoyrpqcirs.supabase.co/storage/v1/object/public/softcodes-logo/softcodes%20logo%20navbar%20desktop%20not%20scrolled.svg"
+                alt="Softcodes White Logo"
+                className="h-8 w-auto object-contain"
+              />
             </div>
             <p className="text-muted-foreground text-sm">
               The next generation AI coding copilot that makes you extraordinarily productive.
@@ -20,27 +23,25 @@ const Footer = () => {
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li><Link to="/#features" className="hover:text-foreground transition-colors">Features</Link></li>
               <li><Link to="/pricing" className="hover:text-foreground transition-colors">Pricing</Link></li>
-              <li><a href="#" className="hover:text-foreground transition-colors">Enterprise</a></li>
-              <li><a href="#" className="hover:text-foreground transition-colors">Security</a></li>
+              <li><Link to="/teams" className="hover:text-foreground transition-colors">Teams & Enterprise</Link></li>
+              <li><a href="https://docs.softcodes.ai" className="hover:text-foreground transition-colors">Documentation</a></li>
             </ul>
           </div>
           
           <div>
             <h3 className="font-semibold text-foreground mb-4">Resources</h3>
             <ul className="space-y-2 text-sm text-muted-foreground">
-              <li><a href="#" className="hover:text-foreground transition-colors">Documentation</a></li>
-              <li><a href="#" className="hover:text-foreground transition-colors">API Reference</a></li>
-              <li><a href="#" className="hover:text-foreground transition-colors">Tutorials</a></li>
-              <li><a href="#" className="hover:text-foreground transition-colors">Blog</a></li>
+              <li><a href="https://docs.softcodes.ai" className="hover:text-foreground transition-colors">Documentation</a></li>
+              <li><a href="https://softcodes.discourse.group/c/feature-requests/5" className="hover:text-foreground transition-colors">Features Requests</a></li>
             </ul>
           </div>
-          
+
           <div>
-            <h3 className="font-semibold text-foreground mb-4">Company</h3>
+            <h3 className="font-semibold text-foreground mb-4">Company & Legal</h3>
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li><a href="#" className="hover:text-foreground transition-colors">About</a></li>
-              <li><a href="#" className="hover:text-foreground transition-colors">Careers</a></li>
-              <li><a href="#" className="hover:text-foreground transition-colors">Contact</a></li>
+              <li><a href="#" className="hover:text-foreground transition-colors">Terms</a></li>
+              <li><a href="#" className="hover:text-foreground transition-colors">Security</a></li>
               <li><a href="#" className="hover:text-foreground transition-colors">Privacy</a></li>
             </ul>
           </div>
@@ -51,15 +52,6 @@ const Footer = () => {
             © 2025 Softcodes. All rights reserved.
           </p>
           <div className="flex space-x-6 mt-4 md:mt-0">
-            <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
-              Twitter
-            </a>
-            <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
-              GitHub
-            </a>
-            <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
-              Discord
-            </a>
           </div>
         </div>
       </div>

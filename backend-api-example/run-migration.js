@@ -4,7 +4,7 @@ const path = require('path');
 require('dotenv').config();
 
 async function runMigration() {
-  console.log('🚀 Running OAuth tables migration...');
+  console.log('🚀 Running Clerk user synchronization migration...');
   
   // Initialize Supabase client
   const supabase = createClient(
@@ -14,7 +14,7 @@ async function runMigration() {
 
   try {
     // Read the migration file
-    const migrationPath = path.join(__dirname, 'migrations', '20250828_add_oauth_tables.sql');
+    const migrationPath = path.join(__dirname, 'migrations', '20250911_add_clerk_id_unique_and_avatar_url.sql');
     const migrationSQL = fs.readFileSync(migrationPath, 'utf8');
     
     console.log('📄 Migration SQL loaded');
@@ -63,7 +63,7 @@ async function runMigration() {
     console.log('\n📋 Please run this SQL manually in your Supabase SQL Editor:');
     console.log('\n' + '='.repeat(60));
     
-    const migrationPath = path.join(__dirname, 'migrations', '20250828_add_oauth_tables.sql');
+    const migrationPath = path.join(__dirname, 'migrations', '20250911_add_clerk_id_unique_and_avatar_url.sql');
     const migrationSQL = fs.readFileSync(migrationPath, 'utf8');
     console.log(migrationSQL);
     console.log('='.repeat(60) + '\n');

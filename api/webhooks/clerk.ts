@@ -18,126 +18,132 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     })
 
     const { type, data } = payload as any
+    const { id } = data;
+
+    console.log(`Received Clerk webhook: ${type}`, { userId: id })
 
     const supabase = createClient(
       process.env.VITE_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
 
-    console.log(`Processing Clerk webhook: ${type}`, { userId: data.id })
+    console.log(`Processing Clerk webhook for user: ${id}`)
 
-    switch (type) {
-      case 'user.created':
-        await handleUserCreated(supabase, data)
-        break
-
-      case 'user.updated':
-        await handleUserUpdated(supabase, data)
-        break
-
-      case 'user.deleted':
-        await handleUserDeleted(supabase, data)
-        break
-
-      default:
-        console.log(`Unhandled webhook type: ${type}`)
+    try {
+      switch (type) {
+        case 'user.created':
+          await handleUserCreated(supabase, data)
+          break
+        case 'user.updated':
+          await handleUserUpdated(supabase, data)
+          break
+        case 'user.deleted':
+          await handleUserDeleted(supabase, data)
+          break
+        case 'organization.membership.created':
+            await handleOrganizationMembershipCreated(supabase, data);
+            break;
+        default:
+          console.log(`Unhandled webhook type: ${type}`)
+      }
+      return res.status(200).json({ received: true })
+    } catch (error) {
+      console.error(`Error processing webhook ${type} for user ${id}:`, error)
+      const message = error instanceof Error ? error.message : 'Unknown error'
+      return res.status(500).json({ error: `Failed to process webhook`, details: message })
     }
-
-    return res.status(200).json({ received: true })
   } catch (error) {
-    console.error('Clerk webhook error:', error)
-    return res.status(400).json({ 
-      error: 'Webhook verification failed',
-      details: error instanceof Error ? error.message : 'Unknown error'
+    console.error('Clerk webhook signature verification failed:', error)
+    return res.status(400).json({
+      error: 'Webhook signature verification failed',
+      details: error instanceof Error ? error.message : 'Invalid signature'
     })
   }
 }
 
-async function handleUserCreated(supabase: any, data: any) {
-  try {
-    const email = data.email_addresses?.[0]?.email_address || 'unknown@example.com'
-    
-    // Auto-create user in Supabase when they sign up via Clerk
-    const { error } = await supabase.from('users').upsert({
-      clerk_id: data.id,
-      email: email,
-      first_name: data.first_name || '',
-      last_name: data.last_name || '',
-      plan_type: 'starter', // Default to starter plan
-      credits: 25, // Starter plan gets 25 credits
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    }, { 
-      onConflict: 'clerk_id',
-      ignoreDuplicates: false 
-    })
+async function handleOrganizationMembershipCreated(supabase: any, data: any) {
+  const { public_user_data, private_metadata } = data;
+  const { user_id } = public_user_data;
+  const { organization_id, role } = private_metadata;
 
-    if (error) {
-      console.error('Error creating user in Supabase:', error)
-    } else {
-      console.log(`User created: ${data.id} (${email})`)
-    }
-  } catch (error) {
-    console.error('Error in handleUserCreated:', error)
+  if (!user_id || !organization_id) {
+    console.warn('Missing user_id or organization_id in organization.membership.created event. Skipping.');
+    return;
+  }
+
+  // Here, you would typically update the user's record in your database
+  // to associate them with the organization and assign their role.
+  // For example, you might have a `memberships` table or add an `organization_id`
+  // and `role` to your `users` table.
+
+  console.log(`User ${user_id} was added to organization ${organization_id} with role ${role}`);
+}
+
+async function handleUserCreated(supabase: any, data: any) {
+  const { id } = data;
+  const email = data.email_addresses?.[0]?.email_address;
+
+  if (!email) {
+    console.warn(`User ${id} has no primary email address. Skipping creation.`);
+    return;
+  }
+
+  const { error } = await supabase.from('users').upsert({
+    clerk_id: id,
+    email: email,
+    first_name: data.first_name || '',
+    last_name: data.last_name || '',
+    avatar_url: data.image_url || null,
+    plan_type: 'starter',
+    credits: 25,
+  }, {
+    onConflict: 'clerk_id'
+  });
+
+  if (error) {
+    console.error(`Error creating user ${id} in Supabase:`, error);
+    throw error;
+  } else {
+    console.log(`User created/updated successfully: ${id} (${email})`);
   }
 }
 
 async function handleUserUpdated(supabase: any, data: any) {
-  try {
-    const email = data.email_addresses?.[0]?.email_address
-    
-    // Update user information
-    const { error } = await supabase.from('users')
-      .update({
-        email: email,
-        first_name: data.first_name || '',
-        last_name: data.last_name || '',
-        updated_at: new Date().toISOString()
-      })
-      .eq('clerk_id', data.id)
+  const { id } = data;
+  const email = data.email_addresses?.[0]?.email_address;
 
-    if (error) {
-      console.error('Error updating user in Supabase:', error)
-    } else {
-      console.log(`User updated: ${data.id}`)
-    }
-  } catch (error) {
-    console.error('Error in handleUserUpdated:', error)
+  if (!email) {
+    console.warn(`User ${id} has no primary email address. Skipping update.`);
+    return;
+  }
+
+  const { error } = await supabase.from('users')
+    .update({
+      email: email,
+      first_name: data.first_name || '',
+      last_name: data.last_name || '',
+      avatar_url: data.image_url || null,
+      updated_at: new Date().toISOString()
+    })
+    .eq('clerk_id', id);
+
+  if (error) {
+    console.error(`Error updating user ${id} in Supabase:`, error);
+    throw error;
+  } else {
+    console.log(`User updated successfully: ${id}`);
   }
 }
 
 async function handleUserDeleted(supabase: any, data: any) {
-  try {
-    // Clean up user data and related sessions
-    const { data: userData, error: userError } = await supabase
-      .from('users')
-      .select('id')
-      .eq('clerk_id', data.id)
-      .single()
+  const { id } = data;
 
-    if (userError || !userData) {
-      console.log(`User not found for deletion: ${data.id}`)
-      return
-    }
+  const { error } = await supabase.from('users').delete().eq('clerk_id', id);
 
-    // Delete refresh tokens and sessions first
-    await supabase.from('refresh_tokens').delete().eq('clerk_user_id', data.id)
-    
-    // Delete OAuth codes
-    await supabase.from('oauth_codes').delete().eq('clerk_user_id', data.id)
-    
-    // Delete credit transactions
-    await supabase.from('credit_transactions').delete().eq('user_id', userData.id)
-    
-    // Finally delete the user
-    const { error } = await supabase.from('users').delete().eq('clerk_id', data.id)
-
-    if (error) {
-      console.error('Error deleting user from Supabase:', error)
-    } else {
-      console.log(`User deleted: ${data.id}`)
-    }
-  } catch (error) {
-    console.error('Error in handleUserDeleted:', error)
+  if (error) {
+    console.error(`Error deleting user ${id} from Supabase:`, error);
+    throw error;
+  } else {
+    console.log(`User deleted successfully: ${id}`);
   }
 }
