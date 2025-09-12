@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS users (
   email TEXT NOT NULL,
   first_name TEXT,
   last_name TEXT,
+  avatar_url TEXT,
   plan_type TEXT DEFAULT 'starter' CHECK (plan_type IN ('starter', 'pro', 'teams', 'enterprise')),
   credits INTEGER DEFAULT 25,
   stripe_customer_id TEXT,
@@ -187,19 +188,21 @@ CREATE OR REPLACE FUNCTION upsert_user(
   p_email TEXT,
   p_first_name TEXT DEFAULT NULL,
   p_last_name TEXT DEFAULT NULL,
+  p_avatar_url TEXT DEFAULT NULL,
   p_plan_type TEXT DEFAULT 'starter'
 )
 RETURNS UUID AS $$
 DECLARE
   v_user_id UUID;
 BEGIN
-  INSERT INTO users (clerk_id, email, first_name, last_name, plan_type)
-  VALUES (p_clerk_id, p_email, p_first_name, p_last_name, p_plan_type)
-  ON CONFLICT (clerk_id) 
-  DO UPDATE SET 
+  INSERT INTO users (clerk_id, email, first_name, last_name, avatar_url, plan_type)
+  VALUES (p_clerk_id, p_email, p_first_name, p_last_name, p_avatar_url, p_plan_type)
+  ON CONFLICT (clerk_id)
+  DO UPDATE SET
     email = EXCLUDED.email,
     first_name = EXCLUDED.first_name,
     last_name = EXCLUDED.last_name,
+    avatar_url = EXCLUDED.avatar_url,
     updated_at = NOW()
   RETURNING id INTO v_user_id;
   

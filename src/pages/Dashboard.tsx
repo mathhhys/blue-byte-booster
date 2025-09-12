@@ -3,13 +3,13 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
-import { 
-  BarChart3, 
-  Settings, 
-  CreditCard, 
-  Activity, 
-  Copy, 
-  RefreshCw, 
+import { Label } from '@/components/ui/label';
+import { useToast } from '@/hooks/use-toast';
+import {
+  Settings,
+  CreditCard,
+  Copy,
+  RefreshCw,
   Code,
   Search,
   Bell,
@@ -22,10 +22,19 @@ import {
   Users,
   MoreHorizontal,
   Home,
+  DollarSign,
+  Loader2,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { setAuthPageMeta } from '@/utils/seo';
+import {
+  AddCreditsRequest,
+  AddCreditsResponse,
+  CREDIT_CONVERSION,
+  QUICK_SELECT_AMOUNTS,
+  CREDIT_LIMITS
+} from '@/types/credits';
 import {
   SidebarProvider,
   Sidebar,
@@ -40,59 +49,29 @@ import {
   SidebarSeparator,
   SidebarTrigger,
 } from '@/components/ui/sidebar';
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { Area, AreaChart, ResponsiveContainer, XAxis, YAxis } from 'recharts';
 
 // Mock data for the dashboard
 import { createStripeCustomerPortalSession } from '@/api/stripe';
 
-const mockUsageData = [
-  { date: '2024-01-01', credits: 1200 },
-  { date: '2024-01-05', credits: 1800 },
-  { date: '2024-01-10', credits: 1400 },
-  { date: '2024-01-15', credits: 2200 },
-  { date: '2024-01-20', credits: 1900 },
-  { date: '2024-01-25', credits: 2400 },
-  { date: '2024-01-30', credits: 2100 },
-];
 
-const mockRecentActivity = [
-  {
-    type: 'purchase',
-    description: 'Credit purchase - 5000 credits',
-    date: '2024-01-15',
-    amount: '+5000 credits',
-    positive: true
-  },
-  {
-    type: 'usage',
-    description: 'Code generation usage',
-    date: '2024-01-14',
-    amount: '-150 credits',
-    positive: false
-  }
-];
 
-const mockPaymentMethods = [
-  {
-    type: 'visa',
-    last4: '4242',
-    primary: true
-  },
-  {
-    type: 'mastercard',
-    last4: '8888',
-    primary: false
-  }
-];
 
 const Dashboard = () => {
   const { user } = useUser();
   const { getToken } = useAuth();
+  const { toast } = useToast();
+  
+  // Extension token state
   const [extensionToken, setExtensionToken] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
   const [autoRenew, setAutoRenew] = useState(true);
+
+  // Credits state
+  const [currentBalance, setCurrentBalance] = useState<number>(15420);
+  const [creditAmount, setCreditAmount] = useState<string>('');
+  const [isAddingCredits, setIsAddingCredits] = useState(false);
+  const [validationError, setValidationError] = useState<string>('');
 
   useEffect(() => {
     setAuthPageMeta('dashboard');
@@ -146,6 +125,109 @@ const Dashboard = () => {
     generateToken();
   };
 
+  // Credit validation function
+  const validateCreditAmount = (creditsStr: string): string => {
+    const numCredits = parseInt(creditsStr);
+    
+    if (!creditsStr || creditsStr.trim() === '') {
+      return 'Number of credits is required';
+    }
+    
+    if (isNaN(numCredits)) {
+      return 'Please enter a valid number';
+    }
+    
+    if (numCredits < CREDIT_LIMITS.MIN_PURCHASE_CREDITS) {
+      return `Minimum purchase is ${CREDIT_LIMITS.MIN_PURCHASE_CREDITS.toLocaleString()} credits`;
+    }
+    
+    if (numCredits > CREDIT_LIMITS.MAX_PURCHASE_CREDITS) {
+      return `Maximum purchase is ${CREDIT_LIMITS.MAX_PURCHASE_CREDITS.toLocaleString()} credits`;
+    }
+    
+    // Check if it's a whole number
+    if (creditsStr.includes('.')) {
+      return 'Credits must be a whole number';
+    }
+    
+    return '';
+  };
+
+  // Handle input change with validation
+  const handleAmountChange = (value: string) => {
+    setCreditAmount(value);
+    const error = validateCreditAmount(value);
+    setValidationError(error);
+  };
+
+  // Handle quick select buttons
+  const handleQuickSelect = (credits: number) => {
+    const creditsStr = credits.toString();
+    setCreditAmount(creditsStr);
+    setValidationError('');
+  };
+
+  // Add credits function
+  const addCredits = async () => {
+    if (!user?.id) {
+      toast({
+        title: "Error",
+        description: "User not authenticated",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const error = validateCreditAmount(creditAmount);
+    if (error) {
+      setValidationError(error);
+      return;
+    }
+
+    setIsAddingCredits(true);
+    
+    try {
+      const creditsToAdd = parseInt(creditAmount);
+      const amount = CREDIT_CONVERSION.creditsToDollars(creditsToAdd);
+      
+      const response = await fetch('/api/credits/add', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ credits: creditsToAdd, amount } as AddCreditsRequest),
+      });
+
+      const result: AddCreditsResponse = await response.json();
+
+      if (result.success && result.newBalance !== undefined) {
+        setCurrentBalance(result.newBalance);
+        setCreditAmount('');
+        setValidationError('');
+        
+        toast({
+          title: "Credits Added Successfully!",
+          description: `Added ${creditsToAdd.toLocaleString()} credits ($${amount.toFixed(2)})`,
+        });
+      } else {
+        toast({
+          title: "Failed to Add Credits",
+          description: result.error || "An unknown error occurred",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('Error adding credits:', error);
+      toast({
+        title: "Error",
+        description: "Failed to process credit addition",
+        variant: "destructive",
+      });
+    } finally {
+      setIsAddingCredits(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#121212] text-white">
       <SidebarProvider>
@@ -156,7 +238,7 @@ const Dashboard = () => {
               <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
                 <Code className="w-5 h-5 text-white" />
               </div>
-              <span className="font-semibold text-white">Copilot Pro</span>
+              <span className="font-semibold text-white">Softcodes</span>
             </div>
           </SidebarHeader>
 
@@ -289,7 +371,7 @@ const Dashboard = () => {
                 <SidebarTrigger className="text-gray-400 hover:text-white" />
                 <div className="flex items-center gap-2 text-sm text-gray-400">
                   <span>Account</span>
-                  <span>&gt;</span>
+                  <span>{'>'}</span>
                   <span className="text-white">Dashboard</span>
                 </div>
               </div>
@@ -309,7 +391,7 @@ const Dashboard = () => {
 
                 {/* Credits */}
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-400 hidden sm:inline">1250 credits</span>
+                  <span className="text-sm text-gray-400 hidden sm:inline">{currentBalance.toLocaleString()} credits</span>
                   <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white">
                     <span className="hidden sm:inline">Top up</span>
                     <span className="sm:hidden">+</span>
@@ -339,16 +421,7 @@ const Dashboard = () => {
           {/* Main Content */}
           <main className="flex-1 p-6">
             {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-              {/* Balance Card */}
-              <Card className="bg-[#2a2a2a] border-white/10 p-6">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-gray-400">Balance</span>
-                  <MoreHorizontal className="w-4 h-4 text-gray-400" />
-                </div>
-                <div className="text-2xl font-bold text-white mb-1">$2549,5</div>
-                <div className="text-xs text-gray-500">USD</div>
-              </Card>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
 
               {/* Credits Card */}
               <Card className="bg-[#2a2a2a] border-white/10 p-6">
@@ -356,7 +429,7 @@ const Dashboard = () => {
                   <span className="text-sm text-gray-400">Credits</span>
                   <MoreHorizontal className="w-4 h-4 text-gray-400" />
                 </div>
-                <div className="text-2xl font-bold text-white mb-1">15 420</div>
+                <div className="text-2xl font-bold text-white mb-1">{currentBalance.toLocaleString()}</div>
                 <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white mt-2">
                   Top Up
                 </Button>
@@ -375,245 +448,201 @@ const Dashboard = () => {
               </Card>
             </div>
 
-            {/* Usage & Credits Chart */}
+
+            {/* Add Credits Section */}
             <Card className="bg-[#2a2a2a] border-white/10 p-6 mb-8">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-semibold text-white">Usage & Credits</h3>
-                <Button size="sm" variant="outline" className="border-white/20 text-gray-300 hover:bg-white/10">
-                  30d
-                </Button>
-              </div>
-              <div className="h-64">
-                <ChartContainer
-                  config={{
-                    credits: {
-                      label: "Credits Used",
-                      color: "hsl(214, 100%, 50%)",
-                    },
-                  }}
-                >
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={mockUsageData}>
-                      <defs>
-                        <linearGradient id="colorCredits" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="hsl(214, 100%, 50%)" stopOpacity={0.3}/>
-                          <stop offset="95%" stopColor="hsl(214, 100%, 50%)" stopOpacity={0}/>
-                        </linearGradient>
-                      </defs>
-                      <XAxis
-                        dataKey="date"
-                        axisLine={false}
-                        tickLine={false}
-                        tick={{ fontSize: 12, fill: '#666' }}
-                        tickFormatter={(value) => new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                      />
-                      <YAxis
-                        axisLine={false}
-                        tickLine={false}
-                        tick={{ fontSize: 12, fill: '#666' }}
-                      />
-                      <ChartTooltip
-                        content={<ChartTooltipContent />}
-                      />
-                      <Area
-                        type="monotone"
-                        dataKey="credits"
-                        stroke="hsl(214, 100%, 50%)"
-                        strokeWidth={2}
-                        fill="url(#colorCredits)"
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </ChartContainer>
-              </div>
-            </Card>
-
-            {/* Bottom Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Recent Activity */}
-              <Card className="bg-[#2a2a2a] border-white/10 p-6">
-                <h3 className="text-lg font-semibold text-white mb-4">Recent Activity</h3>
-                <div className="space-y-4">
-                  {mockRecentActivity.map((activity, index) => (
-                    <div key={index} className="flex items-center justify-between py-2 border-b border-white/10 last:border-0">
-                      <div>
-                        <div className="text-sm text-white">{activity.description}</div>
-                        <div className="text-xs text-gray-400">{activity.date}</div>
-                      </div>
-                      <div className={`text-sm font-medium ${activity.positive ? 'text-green-400' : 'text-red-400'}`}>
-                        {activity.amount}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-
-              {/* Quick Actions */}
-              <Card className="bg-[#2a2a2a] border-white/10 p-6">
-                <h3 className="text-lg font-semibold text-white mb-4">Quick Actions</h3>
-                <div className="space-y-3">
-                  <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white justify-start">
-                    <Zap className="w-4 h-4 mr-2" />
-                    Top Up Credits
-                  </Button>
-                  <Button variant="outline" className="w-full border-white/20 text-white hover:bg-white/10 justify-start">
-                    <CreditCard className="w-4 h-4 mr-2" />
-                    Buy Credits
-                  </Button>
-                  <div className="pt-2">
-                    <div className="text-sm text-gray-400 mb-2">Promo code</div>
-                    <div className="flex gap-2">
-                      <Input
-                        placeholder="Enter code"
-                        className="bg-[#1a1a1a] border-white/10 text-white placeholder-gray-500 flex-1"
-                      />
-                      <Button variant="outline" className="border-white/20 text-white hover:bg-white/10 shrink-0">
-                        <span className="hidden sm:inline">Apply Code</span>
-                        <span className="sm:hidden">Apply</span>
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </Card>
-
-              {/* Payment Methods */}
-              <Card className="bg-[#2a2a2a] border-white/10 p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-white">Payment Methods</h3>
-                  <Button size="sm" variant="outline" className="border-white/20 text-white hover:bg-white/10">
-                    Add New
-                  </Button>
-                </div>
-                <div className="space-y-3">
-                  {mockPaymentMethods.map((method, index) => (
-                    <div key={index} className="flex items-center gap-3 p-3 rounded-lg bg-[#1a1a1a] border border-white/10">
-                      <div className="w-8 h-6 bg-gradient-to-r from-blue-600 to-purple-600 rounded flex items-center justify-center">
-                        <span className="text-xs font-bold text-white">
-                          {method.type === 'visa' ? 'V' : 'M'}
-                        </span>
-                      </div>
-                      <div className="flex-1">
-                        <div className="text-sm text-white">
-                          {method.type === 'visa' ? 'Visa' : 'Mastercard'} ••••{method.last4}
-                        </div>
-                        {method.primary && (
-                          <div className="text-xs text-blue-400">Primary</div>
-                        )}
-                      </div>
-                      <MoreHorizontal className="w-4 h-4 text-gray-400" />
-                    </div>
-                  ))}
-                </div>
-              </Card>
-
-              {/* Billing Summary */}
-              <Card className="bg-[#2a2a2a] border-white/10 p-6">
-                <h3 className="text-lg font-semibold text-white mb-4">Billing Summary</h3>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-400">Next invoice</span>
-                    <span className="text-sm text-white">2024-02-15</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-400">Auto-renew</span>
-                    <Switch 
-                      checked={autoRenew} 
-                      onCheckedChange={setAutoRenew}
-                      className="data-[state=checked]:bg-blue-600"
-                    />
-                  </div>
-                </div>
-              </Card>
-            </div>
-
-            {/* VSCode Extension Integration */}
-            <Card className="bg-[#2a2a2a] border-white/10 p-6 mt-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-white">VSCode Extension</h3>
-                <div className="flex items-center gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="border-white/20 text-white hover:bg-white/10"
-                    onClick={refreshToken}
-                    disabled={isGenerating}
-                  >
-                    <RefreshCw className={`w-4 h-4 mr-2 ${isGenerating ? 'animate-spin' : ''}`} />
-                    Refresh
-                  </Button>
-                </div>
+              <div className="flex items-center gap-2 mb-4">
+                <DollarSign className="w-5 h-5 text-blue-500" />
+                <h3 className="text-lg font-semibold text-white">Add Credits</h3>
               </div>
               
               <div className="space-y-4">
-                <div className="text-sm text-gray-400 mb-3">
-                  Generate an authentication token to connect your VSCode extension to your account.
-                </div>
-                
-                {!extensionToken ? (
-                  <Button
-                    onClick={generateToken}
-                    disabled={isGenerating}
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-                  >
-                    {isGenerating ? (
-                      <>
-                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                        Generating Token...
-                      </>
-                    ) : (
-                      <>
-                        <Code className="w-4 h-4 mr-2" />
-                        Generate Extension Token
-                      </>
-                    )}
-                  </Button>
-                ) : (
-                  <div className="space-y-3">
-                    <div className="text-sm font-medium text-white">Your Extension Token:</div>
-                    <div className="flex gap-2">
-                      <Input
-                        value={extensionToken}
-                        readOnly
-                        className="bg-[#1a1a1a] border-white/10 text-white font-mono text-sm flex-1"
-                      />
-                      <Button
-                        onClick={copyToken}
-                        variant="outline"
-                        className="border-white/20 text-white hover:bg-white/10 shrink-0"
-                      >
-                        {copySuccess ? (
-                          <>
-                            <span className="text-green-400">✓</span>
-                            <span className="ml-1 hidden sm:inline">Copied</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="w-4 h-4" />
-                            <span className="ml-1 hidden sm:inline">Copy</span>
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      This is your Clerk session token. Use this token in your VSCode extension settings.
-                    </div>
+                {/* Credits Input */}
+                <div>
+                  <Label htmlFor="credit-amount" className="text-sm text-gray-400 mb-2 block">
+                    Credits to Add
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      id="credit-amount"
+                      type="number"
+                      min={CREDIT_LIMITS.MIN_PURCHASE_CREDITS}
+                      max={CREDIT_LIMITS.MAX_PURCHASE_CREDITS}
+                      step="1"
+                      value={creditAmount}
+                      onChange={(e) => handleAmountChange(e.target.value)}
+                      placeholder="500"
+                      className={`bg-[#1a1a1a] border-white/10 text-white placeholder-gray-500 ${
+                        validationError ? 'border-red-500' : ''
+                      }`}
+                      disabled={isAddingCredits}
+                    />
+                    <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm">
+                      credits
+                    </span>
                   </div>
-                )}
+                  {validationError && (
+                    <p className="text-red-400 text-xs mt-1">{validationError}</p>
+                  )}
+                  {creditAmount && !validationError && (
+                    <p className="text-green-400 text-xs mt-1">
+                      Cost: ${CREDIT_CONVERSION.creditsToDollars(parseInt(creditAmount) || 0).toFixed(2)}
+                    </p>
+                  )}
+                </div>
+
+                {/* Quick Select Buttons */}
+                <div>
+                  <Label className="text-sm text-gray-400 mb-2 block">Quick Select</Label>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {QUICK_SELECT_AMOUNTS.map((quickAmount) => (
+                      <Button
+                        key={quickAmount.credits}
+                        variant="outline"
+                        onClick={() => handleQuickSelect(quickAmount.credits)}
+                        className={`border-white/20 text-white hover:bg-blue-600/20 hover:border-blue-500 p-4 h-auto flex flex-col items-center gap-1 relative ${
+                          quickAmount.popular ? 'border-blue-500/50 bg-blue-600/10' : ''
+                        }`}
+                        disabled={isAddingCredits}
+                      >
+                        {quickAmount.popular && (
+                          <div className="absolute -top-2 -right-2 bg-blue-500 text-white text-xs px-2 py-0.5 rounded-full">
+                            Popular
+                          </div>
+                        )}
+                        <div className="text-sm font-medium">{quickAmount.credits.toLocaleString()} credits</div>
+                        <div className="text-lg font-bold text-green-400">${quickAmount.cost.toFixed(2)}</div>
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Add Credits Button */}
+                <Button
+                  onClick={addCredits}
+                  disabled={isAddingCredits || !creditAmount || !!validationError}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isAddingCredits ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Credits
+                    </>
+                  )}
+                </Button>
+
+                {/* Promo Code Section (preserved) */}
+                <div className="pt-2 border-t border-white/10">
+                  <Label className="text-sm text-gray-400 mb-2 block">Promo Code</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Enter code"
+                      className="bg-[#1a1a1a] border-white/10 text-white placeholder-gray-500 flex-1"
+                    />
+                    <Button variant="outline" className="border-white/20 text-white hover:bg-white/10 shrink-0">
+                      <span className="hidden sm:inline">Apply Code</span>
+                      <span className="sm:hidden">Apply</span>
+                    </Button>
+                  </div>
+                </div>
               </div>
             </Card>
 
-            {/* Organizations */}
-            <Card className="bg-[#2a2a2a] border-white/10 p-6 mt-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-white">Organizations</h3>
-                <Button size="sm" variant="outline" className="border-white/20 text-white hover:bg-white/10">
-                  Manage
-                </Button>
-              </div>
-              <div className="text-sm text-gray-400">
-                No organizations yet. Create or join an organization to collaborate with your team.
-              </div>
-            </Card>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* VSCode Extension Integration */}
+              <Card className="bg-[#2a2a2a] border-white/10 p-6 mb-8 flex flex-col min-h-[200px]">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-white">VSCode Extension</h3>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-white/20 text-white hover:bg-white/10"
+                      onClick={refreshToken}
+                      disabled={isGenerating}
+                    >
+                      <RefreshCw className={`w-4 h-4 mr-2 ${isGenerating ? 'animate-spin' : ''}`} />
+                      Refresh
+                    </Button>
+                  </div>
+                </div>
+                
+                <div className="space-y-4 flex-1">
+                  <div className="text-sm text-gray-400 mb-3">
+                    Generate an authentication token to connect your VSCode extension to your account.
+                  </div>
+                  
+                  {!extensionToken ? (
+                    <Button
+                      onClick={generateToken}
+                      disabled={isGenerating}
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                    >
+                      {isGenerating ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                          Generating Token...
+                        </>
+                      ) : (
+                        <>
+                          <Code className="w-4 h-4 mr-2" />
+                          Generate Extension Token
+                        </>
+                      )}
+                    </Button>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="text-sm font-medium text-white">Your Extension Token:</div>
+                      <div className="flex gap-2">
+                        <Input
+                          value={extensionToken}
+                          readOnly
+                          className="bg-[#1a1a1a] border-white/10 text-white font-mono text-sm flex-1"
+                        />
+                        <Button
+                          onClick={copyToken}
+                          variant="outline"
+                          className="border-white/20 text-white hover:bg-white/10 shrink-0"
+                        >
+                          {copySuccess ? (
+                            <>
+                              <span className="text-green-400">✓</span>
+                              <span className="ml-1 hidden sm:inline">Copied</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-4 h-4" />
+                              <span className="ml-1 hidden sm:inline">Copy</span>
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        This is your Clerk session token. Use this token in your VSCode extension settings.
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </Card>
+
+              {/* Organizations */}
+              <Card className="bg-[#2a2a2a] border-white/10 p-6 flex flex-col min-h-[200px]">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-white">Organizations</h3>
+                  <Button size="sm" variant="outline" className="border-white/20 text-white hover:bg-white/10">
+                    Manage
+                  </Button>
+                </div>
+                <div className="text-sm text-gray-400 flex-1">
+                  No organizations yet. Create or join an organization to collaborate with your team.
+                </div>
+              </Card>
+            </div>
           </main>
         </SidebarInset>
       </SidebarProvider>

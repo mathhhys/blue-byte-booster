@@ -9,6 +9,7 @@ const jwt = require('jsonwebtoken');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const { createClient } = require('@supabase/supabase-js');
 const { Pool } = require('pg');
+const { Webhook } = require('svix'); // Import Svix
 
 console.log('server.js: Environment Variables Check:');
 console.log('server.js: SUPABASE_URL:', process.env.SUPABASE_URL ? 'Loaded' : 'Not Loaded');
@@ -105,8 +106,9 @@ pool.on('error', (err) => {
 
 app.use(cors());
 
-// For Stripe webhooks, we need the raw body before JSON parsing
+// For Stripe and Clerk webhooks, we need the raw body before JSON parsing
 app.use('/api/stripe/webhooks', express.raw({ type: 'application/json' }));
+app.use('/api/clerk/webhooks', express.raw({ type: 'application/json' }));
 app.use(express.json());
 
 // Register API routes
@@ -741,44 +743,110 @@ app.post('/api/auth/refresh-token', async (req, res) => {
 });
 
 // Clerk webhook handler for user creation
-app.post('/api/clerk/webhooks', express.raw({ type: 'application/json' }), async (req, res) => {
-  try {
-    const event = req.body;
-    
-    // For development, we'll accept any webhook without signature verification
-    // In production, you should verify the webhook signature
-    
-    console.log('Received Clerk webhook:', event.type);
-    
-    if (event.type === 'user.created') {
-      const user = event.data;
-      
-      try {
-        // Create user in database with starter plan by default
-        const { data: newUserId, error: createError } = await supabase.rpc('upsert_user', {
-          p_clerk_id: user.id,
-          p_email: user.email_addresses?.[0]?.email_address || 'unknown@example.com',
-          p_first_name: user.first_name || null,
-          p_last_name: user.last_name || null,
-          p_plan_type: 'starter'
-        });
+app.post('/api/clerk/webhooks', async (req, res) => {
+  const CLERK_WEBHOOK_SIGNING_SECRET = process.env.CLERK_WEBHOOK_SIGNING_SECRET;
 
-        if (createError) {
-          console.error('Error creating user from webhook:', createError);
-          // Don't fail the webhook, just log the error
-        } else {
-          console.log(`Successfully created user ${user.id} from webhook`);
-        }
-      } catch (error) {
-        console.error('Error processing user.created webhook:', error);
-        // Don't fail the webhook, just log the error
+  if (!CLERK_WEBHOOK_SIGNING_SECRET) {
+    console.error('CLERK_WEBHOOK_SIGNING_SECRET is not set in environment variables.');
+    return res.status(500).json({ error: 'Webhook secret not configured.' });
+  }
+
+  const payload = req.body;
+  const headers = req.headers;
+
+
+  const svix_id = headers['svix-id'];
+  const svix_timestamp = headers['svix-timestamp'];
+  const svix_signature = headers['svix-signature'];
+
+  // If there are no Svix headers, error out
+  if (!svix_id || !svix_timestamp || !svix_signature) {
+    return res.status(400).json({ error: 'No Svix headers found.' });
+  }
+
+  // Create a new Webhook instance with your Clerk webhook secret
+  const wh = new Webhook(CLERK_WEBHOOK_SIGNING_SECRET);
+
+  let evt;
+  try {
+    // Verify the webhook payload
+    evt = wh.verify(payload, {
+      'svix-id': svix_id,
+      'svix-timestamp': svix_timestamp,
+      'svix-signature': svix_signature,
+    });
+  } catch (err) {
+    console.error('Error verifying webhook:', err);
+    return res.status(400).json({ error: 'Webhook verification failed.' });
+  }
+
+  const eventType = evt.type;
+  console.log(`Received Clerk webhook with ID ${evt.data.id} and event type of ${eventType}`);
+  console.log('Webhook payload:', evt.data);
+
+  try {
+    if (eventType === 'user.created' || eventType === 'user.updated') {
+      const user = evt.data;
+      
+      // Handle email addresses with graceful fallbacks
+      let primaryEmailAddress = null;
+      
+      // Try to find primary email by ID first
+      if (user.email_addresses && user.email_addresses.length > 0) {
+        primaryEmailAddress = user.email_addresses.find(
+          (email) => email.id === user.primary_email_address_id
+        )?.email_address || user.email_addresses[0]?.email_address;
       }
+      
+      // If no email found but user has primary_email_address_id, use a placeholder
+      if (!primaryEmailAddress) {
+        if (user.primary_email_address_id) {
+          // Use a placeholder email format for users without accessible email data
+          primaryEmailAddress = `user_${user.id.replace('user_', '')}@clerk.placeholder`;
+          console.warn(`No email addresses available for user ${user.id}, using placeholder: ${primaryEmailAddress}`);
+        } else {
+          // Fallback to a generic placeholder
+          primaryEmailAddress = `${user.id}@clerk.placeholder`;
+          console.warn(`No email data found for user ${user.id}, using generic placeholder: ${primaryEmailAddress}`);
+        }
+      }
+
+      const { data, error } = await supabase.rpc('upsert_user', {
+        p_clerk_id: user.id,
+        p_email: primaryEmailAddress,
+        p_first_name: user.first_name || null,
+        p_last_name: user.last_name || null,
+        p_avatar_url: user.image_url || user.profile_image_url || null,
+        p_plan_type: 'starter' // Default to starter, update later if needed
+      });
+
+      if (error) {
+        console.error('Error upserting user from webhook:', error);
+        return res.status(500).json({ error: 'Failed to upsert user.' });
+      }
+      console.log(`Successfully upserted user ${user.id} from webhook with email: ${primaryEmailAddress}`);
+
+    } else if (eventType === 'user.deleted') {
+      const user = evt.data;
+      if (!user.id) {
+        console.error('User ID not found in user.deleted webhook payload');
+        return res.status(400).json({ error: 'User ID not found in payload.' });
+      }
+
+      // In a real application, you might want to soft-delete the user
+      // or remove sensitive information. For this example, we'll log.
+      console.log(`User with Clerk ID ${user.id} marked for deletion.`);
+      // Example: await supabase.from('users').update({ deleted: true }).eq('clerk_id', user.id);
+      // Or delete: await supabase.from('users').delete().eq('clerk_id', user.id);
+
+    } else {
+      console.log(`Unhandled Clerk webhook event type: ${eventType}`);
     }
-    
+
     res.json({ received: true });
   } catch (error) {
-    console.error('Error processing Clerk webhook:', error);
-    res.status(500).json({ error: 'Webhook processing failed' });
+    console.error('Error processing Clerk webhook event:', error);
+    res.status(500).json({ error: 'Webhook event processing failed.' });
   }
 });
 
