@@ -20,9 +20,12 @@
       "maxDuration": 10
     },
     "api/clerk/webhooks.ts": {
-      "maxDuration": 10
+      "maxDuration": 10,
+      "memory": 512
     }
   },
+  "crons": [],
+  "regions": ["iad1"],
   "headers": [
     {
       "source": "/api/auth/(.*)",

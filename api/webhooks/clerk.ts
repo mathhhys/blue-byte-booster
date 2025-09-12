@@ -7,6 +7,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   console.log('🚀 Clerk webhook handler called - URL:', req.url)
   console.log('🚀 Request method:', req.method)
   console.log('🚀 Headers:', JSON.stringify(req.headers, null, 2))
+  console.log('🚀 Raw Body:', JSON.stringify(req.body, null, 2))
+  console.log('🚀 CLERK_WEBHOOK_SECRET (first 5 chars):', process.env.CLERK_WEBHOOK_SECRET?.substring(0, 5))
   console.log('🚀 Environment check - CLERK_WEBHOOK_SECRET exists:', !!process.env.CLERK_WEBHOOK_SECRET)
   console.log('🚀 Environment check - VITE_SUPABASE_URL exists:', !!process.env.VITE_SUPABASE_URL)
   console.log('🚀 Environment check - SUPABASE_SERVICE_ROLE_KEY exists:', !!process.env.SUPABASE_SERVICE_ROLE_KEY)

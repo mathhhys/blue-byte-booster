@@ -27,9 +27,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const payload = req.body;
     const headers = req.headers;
 
+    // DIAGNOSTIC LOGGING - Check payload type and content
+    console.log('🔍 DIAGNOSTIC - Payload type:', typeof payload);
+    console.log('🔍 DIAGNOSTIC - Payload is Buffer:', Buffer.isBuffer(payload));
+    console.log('🔍 DIAGNOSTIC - Payload length:', payload?.length || 'undefined');
+    console.log('🔍 DIAGNOSTIC - First 100 chars of payload:',
+      typeof payload === 'string' ? payload.substring(0, 100) :
+      Buffer.isBuffer(payload) ? payload.toString().substring(0, 100) :
+      JSON.stringify(payload).substring(0, 100)
+    );
+    
+    // DIAGNOSTIC LOGGING - Check webhook secret format
+    console.log('🔍 DIAGNOSTIC - Webhook secret format check:');
+    console.log('  - Has whsec_ prefix:', CLERK_WEBHOOK_SIGNING_SECRET?.startsWith('whsec_'));
+    console.log('  - Secret length:', CLERK_WEBHOOK_SIGNING_SECRET?.length);
+    console.log('  - First 10 chars:', CLERK_WEBHOOK_SIGNING_SECRET?.substring(0, 10));
+
     const svix_id = headers['svix-id'];
     const svix_timestamp = headers['svix-timestamp'];
     const svix_signature = headers['svix-signature'];
+
+    // DIAGNOSTIC LOGGING - Check headers in detail
+    console.log('🔍 DIAGNOSTIC - Svix headers:');
+    console.log('  - svix-id:', svix_id);
+    console.log('  - svix-timestamp:', svix_timestamp);
+    console.log('  - svix-signature:', svix_signature);
+    console.log('  - Current timestamp:', Math.floor(Date.now() / 1000));
+    console.log('  - Timestamp diff:', Math.floor(Date.now() / 1000) - parseInt(svix_timestamp as string || '0'));
 
     // If there are no Svix headers, error out
     if (!svix_id || !svix_timestamp || !svix_signature) {
@@ -42,15 +66,67 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     let evt;
     try {
+      // DIAGNOSTIC LOGGING - Before verification attempt
+      console.log('🔍 DIAGNOSTIC - Attempting verification with:');
+      console.log('  - Payload type for verification:', typeof payload);
+      console.log('  - Headers for verification:', {
+        'svix-id': svix_id,
+        'svix-timestamp': svix_timestamp,
+        'svix-signature': svix_signature
+      });
+
+      // Try with different payload formats to diagnose the issue
+      let verificationPayload = payload;
+      
+      // If payload is already parsed as JSON, convert back to string
+      if (typeof payload === 'object' && !Buffer.isBuffer(payload)) {
+        console.log('🔍 DIAGNOSTIC - Converting parsed JSON back to string for verification');
+        verificationPayload = JSON.stringify(payload);
+      }
+
       // Verify the webhook payload
-      evt = wh.verify(payload, {
+      evt = wh.verify(verificationPayload, {
         'svix-id': svix_id as string,
         'svix-timestamp': svix_timestamp as string,
         'svix-signature': svix_signature as string,
       });
+      
+      console.log('✅ DIAGNOSTIC - Webhook verification successful!');
     } catch (err) {
-      console.error('Error verifying webhook:', err);
-      return res.status(400).json({ error: 'Webhook verification failed.' });
+      console.error('❌ DIAGNOSTIC - Webhook verification failed with error:', err);
+      console.error('❌ DIAGNOSTIC - Error details:', {
+        name: err instanceof Error ? err.name : 'Unknown',
+        message: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : 'No stack trace'
+      });
+      
+      // Try alternative verification method if first attempt fails
+      if (typeof payload === 'object' && !Buffer.isBuffer(payload)) {
+        console.log('🔄 DIAGNOSTIC - Trying verification with original JSON object...');
+        try {
+          evt = wh.verify(JSON.stringify(payload), {
+            'svix-id': svix_id as string,
+            'svix-timestamp': svix_timestamp as string,
+            'svix-signature': svix_signature as string,
+          });
+          console.log('✅ DIAGNOSTIC - Alternative verification successful!');
+        } catch (secondErr) {
+          console.error('❌ DIAGNOSTIC - Alternative verification also failed:', secondErr);
+        }
+      }
+      
+      if (!evt) {
+        return res.status(400).json({
+          error: 'Webhook verification failed.',
+          diagnostics: {
+            payloadType: typeof payload,
+            isBuffer: Buffer.isBuffer(payload),
+            hasWhsecPrefix: CLERK_WEBHOOK_SIGNING_SECRET?.startsWith('whsec_'),
+            timestampDiff: Math.floor(Date.now() / 1000) - parseInt(svix_timestamp as string || '0'),
+            errorMessage: err instanceof Error ? err.message : String(err)
+          }
+        });
+      }
     }
 
     const eventType = evt.type;
