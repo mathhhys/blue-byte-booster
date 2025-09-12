@@ -3,7 +3,16 @@ import { createClient } from '@supabase/supabase-js'
 import { Webhook } from 'svix'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // Add debugging logs to validate deployment
+  console.log('🚀 Clerk webhook handler called - URL:', req.url)
+  console.log('🚀 Request method:', req.method)
+  console.log('🚀 Headers:', JSON.stringify(req.headers, null, 2))
+  console.log('🚀 Environment check - CLERK_WEBHOOK_SECRET exists:', !!process.env.CLERK_WEBHOOK_SECRET)
+  console.log('🚀 Environment check - VITE_SUPABASE_URL exists:', !!process.env.VITE_SUPABASE_URL)
+  console.log('🚀 Environment check - SUPABASE_SERVICE_ROLE_KEY exists:', !!process.env.SUPABASE_SERVICE_ROLE_KEY)
+  
   if (req.method !== 'POST') {
+    console.log('❌ Method not allowed:', req.method)
     return res.status(405).json({ error: 'Method not allowed' })
   }
 

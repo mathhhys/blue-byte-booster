@@ -15,6 +15,17 @@
       "destination": "/index.html"
     }
   ],
+  "functions": {
+    "api/webhooks/clerk.ts": {
+      "maxDuration": 10
+    },
+    "api/clerk/webhooks.ts": {
+      "maxDuration": 10
+    },
+    "api/test-webhook-deployment.ts": {
+      "maxDuration": 5
+    }
+  },
   "headers": [
     {
       "source": "/api/auth/(.*)",

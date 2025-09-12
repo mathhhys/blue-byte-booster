@@ -975,10 +975,10 @@ async function handleSubscriptionDeleted(subscription) {
 
 
 // Start server (only if not being imported as a module)
-if (require.main === module) {
-  app.listen(port, () => {
-    console.log(`server.js: Server running on port ${port}`);
-  });
-}
+// if (require.main === module) {
+//   app.listen(port, () => {
+//     console.log(`server.js: Server running on port ${port}`);
+//   });
+// }
 
 module.exports = app;
