@@ -21,9 +21,6 @@
     },
     "api/clerk/webhooks.ts": {
       "maxDuration": 10
-    },
-    "api/test-webhook-deployment.ts": {
-      "maxDuration": 5
     }
   },
   "headers": [

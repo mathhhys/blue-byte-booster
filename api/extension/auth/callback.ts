@@ -1,6 +1,6 @@
 import { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
-import { generateJWT, generateRefreshToken, generateSessionId, validatePKCE } from '../../utils/jwt'
+import { generateJWT, generateRefreshToken, generateSessionId, validatePKCE } from '../../utils/jwt.js'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Enable CORS for VSCode extension

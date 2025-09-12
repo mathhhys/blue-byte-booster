@@ -1,6 +1,6 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
-import { verifyJWT } from '../utils/jwt';
+import { verifyJWT } from '../utils/jwt.js';
 
 // Credit conversion rate: $7 = 500 credits
 const CREDITS_PER_DOLLAR = 500 / 7; // ≈71.428571
