@@ -16,9 +16,6 @@
     }
   ],
   "functions": {
-    "api/webhooks/clerk.ts": {
-      "maxDuration": 10
-    },
     "api/clerk/webhooks.ts": {
       "maxDuration": 10,
       "memory": 512
