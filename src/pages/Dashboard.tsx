@@ -1,4 +1,4 @@
-import { useUser, UserButton, useAuth } from '@clerk/clerk-react';
+import { useUser, UserButton, useAuth, useOrganization, OrganizationSwitcher, OrganizationProfile } from '@clerk/clerk-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -53,12 +53,40 @@ import {
 // Mock data for the dashboard
 import { createStripeCustomerPortalSession } from '@/api/stripe';
 
-
-
+// Dark theme appearance configuration for Clerk components
+const clerkAppearance = {
+  elements: {
+    card: "bg-[#2a2a2a] border-white/10 text-white",
+    headerTitle: "text-white",
+    headerSubtitle: "text-gray-400",
+    socialButtonsBlockButton: "bg-[#1a1a1a] border-white/10 text-white hover:bg-white/10",
+    formButtonPrimary: "bg-blue-600 hover:bg-blue-700 text-white",
+    formFieldInput: "bg-[#1a1a1a] border-white/10 text-white placeholder-gray-500",
+    footerActionText: "text-gray-400",
+    footerActionLink: "text-blue-400 hover:text-blue-300",
+    dividerLine: "bg-white/10",
+    dividerText: "text-gray-400",
+    modalContent: "bg-[#2a2a2a]",
+    modalCloseButton: "text-gray-400 hover:text-white",
+    organizationSwitcherTrigger: "bg-transparent border-white/10 text-white hover:bg-white/10",
+    organizationSwitcherTriggerIcon: "text-gray-400",
+    organizationPreview: "text-white",
+    organizationPreviewAvatarBox: "border-white/10"
+  },
+  variables: {
+    colorBackground: "#2a2a2a",
+    colorInputBackground: "#1a1a1a",
+    colorInputText: "#ffffff",
+    colorPrimary: "#2563eb",
+    colorText: "#ffffff",
+    colorTextSecondary: "#9ca3af"
+  }
+};
 
 const Dashboard = () => {
   const { user } = useUser();
   const { getToken } = useAuth();
+  const { organization, isLoaded: orgLoaded } = useOrganization();
   const { toast } = useToast();
   
   // Extension token state
@@ -243,15 +271,40 @@ const Dashboard = () => {
           </SidebarHeader>
 
           <SidebarContent className="p-4">
-            {/* Personal Workspace */}
+            {/* Organization Switcher */}
             <div className="mb-6">
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-5 h-5 bg-blue-600 rounded-sm flex items-center justify-center">
-                  <span className="text-xs font-bold text-white">P</span>
+              {!orgLoaded ? (
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-5 h-5 bg-gray-600 rounded-sm animate-pulse"></div>
+                  <div className="h-4 bg-gray-600 rounded animate-pulse flex-1"></div>
+                  <div className="w-4 h-4 bg-gray-600 rounded animate-pulse"></div>
                 </div>
-                <span className="text-sm text-white/70">Personal Workspace</span>
-                <ChevronDown className="w-4 h-4 text-white/70 ml-auto" />
-              </div>
+              ) : (
+                <div className="clerk-organization-switcher">
+                  <OrganizationSwitcher
+                    appearance={{
+                      ...clerkAppearance,
+                      elements: {
+                        ...clerkAppearance.elements,
+                        organizationSwitcherTrigger: "w-full justify-start bg-transparent border-white/10 text-white hover:bg-white/10 p-2 rounded-md",
+                        organizationSwitcherTriggerIcon: "text-gray-400 ml-auto",
+                        organizationPreview: "text-white",
+                        organizationPreviewAvatarBox: "w-5 h-5 border-white/10",
+                        organizationPreviewMainIdentifier: "text-sm text-white/70"
+                      }
+                    }}
+                    organizationProfileMode="modal"
+                    organizationProfileProps={{
+                      appearance: clerkAppearance
+                    }}
+                    createOrganizationMode="modal"
+                    afterCreateOrganizationUrl="/dashboard"
+                    afterLeaveOrganizationUrl="/dashboard"
+                    afterSelectOrganizationUrl="/dashboard"
+                    hidePersonal={false}
+                  />
+                </div>
+              )}
             </div>
 
             {/* Navigation Menu */}
@@ -313,10 +366,15 @@ const Dashboard = () => {
               </SidebarMenuItem>
 
               <SidebarMenuItem>
-                <SidebarMenuButton className="text-white/70 hover:text-white hover:bg-white/10">
-                  <Users className="w-4 h-4" />
-                  <span>Organizations</span>
-                  <SidebarMenuBadge></SidebarMenuBadge>
+                <SidebarMenuButton
+                  asChild
+                  className={`${organization ? 'bg-blue-600/20 text-white' : 'text-white/70'} hover:text-white hover:bg-white/10`}
+                >
+                  <Link to="/organizations">
+                    <Users className="w-4 h-4" />
+                    <span>{organization ? organization.name : 'Organizations'}</span>
+                    <SidebarMenuBadge>{organization ? '1' : ''}</SidebarMenuBadge>
+                  </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
@@ -553,96 +611,81 @@ const Dashboard = () => {
               </div>
             </Card>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* VSCode Extension Integration */}
-              <Card className="bg-[#2a2a2a] border-white/10 p-6 mb-8 flex flex-col min-h-[200px]">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-white">VSCode Extension</h3>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="border-white/20 text-white hover:bg-white/10"
-                      onClick={refreshToken}
-                      disabled={isGenerating}
-                    >
-                      <RefreshCw className={`w-4 h-4 mr-2 ${isGenerating ? 'animate-spin' : ''}`} />
-                      Refresh
-                    </Button>
-                  </div>
-                </div>
-                
-                <div className="space-y-4 flex-1">
-                  <div className="text-sm text-gray-400 mb-3">
-                    Generate an authentication token to connect your VSCode extension to your account.
-                  </div>
-                  
-                  {!extensionToken ? (
-                    <Button
-                      onClick={generateToken}
-                      disabled={isGenerating}
-                      className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-                    >
-                      {isGenerating ? (
-                        <>
-                          <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                          Generating Token...
-                        </>
-                      ) : (
-                        <>
-                          <Code className="w-4 h-4 mr-2" />
-                          Generate Extension Token
-                        </>
-                      )}
-                    </Button>
-                  ) : (
-                    <div className="space-y-3">
-                      <div className="text-sm font-medium text-white">Your Extension Token:</div>
-                      <div className="flex gap-2">
-                        <Input
-                          value={extensionToken}
-                          readOnly
-                          className="bg-[#1a1a1a] border-white/10 text-white font-mono text-sm flex-1"
-                        />
-                        <Button
-                          onClick={copyToken}
-                          variant="outline"
-                          className="border-white/20 text-white hover:bg-white/10 shrink-0"
-                        >
-                          {copySuccess ? (
-                            <>
-                              <span className="text-green-400">✓</span>
-                              <span className="ml-1 hidden sm:inline">Copied</span>
-                            </>
-                          ) : (
-                            <>
-                              <Copy className="w-4 h-4" />
-                              <span className="ml-1 hidden sm:inline">Copy</span>
-                            </>
-                          )}
-                        </Button>
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        This is your Clerk session token. Use this token in your VSCode extension settings.
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </Card>
-
-              {/* Organizations */}
-              <Card className="bg-[#2a2a2a] border-white/10 p-6 flex flex-col min-h-[200px]">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-white">Organizations</h3>
-                  <Button size="sm" variant="outline" className="border-white/20 text-white hover:bg-white/10">
-                    Manage
+            {/* VSCode Extension Integration */}
+            <Card className="bg-[#2a2a2a] border-white/10 p-6 mb-8 flex flex-col min-h-[200px] max-w-2xl">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-white">VSCode Extension</h3>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-white/20 text-white hover:bg-white/10"
+                    onClick={refreshToken}
+                    disabled={isGenerating}
+                  >
+                    <RefreshCw className={`w-4 h-4 mr-2 ${isGenerating ? 'animate-spin' : ''}`} />
+                    Refresh
                   </Button>
                 </div>
-                <div className="text-sm text-gray-400 flex-1">
-                  No organizations yet. Create or join an organization to collaborate with your team.
+              </div>
+              
+              <div className="space-y-4 flex-1">
+                <div className="text-sm text-gray-400 mb-3">
+                  Generate an authentication token to connect your VSCode extension to your account.
                 </div>
-              </Card>
-            </div>
+                
+                {!extensionToken ? (
+                  <Button
+                    onClick={generateToken}
+                    disabled={isGenerating}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                  >
+                    {isGenerating ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                        Generating Token...
+                      </>
+                    ) : (
+                      <>
+                        <Code className="w-4 h-4 mr-2" />
+                        Generate Extension Token
+                      </>
+                    )}
+                  </Button>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="text-sm font-medium text-white">Your Extension Token:</div>
+                    <div className="flex gap-2">
+                      <Input
+                        value={extensionToken}
+                        readOnly
+                        className="bg-[#1a1a1a] border-white/10 text-white font-mono text-sm flex-1"
+                      />
+                      <Button
+                        onClick={copyToken}
+                        variant="outline"
+                        className="border-white/20 text-white hover:bg-white/10 shrink-0"
+                      >
+                        {copySuccess ? (
+                          <>
+                            <span className="text-green-400">✓</span>
+                            <span className="ml-1 hidden sm:inline">Copied</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-4 h-4" />
+                            <span className="ml-1 hidden sm:inline">Copy</span>
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      This is your Clerk session token. Use this token in your VSCode extension settings.
+                    </div>
+                  </div>
+                )}
+              </div>
+            </Card>
           </main>
         </SidebarInset>
       </SidebarProvider>

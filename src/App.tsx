@@ -14,6 +14,7 @@ import SignUp from "./pages/SignUp";
 import SignIn from "./pages/SignIn";
 import PostSignup from "./pages/PostSignup";
 import Dashboard from "./pages/Dashboard";
+import Organizations from "./pages/Organizations";
 import Profile from "./pages/Profile";
 import PaymentSuccess from "./pages/PaymentSuccess";
 import PaymentCancelled from "./pages/PaymentCancelled";
@@ -53,6 +54,19 @@ const App = () => (
               <>
                 <SignedIn>
                   <Dashboard />
+                </SignedIn>
+                <SignedOut>
+                  <RedirectToSignIn />
+                </SignedOut>
+              </>
+            }
+          />
+          <Route
+            path="/organizations"
+            element={
+              <>
+                <SignedIn>
+                  <Organizations />
                 </SignedIn>
                 <SignedOut>
                   <RedirectToSignIn />
