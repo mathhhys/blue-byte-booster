@@ -11,6 +11,9 @@ export interface User {
   plan_type: 'starter' | 'pro' | 'teams' | 'enterprise';
   credits: number;
   stripe_customer_id?: string;
+  vscode_session_id?: string;
+  last_vscode_login?: string;
+  vscode_client_version?: string;
   created_at: string;
   updated_at: string;
 }
@@ -89,14 +92,30 @@ export const userOperations = {
   // Get user by Clerk ID
   async getUserByClerkId(clerkId: string): Promise<{ data: User | null; error: any }> {
     try {
+      console.log('🔍 Searching for user with Clerk ID:', clerkId);
+      
       const { data, error } = await supabase
         .from('users')
         .select('*')
         .eq('clerk_id', clerkId)
-        .single();
+        .limit(1);
 
-      return { data, error };
+      console.log('📊 Database query result:', { data, error, count: data?.length });
+
+      if (error) {
+        console.error('❌ Database query error:', error);
+        return { data: null, error };
+      }
+
+      if (data && data.length > 0) {
+        console.log('✅ Found user:', data[0]);
+        return { data: data[0], error: null };
+      } else {
+        console.log('⚠️ No user found with Clerk ID:', clerkId);
+        return { data: null, error: null };
+      }
     } catch (error) {
+      console.error('❌ Exception in getUserByClerkId:', error);
       return { data: null, error };
     }
   },

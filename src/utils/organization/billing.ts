@@ -3,81 +3,92 @@ import { OrganizationBillingInfo, CreateOrganizationSubscriptionRequest } from '
 // Mock API functions for organization billing
 // In production, these would call your actual backend endpoints
 
-export const getOrganizationBilling = async (orgId: string): Promise<OrganizationBillingInfo> => {
-  // Mock implementation for development
-  await new Promise(resolve => setTimeout(resolve, 1000));
+export const getOrganizationSubscription = async (orgId: string) => {
+  try {
+    const response = await fetch(`/api/organizations/subscription?orgId=${orgId}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
 
-  return {
-    subscription: {
-      id: `sub_${orgId}`,
-      clerk_org_id: orgId,
-      stripe_customer_id: `cus_${orgId}`,
-      stripe_subscription_id: `sub_stripe_${orgId}`,
-      plan_type: 'teams',
-      billing_frequency: 'monthly',
-      seats_total: 10,
-      seats_used: 3,
-      status: 'active',
-      current_period_start: new Date(),
-      current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-      created_at: new Date(),
-      updated_at: new Date(),
-    },
-    seats: [
-      {
-        id: 'seat_1',
-        organization_subscription_id: `sub_${orgId}`,
-        clerk_user_id: 'user_1',
-        clerk_org_id: orgId,
-        user_email: 'admin@example.com',
-        user_name: 'John Admin',
-        assigned_at: new Date(),
-        assigned_by: 'user_1',
-      },
-      {
-        id: 'seat_2',
-        organization_subscription_id: `sub_${orgId}`,
-        clerk_user_id: 'user_2',
-        clerk_org_id: orgId,
-        user_email: 'member@example.com',
-        user_name: 'Jane Member',
-        assigned_at: new Date(),
-        assigned_by: 'user_1',
-      },
-      {
-        id: 'seat_3',
-        organization_subscription_id: `sub_${orgId}`,
-        clerk_user_id: 'user_3',
-        clerk_org_id: orgId,
-        user_email: 'developer@example.com',
-        user_name: 'Bob Developer',
-        assigned_at: new Date(),
-        assigned_by: 'user_1',
-      },
-    ],
-    isAdmin: true,
-    canManageBilling: true,
-    memberCount: 3,
-    seatUsage: {
-      used: 3,
-      total: 10,
-      available: 7,
-      percentUsed: 30,
-    },
-  };
+    if (!response.ok) {
+      throw new Error('Failed to fetch subscription data');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching organization subscription:', error);
+    
+    // Fallback to mock data for development
+    return {
+      hasSubscription: false,
+      subscription: null,
+    };
+  }
 };
 
 export const createOrganizationSubscription = async (
   request: CreateOrganizationSubscriptionRequest
 ): Promise<{ success: boolean; checkout_url?: string; error?: string }> => {
-  // Mock implementation
-  await new Promise(resolve => setTimeout(resolve, 1500));
+  try {
+    console.log('Creating organization subscription with request:', request);
+    
+    const payload = {
+      ...request,
+      priceId: 'price_1RwNazH6gWxKcaTXi3OmXp4u', // Use the real Stripe price ID
+    };
+    
+    console.log('Sending payload to API:', payload);
+    
+    const response = await fetch('/api/organizations/create-subscription', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
 
-  // Simulate success with checkout URL
-  return {
-    success: true,
-    checkout_url: `/organizations?billing=success&mock=true`,
-  };
+    console.log('API response status:', response.status);
+    console.log('API response ok:', response.ok);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.log('Error response text:', errorText);
+      
+      let errorData: any = {};
+      try {
+        errorData = JSON.parse(errorText);
+      } catch (e) {
+        console.log('Failed to parse error as JSON:', e);
+      }
+      
+      throw new Error(errorData.error || `HTTP ${response.status}: ${errorText || 'Failed to create subscription'}`);
+    }
+
+    const data = await response.json();
+    console.log('Success response data:', data);
+    
+    return {
+      success: true,
+      checkout_url: data.checkout_url,
+    };
+  } catch (error) {
+    console.error('Error creating organization subscription:', error);
+    
+    // For debugging, let's provide more detailed error information
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    console.log('Detailed error info:', {
+      message: errorMessage,
+      type: error?.constructor?.name,
+      stack: error instanceof Error ? error.stack : 'No stack trace'
+    });
+    
+    return {
+      success: false,
+      error: `Subscription creation failed: ${errorMessage}`,
+    };
+  }
 };
 
 export const createOrganizationBillingPortal = async (

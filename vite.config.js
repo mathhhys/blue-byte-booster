@@ -18,5 +18,12 @@ export default defineConfig({
       '127.0.0.1',
       '56b095ded4e0.ngrok-free.app' // Corrected ngrok domain without https://
     ],
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3000', // Vercel dev server default port
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, '/api'),
+      },
+    },
   },
 });

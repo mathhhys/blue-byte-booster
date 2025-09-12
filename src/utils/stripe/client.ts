@@ -37,7 +37,7 @@ export const STRIPE_PRODUCTS = {
   },
   teams: {
     monthly: {
-      priceId: 'price_teams_monthly', // You'll need to create Teams monthly price in Stripe
+      priceId: 'price_1RwNazH6gWxKcaTXi3OmXp4u', // Real Stripe price ID for Teams Monthly
       amount: 3000, // $30.00 in cents per seat
     },
     yearly: {

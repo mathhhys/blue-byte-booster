@@ -22,6 +22,9 @@
     "api/clerk/webhooks.ts": {
       "maxDuration": 10,
       "memory": 512
+    },
+    "api/organizations/create-subscription.ts": {
+      "maxDuration": 10
     }
   },
   "crons": [],
