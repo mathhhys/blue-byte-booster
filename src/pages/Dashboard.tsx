@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { userOperations, User, databaseHelpers } from '@/utils/supabase/database';
 import {
   Settings,
   CreditCard,
@@ -84,11 +85,15 @@ const clerkAppearance = {
 };
 
 const Dashboard = () => {
-  const { user } = useUser();
+  const { user, isLoaded: userLoaded } = useUser();
   const { getToken } = useAuth();
   const { organization, isLoaded: orgLoaded } = useOrganization();
   const { toast } = useToast();
   
+  // User data from Supabase
+  const [dbUser, setDbUser] = useState<User | null>(null);
+  const [isDbUserLoading, setIsDbUserLoading] = useState(true);
+
   // Extension token state
   const [extensionToken, setExtensionToken] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -96,7 +101,7 @@ const Dashboard = () => {
   const [autoRenew, setAutoRenew] = useState(true);
 
   // Credits state
-  const [currentBalance, setCurrentBalance] = useState<number>(15420);
+  const [currentBalance, setCurrentBalance] = useState<number>(0); // Initialize with 0, will be updated from dbUser
   const [creditAmount, setCreditAmount] = useState<string>('');
   const [isAddingCredits, setIsAddingCredits] = useState(false);
   const [validationError, setValidationError] = useState<string>('');
@@ -104,6 +109,96 @@ const Dashboard = () => {
   useEffect(() => {
     setAuthPageMeta('dashboard');
   }, []);
+
+  // Fetch user data from Supabase database using Clerk ID
+  useEffect(() => {
+    const fetchDbUser = async () => {
+      if (userLoaded && user?.id) {
+        setIsDbUserLoading(true);
+        console.log('=== DASHBOARD DATA FETCH DEBUG ===');
+        console.log('Clerk User ID:', user.id);
+        console.log('Clerk User Email:', user.emailAddresses?.[0]?.emailAddress);
+        console.log('Fetching user from Supabase database...');
+        
+        const { data, error } = await userOperations.getUserByClerkId(user.id);
+        
+        console.log('Database query result:');
+        console.log('- Data:', data);
+        console.log('- Error:', error);
+        
+        if (error) {
+          console.error('❌ Database fetch error:', error);
+          toast({
+            title: "Database Error",
+            description: `Failed to fetch user data: ${error.message || 'Unknown error'}`,
+            variant: "destructive",
+          });
+        } else if (data) {
+          console.log('✅ Successfully fetched user data:');
+          console.log('- Credits:', data.credits);
+          console.log('- Plan Type:', data.plan_type);
+          console.log('- Email:', data.email);
+          console.log('- Clerk ID:', data.clerk_id);
+          
+          setDbUser(data);
+          setCurrentBalance(data.credits);
+          
+          toast({
+            title: "Data Loaded",
+            description: `Found user with ${data.credits} credits on ${data.plan_type} plan`,
+          });
+        } else {
+          console.log('⚠️ No user found in database for Clerk ID:', user.id);
+          console.log('Attempting to initialize user in database...');
+          
+          // Try to initialize the user in Supabase
+          const { user: newUser, error: initError } = await databaseHelpers.initializeUser({
+            id: user.id,
+            emailAddresses: [{ emailAddress: user.emailAddresses?.[0]?.emailAddress || user.primaryEmailAddress?.emailAddress || '' }],
+            firstName: user.firstName,
+            lastName: user.lastName
+          });
+          
+          if (initError) {
+            console.error('❌ Error initializing user:', initError);
+            toast({
+              title: "Initialization Error",
+              description: `Failed to create user in database: ${initError.message || 'Unknown error'}`,
+              variant: "destructive",
+            });
+          } else if (newUser) {
+            console.log('✅ Successfully created user in database:');
+            console.log('- Credits:', newUser.credits);
+            console.log('- Plan Type:', newUser.plan_type);
+            
+            setDbUser(newUser);
+            setCurrentBalance(newUser.credits);
+            
+            toast({
+              title: "Account Created",
+              description: `Welcome! Account created with ${newUser.credits} credits on ${newUser.plan_type} plan`,
+            });
+          } else {
+            console.log('❌ Failed to create user in database');
+            toast({
+              title: "User Creation Failed",
+              description: "Could not create user account in database",
+              variant: "destructive",
+            });
+          }
+        }
+        
+        console.log('=== END DASHBOARD DATA FETCH DEBUG ===');
+        setIsDbUserLoading(false);
+      } else if (userLoaded && !user?.id) {
+        console.log('⚠️ Clerk user not loaded or no user ID available');
+        setIsDbUserLoading(false);
+      }
+    };
+
+    fetchDbUser();
+  }, [userLoaded, user?.id, toast]);
+
 
   const generateToken = async () => {
     if (!user?.id) {
@@ -449,7 +544,11 @@ const Dashboard = () => {
 
                 {/* Credits */}
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-400 hidden sm:inline">{currentBalance.toLocaleString()} credits</span>
+                  {isDbUserLoading ? (
+                    <div className="h-4 bg-gray-600 rounded w-20 animate-pulse hidden sm:block"></div>
+                  ) : (
+                    <span className="text-sm text-gray-400 hidden sm:inline">{currentBalance.toLocaleString()} credits</span>
+                  )}
                   <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white">
                     <span className="hidden sm:inline">Top up</span>
                     <span className="sm:hidden">+</span>
@@ -484,10 +583,19 @@ const Dashboard = () => {
               {/* Credits Card */}
               <Card className="bg-[#2a2a2a] border-white/10 p-6">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-gray-400">Credits</span>
+                  <span className="text-sm text-gray-400">Available Credits</span>
                   <MoreHorizontal className="w-4 h-4 text-gray-400" />
                 </div>
-                <div className="text-2xl font-bold text-white mb-1">{currentBalance.toLocaleString()}</div>
+                {isDbUserLoading ? (
+                  <div className="h-8 bg-gray-600 rounded w-32 animate-pulse mb-1"></div>
+                ) : (
+                  <div className="text-2xl font-bold text-white mb-1">
+                    {dbUser ? currentBalance.toLocaleString() : 'Loading...'}
+                  </div>
+                )}
+                <div className="text-xs text-gray-400 mt-1">
+                  {dbUser ? 'From database via Clerk ID' : 'Fetching from database...'}
+                </div>
                 <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white mt-2">
                   Top Up
                 </Button>
@@ -499,7 +607,16 @@ const Dashboard = () => {
                   <span className="text-sm text-gray-400">Current Plan</span>
                   <MoreHorizontal className="w-4 h-4 text-gray-400" />
                 </div>
-                <div className="text-2xl font-bold text-white mb-1">Pro</div>
+                {isDbUserLoading ? (
+                  <div className="h-8 bg-gray-600 rounded w-24 animate-pulse mb-1"></div>
+                ) : (
+                  <div className="text-2xl font-bold text-white mb-1">
+                    {dbUser?.plan_type ? dbUser.plan_type.charAt(0).toUpperCase() + dbUser.plan_type.slice(1) : 'Loading...'}
+                  </div>
+                )}
+                <div className="text-xs text-gray-400 mt-1">
+                  {dbUser ? 'From database via Clerk ID' : 'Looking up user...'}
+                </div>
                 <Button size="sm" variant="outline" className="border-white/20 text-white hover:bg-white/10 mt-2">
                   Upgrade
                 </Button>

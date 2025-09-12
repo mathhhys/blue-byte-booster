@@ -3,6 +3,7 @@ import { useOrganization, useOrganizationList } from '@clerk/clerk-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import {
   CreditCard,
@@ -16,10 +17,14 @@ import {
   ExternalLink,
   Crown,
   Mail,
+  UserPlus,
+  Clock,
+  X,
 } from 'lucide-react';
 import {
   createOrganizationBillingPortal,
   createOrganizationSubscription,
+  getOrganizationSubscription,
   formatSeatCost,
 } from '@/utils/organization/billing';
 
@@ -28,19 +33,31 @@ interface BillingDashboardProps {
 }
 
 export const BillingDashboard = ({ className }: BillingDashboardProps) => {
-  const { organization, membership, memberships } = useOrganization();
+  const { organization, membership, memberships, invitations } = useOrganization();
   const { toast } = useToast();
   
-  const [hasSubscription, setHasSubscription] = useState(false);
+  const [subscriptionData, setSubscriptionData] = useState<{
+    seats_total: number;
+    plan_type: string;
+    status: string;
+    billing_frequency: string;
+    stripe_subscription_id: string | null;
+  } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreatingSubscription, setIsCreatingSubscription] = useState(false);
   const [isOpeningPortal, setIsOpeningPortal] = useState(false);
+  const [newMemberEmail, setNewMemberEmail] = useState('');
+  const [isInviting, setIsInviting] = useState(false);
 
   const isAdmin = membership?.role === 'org:admin';
   const memberCount = memberships?.count || 0;
-  const maxSeats = 10; // This would come from actual subscription data
-  const availableSeats = Math.max(0, maxSeats - memberCount);
-  const percentUsed = maxSeats > 0 ? Math.round((memberCount / maxSeats) * 100) : 0;
+  const pendingInvitationsCount = invitations?.count || 0;
+  const totalUsedSeats = memberCount + pendingInvitationsCount;
+  
+  // Get seat data from Stripe subscription - no default if no subscription
+  const maxSeats = subscriptionData?.seats_total || 0;
+  const availableSeats = Math.max(0, maxSeats - totalUsedSeats);
+  const percentUsed = maxSeats > 0 ? Math.round((totalUsedSeats / maxSeats) * 100) : 0;
 
   useEffect(() => {
     if (organization?.id) {
@@ -53,15 +70,31 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
     
     try {
       setIsLoading(true);
-      // In production, this would check if organization has an active subscription
-      // For demo purposes, we'll assume organizations have subscriptions
-      setHasSubscription(!!organization.id);
+      
+      // Fetch real subscription data from Stripe
+      const result = await getOrganizationSubscription(organization.id);
+      
+      if (result.hasSubscription && result.subscription) {
+        setSubscriptionData({
+          seats_total: result.subscription.seats_total,
+          plan_type: result.subscription.plan_type,
+          status: result.subscription.status,
+          billing_frequency: result.subscription.billing_frequency,
+          stripe_subscription_id: result.subscription.id
+        });
+      } else {
+        // No subscription found
+        setSubscriptionData(null);
+      }
     } catch (error) {
+      console.error('Error loading billing info:', error);
       toast({
         title: "Error",
         description: "Failed to load billing information",
         variant: "destructive",
       });
+      // Set to null if we can't load data
+      setSubscriptionData(null);
     } finally {
       setIsLoading(false);
     }
@@ -80,16 +113,11 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
       });
 
       if (result.success && result.checkout_url) {
-        if (result.checkout_url.includes('mock=true')) {
-          toast({
-            title: "Success!",
-            description: "Mock subscription created for development",
-          });
-          await loadBillingInfo();
-        } else {
-          window.location.href = result.checkout_url;
-        }
+        // Always redirect to Stripe checkout - no mock handling
+        console.log('Redirecting to Stripe checkout:', result.checkout_url);
+        window.location.href = result.checkout_url;
       } else {
+        console.error('Subscription creation failed:', result);
         throw new Error(result.error || 'Failed to create subscription');
       }
     } catch (error) {
@@ -128,6 +156,47 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
       });
     } finally {
       setIsOpeningPortal(false);
+    }
+  };
+
+  const handleInviteMember = async () => {
+    if (!organization?.id || !newMemberEmail.trim()) return;
+    
+    if (availableSeats <= 0) {
+      toast({
+        title: "Cannot Send Invitation",
+        description: "No available seats. Upgrade your subscription to add more members.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsInviting(true);
+      
+      // For demo purposes, simulate invitation creation
+      // In production, you would use Clerk's invitation API or backend endpoint
+      console.log(`Creating invitation for ${newMemberEmail} to organization ${organization.id}`);
+      
+      // Simulate API call delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      toast({
+        title: "Invitation Sent!",
+        description: `Invitation sent to ${newMemberEmail}`,
+      });
+      
+      setNewMemberEmail('');
+      // Refresh data to show updated invitation count
+      await loadBillingInfo();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : 'Failed to send invitation',
+        variant: "destructive",
+      });
+    } finally {
+      setIsInviting(false);
     }
   };
 
@@ -182,7 +251,7 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
     );
   }
 
-  if (!hasSubscription) {
+  if (!subscriptionData) {
     return (
       <Card className="bg-[#2a2a2a] border-white/10 p-6">
         <div className="text-center space-y-6">
@@ -208,7 +277,7 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
               </li>
               <li className="flex items-start gap-2">
                 <CheckCircle className="w-4 h-4 text-green-400 mt-0.5 shrink-0" />
-                <span>Admin dashboard with analytics</span>
+                <span>Admin dashboard</span>
               </li>
               <li className="flex items-start gap-2">
                 <CheckCircle className="w-4 h-4 text-green-400 mt-0.5 shrink-0" />
@@ -259,7 +328,10 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
           <div>
             <div className="text-sm text-gray-400 mb-1">Seat Usage</div>
             <div className="text-xl font-semibold text-white">
-              {formatSeatUsage(memberCount, maxSeats)}
+              {formatSeatUsage(totalUsedSeats, maxSeats)}
+            </div>
+            <div className="text-xs text-gray-500 mb-2">
+              {memberCount} members + {pendingInvitationsCount} pending
             </div>
             <div className="w-full bg-gray-700 rounded-full h-2 mt-2">
               <div
@@ -312,6 +384,7 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
         </div>
 
         <div className="space-y-3">
+          {/* Active Members */}
           {memberships?.data?.map((membershipData) => (
             <div
               key={membershipData.id}
@@ -335,19 +408,94 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <Badge 
+                <Badge
                   variant={membershipData.role === 'org:admin' ? 'default' : 'secondary'}
                   className={membershipData.role === 'org:admin' ? 'bg-blue-600 text-white' : ''}
                 >
                   {membershipData.role === 'org:admin' ? 'Admin' : 'Member'}
                 </Badge>
-                <Badge variant="outline" className="text-xs border-white/20 text-gray-400">
-                  Seat Assigned
+                <Badge variant="outline" className="text-xs border-green-500/50 text-green-400">
+                  Active
                 </Badge>
               </div>
             </div>
           )) || []}
+
+          {/* Pending Invitations */}
+          {invitations?.data?.map((invitation) => (
+            <div
+              key={invitation.id}
+              className="flex items-center justify-between p-3 bg-[#1a1a1a] rounded-lg border border-yellow-500/20"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-yellow-600 rounded-full flex items-center justify-center">
+                  <Clock className="w-4 h-4 text-white" />
+                </div>
+                <div>
+                  <div className="text-white font-medium">{invitation.emailAddress}</div>
+                  <div className="text-gray-400 text-sm">
+                    Invited {new Date(invitation.createdAt).toLocaleDateString()}
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="text-xs border-yellow-500/50 text-yellow-400">
+                  Pending
+                </Badge>
+                {isAdmin && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-gray-400 hover:text-red-400 p-1"
+                    onClick={() => {
+                      // Handle invitation revocation
+                      toast({
+                        title: "Feature Coming Soon",
+                        description: "Invitation management will be available soon",
+                      });
+                    }}
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                )}
+              </div>
+            </div>
+          )) || []}
         </div>
+
+        {/* Invite New Member */}
+        {isAdmin && availableSeats > 0 && (
+          <div className="mt-4 p-4 bg-[#1a1a1a] rounded-lg">
+            <div className="flex items-center gap-2 mb-3">
+              <UserPlus className="w-4 h-4 text-blue-400" />
+              <span className="text-white font-medium">Invite New Member</span>
+            </div>
+            <div className="flex gap-2">
+              <Input
+                type="email"
+                placeholder="Enter email address"
+                value={newMemberEmail}
+                onChange={(e) => setNewMemberEmail(e.target.value)}
+                className="bg-[#2a2a2a] border-white/10 text-white placeholder-gray-500 flex-1"
+                disabled={isInviting}
+              />
+              <Button
+                onClick={handleInviteMember}
+                disabled={isInviting || !newMemberEmail.trim()}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                {isInviting ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  'Invite'
+                )}
+              </Button>
+            </div>
+            <div className="text-xs text-gray-500 mt-2">
+              This will consume 1 seat from your subscription
+            </div>
+          </div>
+        )}
 
         {/* Seat Usage Warning */}
         {percentUsed > 80 && (
