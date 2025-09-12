@@ -1,7 +1,7 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import Stripe from 'stripe';
 import { getAuth } from '@clerk/nextjs/server';
-import { getOrCreateStripeCustomer } from '../../utils/stripe/server';
+import { getOrCreateStripeCustomer } from '../../utils/stripe/server.js';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2025-08-27.basil',
