@@ -98,18 +98,24 @@ export const userOperations = {
         .from('users')
         .select('*')
         .eq('clerk_id', clerkId)
-        .limit(1);
+        .single(); // Use .single() instead of .limit(1)
 
-      console.log('📊 Database query result:', { data, error, count: data?.length });
+      console.log('📊 Database query result:', { data, error });
 
       if (error) {
+        // If no rows found, Supabase .single() returns an error with code 'PGRST116'
+        // We treat this as no user found, not a critical error
+        if (error.code === 'PGRST116') {
+          console.log('⚠️ No user found with Clerk ID:', clerkId);
+          return { data: null, error: null };
+        }
         console.error('❌ Database query error:', error);
         return { data: null, error };
       }
 
-      if (data && data.length > 0) {
-        console.log('✅ Found user:', data[0]);
-        return { data: data[0], error: null };
+      if (data) {
+        console.log('✅ Found user:', data);
+        return { data: data, error: null };
       } else {
         console.log('⚠️ No user found with Clerk ID:', clerkId);
         return { data: null, error: null };
