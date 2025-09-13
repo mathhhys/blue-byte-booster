@@ -1,17 +1,33 @@
 import { supabase } from './client';
 import { createClient } from '@supabase/supabase-js';
 
-// Create server-side client with service role key for database operations
-const serverSupabase = createClient(
-  process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// Check if we're in a server environment (Node.js/API routes)
+const isServerEnvironment = typeof window === 'undefined';
 
-// Debug logging for validation
-console.log('🔧 Database client configuration:');
-console.log('- Using server-side client with service role key');
-console.log('- URL:', process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL);
-console.log('- Service role key configured:', !!process.env.SUPABASE_SERVICE_ROLE_KEY);
+// Create server-side client with service role key if available
+let serverSupabase: any = null;
+if (isServerEnvironment && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  console.log('🔧 Creating server-side client with service role key');
+  serverSupabase = createClient(
+    process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+}
+
+// Helper function to get appropriate client with authentication
+async function getAuthenticatedClient() {
+  if (serverSupabase) {
+    console.log('🔧 Using server-side client (bypasses RLS)');
+    return serverSupabase;
+  }
+  
+  // Browser environment - need to check Clerk authentication
+  console.log('🔧 Using browser client - checking authentication');
+  
+  // For now, we'll need to handle this differently
+  // The browser client needs proper Clerk JWT token set
+  return supabase;
+}
 
 // Types for database operations
 export interface User {
@@ -78,7 +94,8 @@ export const userOperations = {
     plan_type?: 'starter' | 'pro' | 'teams' | 'enterprise';
   }): Promise<{ data: User | null; error: any }> {
     try {
-      const { data, error } = await serverSupabase.rpc('upsert_user', {
+      const client = await getAuthenticatedClient();
+      const { data, error } = await client.rpc('upsert_user', {
         p_clerk_id: userData.clerk_id,
         p_email: userData.email,
         p_first_name: userData.first_name || null,
@@ -90,7 +107,7 @@ export const userOperations = {
       if (error) throw error;
 
       // Fetch the complete user record using clerk_id to respect RLS policy
-      const { data: user, error: fetchError } = await serverSupabase
+      const { data: user, error: fetchError } = await client
         .from('users')
         .select('*')
         .eq('clerk_id', userData.clerk_id)
@@ -106,18 +123,28 @@ export const userOperations = {
   async getUserByClerkId(clerkId: string): Promise<{ data: User | null; error: any }> {
     try {
       console.log('🔍 Searching for user with Clerk ID:', clerkId);
-      console.log('🔧 Using serverSupabase client with service role (bypasses RLS)');
       
-      const { data, error } = await serverSupabase
+      const client = await getAuthenticatedClient();
+      const { data, error } = await client
         .from('users')
         .select('*')
         .eq('clerk_id', clerkId)
-        .single(); // Use .single() instead of .limit(1)
+        .single();
 
       console.log('📊 Database query result:', { data, error });
       
-      if (error && error.code !== 'PGRST116') {
-        console.error('❌ Unexpected database error:', error);
+      // Handle RLS error specifically
+      if (error) {
+        if (error.code === 'PGRST116') {
+          console.log('⚠️ No user found with Clerk ID:', clerkId);
+          return { data: null, error: null };
+        } else if (error.message?.includes('new row violates row-level security') || error.status === 406) {
+          console.error('🔒 RLS Policy blocked access. User needs to be authenticated with Clerk.');
+          console.log('💡 This operation should be performed server-side or with proper Clerk session.');
+          return { data: null, error: 'Authentication required - RLS policy blocking access' };
+        }
+        console.error('❌ Database query error:', error);
+        return { data: null, error };
       }
 
       if (error) {
@@ -147,7 +174,8 @@ export const userOperations = {
   // Update user plan
   async updateUserPlan(clerkId: string, planType: string): Promise<{ data: User | null; error: any }> {
     try {
-      const { data, error } = await serverSupabase
+      const client = await getAuthenticatedClient();
+      const { data, error } = await client
         .from('users')
         .update({ plan_type: planType, updated_at: new Date().toISOString() })
         .eq('clerk_id', clerkId)
@@ -163,7 +191,8 @@ export const userOperations = {
   // Update Stripe customer ID
   async updateStripeCustomerId(clerkId: string, stripeCustomerId: string): Promise<{ data: User | null; error: any }> {
     try {
-      const { data, error } = await serverSupabase
+      const client = await getAuthenticatedClient();
+      const { data, error } = await client
         .from('users')
         .update({ stripe_customer_id: stripeCustomerId, updated_at: new Date().toISOString() })
         .eq('clerk_id', clerkId)
@@ -187,7 +216,8 @@ export const creditOperations = {
     referenceId?: string
   ): Promise<{ success: boolean; error?: any }> {
     try {
-      const { data, error } = await serverSupabase.rpc('grant_credits', {
+      const client = await getAuthenticatedClient();
+      const { data, error } = await client.rpc('grant_credits', {
         p_clerk_id: clerkId,
         p_amount: amount,
         p_description: description,
@@ -208,7 +238,8 @@ export const creditOperations = {
     referenceId?: string
   ): Promise<{ success: boolean; error?: any }> {
     try {
-      const { data, error } = await serverSupabase.rpc('deduct_credits', {
+      const client = await getAuthenticatedClient();
+      const { data, error } = await client.rpc('deduct_credits', {
         p_clerk_id: clerkId,
         p_amount: amount,
         p_description: description,
@@ -228,7 +259,8 @@ export const creditOperations = {
       const { data: user } = await userOperations.getUserByClerkId(clerkId);
       if (!user) return { data: null, error: 'User not found' };
 
-      const { data, error } = await serverSupabase
+      const client = await getAuthenticatedClient();
+      const { data, error } = await client
         .from('credit_transactions')
         .select('*')
         .eq('user_id', user.id)
@@ -254,7 +286,8 @@ export const subscriptionOperations = {
     current_period_end?: string;
   }): Promise<{ data: Subscription | null; error: any }> {
     try {
-      const { data, error } = await serverSupabase
+      const client = await getAuthenticatedClient();
+      const { data, error } = await client
         .from('subscriptions')
         .insert({
           ...subscriptionData,
@@ -276,7 +309,8 @@ export const subscriptionOperations = {
       const { data: user } = await userOperations.getUserByClerkId(clerkId);
       if (!user) return { data: null, error: 'User not found' };
 
-      const { data, error } = await serverSupabase
+      const client = await getAuthenticatedClient();
+      const { data, error } = await client
         .from('subscriptions')
         .select('*')
         .eq('user_id', user.id)
@@ -294,7 +328,8 @@ export const subscriptionOperations = {
     status: 'active' | 'canceled' | 'past_due' | 'incomplete'
   ): Promise<{ data: Subscription | null; error: any }> {
     try {
-      const { data, error } = await serverSupabase
+      const client = await getAuthenticatedClient();
+      const { data, error } = await client
         .from('subscriptions')
         .update({ status, updated_at: new Date().toISOString() })
         .eq('stripe_subscription_id', stripeSubscriptionId)
@@ -318,7 +353,8 @@ export const teamInvitationOperations = {
     clerk_invitation_id?: string;
   }): Promise<{ data: TeamInvitation | null; error: any }> {
     try {
-      const { data, error } = await serverSupabase
+      const client = await getAuthenticatedClient();
+      const { data, error } = await client
         .from('team_invitations')
         .insert(invitationData)
         .select()
@@ -333,7 +369,8 @@ export const teamInvitationOperations = {
   // Get invitations for subscription
   async getSubscriptionInvitations(subscriptionId: string): Promise<{ data: TeamInvitation[] | null; error: any }> {
     try {
-      const { data, error } = await serverSupabase
+      const client = await getAuthenticatedClient();
+      const { data, error } = await client
         .from('team_invitations')
         .select('*')
         .eq('subscription_id', subscriptionId)
@@ -351,7 +388,8 @@ export const teamInvitationOperations = {
     status: 'pending' | 'accepted' | 'expired' | 'revoked'
   ): Promise<{ data: TeamInvitation | null; error: any }> {
     try {
-      const { data, error } = await serverSupabase
+      const client = await getAuthenticatedClient();
+      const { data, error } = await client
         .from('team_invitations')
         .update({ status, updated_at: new Date().toISOString() })
         .eq('id', invitationId)
@@ -367,7 +405,8 @@ export const teamInvitationOperations = {
   // Get invitations by email
   async getInvitationsByEmail(email: string): Promise<{ data: TeamInvitation[] | null; error: any }> {
     try {
-      const { data, error } = await serverSupabase
+      const client = await getAuthenticatedClient();
+      const { data, error } = await client
         .from('team_invitations')
         .select('*')
         .eq('email', email)
