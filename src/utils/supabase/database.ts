@@ -1,4 +1,17 @@
 import { supabase } from './client';
+import { createClient } from '@supabase/supabase-js';
+
+// Create server-side client with service role key for database operations
+const serverSupabase = createClient(
+  process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+// Debug logging for validation
+console.log('🔧 Database client configuration:');
+console.log('- Using server-side client with service role key');
+console.log('- URL:', process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL);
+console.log('- Service role key configured:', !!process.env.SUPABASE_SERVICE_ROLE_KEY);
 
 // Types for database operations
 export interface User {
@@ -65,7 +78,7 @@ export const userOperations = {
     plan_type?: 'starter' | 'pro' | 'teams' | 'enterprise';
   }): Promise<{ data: User | null; error: any }> {
     try {
-      const { data, error } = await supabase.rpc('upsert_user', {
+      const { data, error } = await serverSupabase.rpc('upsert_user', {
         p_clerk_id: userData.clerk_id,
         p_email: userData.email,
         p_first_name: userData.first_name || null,
@@ -77,7 +90,7 @@ export const userOperations = {
       if (error) throw error;
 
       // Fetch the complete user record using clerk_id to respect RLS policy
-      const { data: user, error: fetchError } = await supabase
+      const { data: user, error: fetchError } = await serverSupabase
         .from('users')
         .select('*')
         .eq('clerk_id', userData.clerk_id)
@@ -93,14 +106,19 @@ export const userOperations = {
   async getUserByClerkId(clerkId: string): Promise<{ data: User | null; error: any }> {
     try {
       console.log('🔍 Searching for user with Clerk ID:', clerkId);
+      console.log('🔧 Using serverSupabase client with service role (bypasses RLS)');
       
-      const { data, error } = await supabase
+      const { data, error } = await serverSupabase
         .from('users')
         .select('*')
         .eq('clerk_id', clerkId)
         .single(); // Use .single() instead of .limit(1)
 
       console.log('📊 Database query result:', { data, error });
+      
+      if (error && error.code !== 'PGRST116') {
+        console.error('❌ Unexpected database error:', error);
+      }
 
       if (error) {
         // If no rows found, Supabase .single() returns an error with code 'PGRST116'
@@ -129,7 +147,7 @@ export const userOperations = {
   // Update user plan
   async updateUserPlan(clerkId: string, planType: string): Promise<{ data: User | null; error: any }> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await serverSupabase
         .from('users')
         .update({ plan_type: planType, updated_at: new Date().toISOString() })
         .eq('clerk_id', clerkId)
@@ -145,7 +163,7 @@ export const userOperations = {
   // Update Stripe customer ID
   async updateStripeCustomerId(clerkId: string, stripeCustomerId: string): Promise<{ data: User | null; error: any }> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await serverSupabase
         .from('users')
         .update({ stripe_customer_id: stripeCustomerId, updated_at: new Date().toISOString() })
         .eq('clerk_id', clerkId)
@@ -169,7 +187,7 @@ export const creditOperations = {
     referenceId?: string
   ): Promise<{ success: boolean; error?: any }> {
     try {
-      const { data, error } = await supabase.rpc('grant_credits', {
+      const { data, error } = await serverSupabase.rpc('grant_credits', {
         p_clerk_id: clerkId,
         p_amount: amount,
         p_description: description,
@@ -190,7 +208,7 @@ export const creditOperations = {
     referenceId?: string
   ): Promise<{ success: boolean; error?: any }> {
     try {
-      const { data, error } = await supabase.rpc('deduct_credits', {
+      const { data, error } = await serverSupabase.rpc('deduct_credits', {
         p_clerk_id: clerkId,
         p_amount: amount,
         p_description: description,
@@ -210,7 +228,7 @@ export const creditOperations = {
       const { data: user } = await userOperations.getUserByClerkId(clerkId);
       if (!user) return { data: null, error: 'User not found' };
 
-      const { data, error } = await supabase
+      const { data, error } = await serverSupabase
         .from('credit_transactions')
         .select('*')
         .eq('user_id', user.id)
@@ -236,7 +254,7 @@ export const subscriptionOperations = {
     current_period_end?: string;
   }): Promise<{ data: Subscription | null; error: any }> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await serverSupabase
         .from('subscriptions')
         .insert({
           ...subscriptionData,
@@ -258,7 +276,7 @@ export const subscriptionOperations = {
       const { data: user } = await userOperations.getUserByClerkId(clerkId);
       if (!user) return { data: null, error: 'User not found' };
 
-      const { data, error } = await supabase
+      const { data, error } = await serverSupabase
         .from('subscriptions')
         .select('*')
         .eq('user_id', user.id)
@@ -276,7 +294,7 @@ export const subscriptionOperations = {
     status: 'active' | 'canceled' | 'past_due' | 'incomplete'
   ): Promise<{ data: Subscription | null; error: any }> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await serverSupabase
         .from('subscriptions')
         .update({ status, updated_at: new Date().toISOString() })
         .eq('stripe_subscription_id', stripeSubscriptionId)
@@ -300,7 +318,7 @@ export const teamInvitationOperations = {
     clerk_invitation_id?: string;
   }): Promise<{ data: TeamInvitation | null; error: any }> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await serverSupabase
         .from('team_invitations')
         .insert(invitationData)
         .select()
@@ -315,7 +333,7 @@ export const teamInvitationOperations = {
   // Get invitations for subscription
   async getSubscriptionInvitations(subscriptionId: string): Promise<{ data: TeamInvitation[] | null; error: any }> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await serverSupabase
         .from('team_invitations')
         .select('*')
         .eq('subscription_id', subscriptionId)
@@ -333,7 +351,7 @@ export const teamInvitationOperations = {
     status: 'pending' | 'accepted' | 'expired' | 'revoked'
   ): Promise<{ data: TeamInvitation | null; error: any }> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await serverSupabase
         .from('team_invitations')
         .update({ status, updated_at: new Date().toISOString() })
         .eq('id', invitationId)
@@ -349,7 +367,7 @@ export const teamInvitationOperations = {
   // Get invitations by email
   async getInvitationsByEmail(email: string): Promise<{ data: TeamInvitation[] | null; error: any }> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await serverSupabase
         .from('team_invitations')
         .select('*')
         .eq('email', email)
