@@ -76,11 +76,11 @@ export const userOperations = {
 
       if (error) throw error;
 
-      // Fetch the complete user record
+      // Fetch the complete user record using clerk_id to respect RLS policy
       const { data: user, error: fetchError } = await supabase
         .from('users')
         .select('*')
-        .eq('id', data)
+        .eq('clerk_id', userData.clerk_id)
         .single();
 
       return { data: user, error: fetchError };
