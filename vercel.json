@@ -22,6 +22,12 @@
     },
     "api/organizations/create-subscription.ts": {
       "maxDuration": 10
+    },
+    "api/user/get.ts": {
+      "maxDuration": 10
+    },
+    "api/user/initialize.ts": {
+      "maxDuration": 10
     }
   },
   "crons": [],
