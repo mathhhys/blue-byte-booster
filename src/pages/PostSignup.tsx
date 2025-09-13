@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Loader2, CheckCircle, XCircle } from 'lucide-react';
 import { createCheckoutSession, prepareCheckoutData } from '@/utils/stripe/checkout';
-import { databaseHelpers } from '@/utils/supabase/database';
+// Removed direct database import - now using API routes
 import { processStarterSignup, prepareStarterSignupData } from '@/utils/starter/signup';
 
 const PostSignup = () => {
@@ -61,16 +61,27 @@ const PostSignup = () => {
         return;
       }
 
-      // Initialize user in database for paid plans
-      await databaseHelpers.initializeUser(
-        {
-          id: user.id,
-          emailAddresses: user.emailAddresses,
-          firstName: user.firstName,
-          lastName: user.lastName,
+      // Initialize user via API route to avoid RLS issues
+      const initResponse = await fetch('/api/user/initialize', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-        plan
-      );
+        body: JSON.stringify({
+          clerkUser: {
+            id: user.id,
+            emailAddresses: user.emailAddresses,
+            firstName: user.firstName,
+            lastName: user.lastName,
+          },
+          planType: plan
+        }),
+      });
+      
+      const { user: newUser, error: initError } = await initResponse.json();
+      if (initError) {
+        throw new Error(initError.message || 'Failed to initialize user');
+      }
 
       // For paid plans, create checkout session
       const checkoutData = prepareCheckoutData(

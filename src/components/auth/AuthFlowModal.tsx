@@ -7,7 +7,7 @@ import { useUser, useSignIn, useSignUp } from '@clerk/clerk-react';
 import { PLAN_CONFIGS, formatPlanPrice, calculateSavings } from '@/config/plans';
 import { AuthFlowState } from '@/types/database';
 import { createCheckoutSession, prepareCheckoutData } from '@/utils/stripe/checkout';
-import { databaseHelpers } from '@/utils/supabase/database';
+// Removed direct database import - now using API routes
 import { processStarterSignup, prepareStarterSignupData } from '@/utils/starter/signup';
 
 interface AuthFlowModalProps {
@@ -157,16 +157,27 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
     if (!user) return;
 
     try {
-      // Initialize user first
-      await databaseHelpers.initializeUser(
-        {
-          id: user.id,
-          emailAddresses: user.emailAddresses,
-          firstName: user.firstName,
-          lastName: user.lastName,
+      // Initialize user via API route to avoid RLS issues
+      const initResponse = await fetch('/api/user/initialize', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-        'pro'
-      );
+        body: JSON.stringify({
+          clerkUser: {
+            id: user.id,
+            emailAddresses: user.emailAddresses,
+            firstName: user.firstName,
+            lastName: user.lastName,
+          },
+          planType: 'pro'
+        }),
+      });
+      
+      const { user: newUser, error: initError } = await initResponse.json();
+      if (initError) {
+        throw new Error(initError.message || 'Failed to initialize user');
+      }
 
       // Create Stripe checkout session
       const checkoutData = prepareCheckoutData(
@@ -192,16 +203,27 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
     if (!user) return;
 
     try {
-      // Initialize user first
-      await databaseHelpers.initializeUser(
-        {
-          id: user.id,
-          emailAddresses: user.emailAddresses,
-          firstName: user.firstName,
-          lastName: user.lastName,
+      // Initialize user via API route to avoid RLS issues
+      const initResponse = await fetch('/api/user/initialize', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-        'teams'
-      );
+        body: JSON.stringify({
+          clerkUser: {
+            id: user.id,
+            emailAddresses: user.emailAddresses,
+            firstName: user.firstName,
+            lastName: user.lastName,
+          },
+          planType: 'teams'
+        }),
+      });
+      
+      const { user: newUser, error: initError } = await initResponse.json();
+      if (initError) {
+        throw new Error(initError.message || 'Failed to initialize user');
+      }
 
       // Create Stripe checkout session with seat count
       const checkoutData = prepareCheckoutData(

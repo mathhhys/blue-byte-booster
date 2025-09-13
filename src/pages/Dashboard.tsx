@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { userOperations, User, databaseHelpers } from '@/utils/supabase/database';
+import { User } from '@/utils/supabase/database';
 import {
   Settings,
   CreditCard,
@@ -120,7 +120,9 @@ const Dashboard = () => {
         console.log('Clerk User Email:', user.emailAddresses?.[0]?.emailAddress);
         console.log('Fetching user from Supabase database...');
         
-        const { data, error } = await userOperations.getUserByClerkId(user.id);
+        // Use API route to avoid RLS issues in browser
+        const response = await fetch(`/api/user/get?clerkId=${encodeURIComponent(user.id)}`);
+        const { data, error } = await response.json();
         
         console.log('Database query result:');
         console.log('- Data:', data);
@@ -151,13 +153,24 @@ const Dashboard = () => {
           console.log('⚠️ No user found in database for Clerk ID:', user.id);
           console.log('Attempting to initialize user in database...');
           
-          // Try to initialize the user in Supabase
-          const { user: newUser, error: initError } = await databaseHelpers.initializeUser({
-            id: user.id,
-            emailAddresses: [{ emailAddress: user.emailAddresses?.[0]?.emailAddress || user.primaryEmailAddress?.emailAddress || '' }],
-            firstName: user.firstName,
-            lastName: user.lastName
+          // Try to initialize the user in Supabase via API
+          const initResponse = await fetch('/api/user/initialize', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              clerkUser: {
+                id: user.id,
+                emailAddresses: [{ emailAddress: user.emailAddresses?.[0]?.emailAddress || user.primaryEmailAddress?.emailAddress || '' }],
+                firstName: user.firstName,
+                lastName: user.lastName
+              },
+              planType: 'starter'
+            }),
           });
+          
+          const { user: newUser, error: initError } = await initResponse.json();
           
           if (initError) {
             console.error('❌ Error initializing user:', initError);

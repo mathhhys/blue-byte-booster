@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { useUser } from '@clerk/clerk-react';
 import { AuthFlowState } from '@/types/database';
 import { createCheckoutSession, prepareCheckoutData } from '@/utils/stripe/checkout';
-import { databaseHelpers } from '@/utils/supabase/database';
+// Removed direct database import - now using API routes
 
 export const useAuthFlow = () => {
   const { user, isLoaded } = useUser();
@@ -62,16 +62,23 @@ export const useAuthFlow = () => {
     if (!user) throw new Error('User not authenticated');
 
     try {
-      const { user: dbUser, error } = await databaseHelpers.initializeUser(
-        {
-          id: user.id,
-          emailAddresses: user.emailAddresses,
-          firstName: user.firstName,
-          lastName: user.lastName,
+      const initResponse = await fetch('/api/user/initialize', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-        'starter'
-      );
-
+        body: JSON.stringify({
+          clerkUser: {
+            id: user.id,
+            emailAddresses: user.emailAddresses,
+            firstName: user.firstName,
+            lastName: user.lastName,
+          },
+          planType: 'starter'
+        }),
+      });
+      
+      const { user: dbUser, error } = await initResponse.json();
       if (error) throw new Error('Failed to initialize user account');
 
       return { success: true, redirectUrl: '/dashboard' };
@@ -84,16 +91,27 @@ export const useAuthFlow = () => {
     if (!user) throw new Error('User not authenticated');
 
     try {
-      // Initialize user first
-      await databaseHelpers.initializeUser(
-        {
-          id: user.id,
-          emailAddresses: user.emailAddresses,
-          firstName: user.firstName,
-          lastName: user.lastName,
+      // Initialize user via API route
+      const initResponse = await fetch('/api/user/initialize', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-        'pro'
-      );
+        body: JSON.stringify({
+          clerkUser: {
+            id: user.id,
+            emailAddresses: user.emailAddresses,
+            firstName: user.firstName,
+            lastName: user.lastName,
+          },
+          planType: 'pro'
+        }),
+      });
+      
+      const { user: newUser, error: initError } = await initResponse.json();
+      if (initError) {
+        throw new Error(initError.message || 'Failed to initialize user');
+      }
 
       // Create Stripe checkout session
       const checkoutData = prepareCheckoutData(
@@ -119,16 +137,27 @@ export const useAuthFlow = () => {
     if (!user) throw new Error('User not authenticated');
 
     try {
-      // Initialize user first
-      await databaseHelpers.initializeUser(
-        {
-          id: user.id,
-          emailAddresses: user.emailAddresses,
-          firstName: user.firstName,
-          lastName: user.lastName,
+      // Initialize user via API route
+      const initResponse = await fetch('/api/user/initialize', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-        'teams'
-      );
+        body: JSON.stringify({
+          clerkUser: {
+            id: user.id,
+            emailAddresses: user.emailAddresses,
+            firstName: user.firstName,
+            lastName: user.lastName,
+          },
+          planType: 'teams'
+        }),
+      });
+      
+      const { user: newUser, error: initError } = await initResponse.json();
+      if (initError) {
+        throw new Error(initError.message || 'Failed to initialize user');
+      }
 
       // Create Stripe checkout session with seat count
       const checkoutData = prepareCheckoutData(
