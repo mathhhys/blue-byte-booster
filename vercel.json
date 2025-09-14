@@ -19,6 +19,12 @@
     "api/clerk/webhooks.ts": {
       "maxDuration": 10,
       "memory": 512
+    },
+    "api/user/get.ts": {
+      "maxDuration": 10
+    },
+    "api/user/initialize.ts": {
+      "maxDuration": 10
     }
   },
   "crons": [],

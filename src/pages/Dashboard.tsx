@@ -339,32 +339,13 @@ const Dashboard = () => {
       const creditsToAdd = parseInt(creditAmount);
       const amount = CREDIT_CONVERSION.creditsToDollars(creditsToAdd);
       
-      const response = await fetch('/api/credits/add', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ credits: creditsToAdd, amount } as AddCreditsRequest),
+      // Temporarily disabled - API function moved to reduce Vercel function count
+      console.log('🔧 Credits functionality temporarily disabled for 406 error debugging');
+      toast({
+        title: "Credits Feature Temporarily Disabled",
+        description: "Focusing on fixing 406 database error. Credits feature will be restored after fix.",
+        variant: "destructive",
       });
-
-      const result: AddCreditsResponse = await response.json();
-
-      if (result.success && result.newBalance !== undefined) {
-        setCurrentBalance(result.newBalance);
-        setCreditAmount('');
-        setValidationError('');
-        
-        toast({
-          title: "Credits Added Successfully!",
-          description: `Added ${creditsToAdd.toLocaleString()} credits ($${amount.toFixed(2)})`,
-        });
-      } else {
-        toast({
-          title: "Failed to Add Credits",
-          description: result.error || "An unknown error occurred",
-          variant: "destructive",
-        });
-      }
     } catch (error) {
       console.error('Error adding credits:', error);
       toast({
@@ -441,43 +422,9 @@ const Dashboard = () => {
               <SidebarMenuItem>
                 <SidebarMenuButton
                   className="text-white/70 hover:text-white hover:bg-white/10"
-                  onClick={async () => {
-                    if (user?.id) {
-                      try {
-                        console.log('=== BILLING PORTAL DEBUG START ===');
-                        console.log('User ID:', user.id);
-                        console.log('API Base URL from env:', import.meta.env.VITE_API_URL);
-                        console.log('Full API endpoint URL:', `${import.meta.env.VITE_API_URL || ''}/api/stripe/create-customer-portal-session`);
-                        
-                        console.log('Creating billing portal session for user:', user.id);
-                        const result = await createStripeCustomerPortalSession(user.id);
-                        console.log('Billing portal result:', result);
-                        
-                        if (result.success && result.url) {
-                          console.log('Success! Redirecting to:', result.url);
-                          window.location.href = result.url;
-                        } else if (result.success && 'mock' in result && result.mock) {
-                          console.log('Mock billing portal in development mode');
-                          console.log('=== BILLING PORTAL DEBUG END ===');
-                          alert('Development Mode: Billing portal would open here. In production, this will redirect to Stripe Customer Portal.');
-                        } else {
-                          console.error('Billing portal failed with error:', 'error' in result ? result.error : 'Unknown error');
-                          console.log('=== BILLING PORTAL DEBUG END ===');
-                          alert(`Failed to open billing portal: ${'error' in result ? result.error : 'Unknown error'}`);
-                        }
-                      } catch (error) {
-                        console.error('Exception in billing portal creation:', error);
-                        console.log('Error details:', {
-                          name: error instanceof Error ? error.name : 'Unknown',
-                          message: error instanceof Error ? error.message : 'Unknown error',
-                          stack: error instanceof Error ? error.stack : 'No stack trace'
-                        });
-                        console.log('=== BILLING PORTAL DEBUG END ===');
-                        alert(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-                      }
-                    } else {
-                      alert('User not logged in.');
-                    }
+                  onClick={() => {
+                    console.log('🔧 Billing functionality temporarily disabled for 406 error debugging');
+                    alert('Billing feature temporarily disabled while fixing 406 database error. Will be restored after fix.');
                   }}
                 >
                   <CreditCard className="w-4 h-4" />
