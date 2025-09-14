@@ -1,4 +1,7 @@
 import { loadStripe, Stripe } from '@stripe/stripe-js';
+import { CurrencyCode } from '@/types/database';
+import { MULTI_CURRENCY_PRICING } from '@/config/pricing';
+import { getCurrencyConfig } from '@/config/currencies';
 
 const stripePublishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
 
@@ -19,53 +22,92 @@ export const getStripe = () => {
 // Stripe configuration constants
 export const STRIPE_CONFIG = {
   publishableKey: stripePublishableKey,
-  currency: 'usd',
-  locale: 'en' as const,
+  defaultCurrency: 'eur' as const,
+  defaultLocale: 'en' as const,
 } as const;
 
-// Product and price configurations
+// Legacy STRIPE_PRODUCTS for backward compatibility
 export const STRIPE_PRODUCTS = {
   pro: {
     monthly: {
-      priceId: 'price_1RvKJcH6gWxKcaTXQ4PITKei', // Actual Stripe price ID for Pro Monthly
-      amount: 2000, // $20.00 in cents
+      priceId: 'price_1RvK8KH6gWxKcaTXCWyv035N',
+      amount: 2000,
     },
     yearly: {
-      priceId: 'price_1RvKJtH6gWxKcaTXfeLXklqU', // Actual Stripe price ID for Pro Yearly
-      amount: 19200, // $192.00 in cents (20% discount)
+      priceId: 'price_1RvK8KH6gWxKcaTXEn1S0Lql',
+      amount: 19200,
     },
   },
   teams: {
     monthly: {
-      priceId: 'price_1RwNazH6gWxKcaTXi3OmXp4u', // Real Stripe price ID for Teams Monthly
-      amount: 3000, // $30.00 in cents per seat
+      priceId: 'price_1RwN7VH6gWxKcaTXHVkwwT60',
+      amount: 3000,
     },
     yearly: {
-      priceId: 'price_teams_yearly', // You'll need to create Teams yearly price in Stripe
-      amount: 28800, // $288.00 in cents per seat (20% discount)
+      priceId: 'price_1RwN8hH6gWxKcaTXEaGbVvhz',
+      amount: 28800,
     },
   },
 } as const;
 
-// Helper function to get price configuration
+// Multi-currency product configurations
+export const STRIPE_PRODUCTS_MULTI_CURRENCY = MULTI_CURRENCY_PRICING;
+
+// Updated helper function to get price configuration with currency
 export const getPriceConfig = (
+  planType: 'pro' | 'teams',
+  billingFrequency: 'monthly' | 'yearly',
+  currency: CurrencyCode
+) => {
+  const planPricing = MULTI_CURRENCY_PRICING[planType][currency];
+  return {
+    priceId: planPricing.priceIds[billingFrequency],
+    amount: planPricing[billingFrequency] * 100, // Convert to cents
+  };
+};
+
+// Legacy helper function for backward compatibility
+export const getPriceConfigLegacy = (
   planType: 'pro' | 'teams',
   billingFrequency: 'monthly' | 'yearly'
 ) => {
   return STRIPE_PRODUCTS[planType][billingFrequency];
 };
 
-// Helper function to calculate total amount
+// Updated helper function to calculate total amount with currency
 export const calculateTotalAmount = (
+  planType: 'pro' | 'teams',
+  billingFrequency: 'monthly' | 'yearly',
+  currency: CurrencyCode,
+  seats: number = 1
+): number => {
+  const priceConfig = getPriceConfig(planType, billingFrequency, currency);
+  return priceConfig.amount * seats;
+};
+
+// Legacy helper function for backward compatibility
+export const calculateTotalAmountLegacy = (
   planType: 'pro' | 'teams',
   billingFrequency: 'monthly' | 'yearly',
   seats: number = 1
 ): number => {
-  const priceConfig = getPriceConfig(planType, billingFrequency);
+  const priceConfig = getPriceConfigLegacy(planType, billingFrequency);
   return priceConfig.amount * seats;
 };
 
-// Helper function to format price for display
+// Updated helper function to format price with currency
+export const formatPriceWithCurrency = (
+  amountInCents: number,
+  currency: CurrencyCode
+): string => {
+  const config = getCurrencyConfig(currency);
+  return new Intl.NumberFormat(config.locale, {
+    style: 'currency',
+    currency: currency,
+  }).format(amountInCents / 100);
+};
+
+// Legacy helper function for backward compatibility
 export const formatPrice = (amountInCents: number): string => {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -73,10 +115,40 @@ export const formatPrice = (amountInCents: number): string => {
   }).format(amountInCents / 100);
 };
 
-// Helper function to get savings percentage
-export const getSavingsPercentage = (planType: 'pro' | 'teams'): number => {
+// Updated helper function to get savings percentage with currency
+export const getSavingsPercentage = (
+  planType: 'pro' | 'teams',
+  currency: CurrencyCode
+): number => {
+  const pricing = MULTI_CURRENCY_PRICING[planType][currency];
+  const monthly = pricing.monthly;
+  const yearly = pricing.yearly;
+  const yearlyEquivalent = monthly * 12;
+  return Math.round(((yearlyEquivalent - yearly) / yearlyEquivalent) * 100);
+};
+
+// Legacy helper function for backward compatibility
+export const getSavingsPercentageLegacy = (planType: 'pro' | 'teams'): number => {
   const monthly = STRIPE_PRODUCTS[planType].monthly.amount;
   const yearly = STRIPE_PRODUCTS[planType].yearly.amount;
   const yearlyEquivalent = monthly * 12;
   return Math.round(((yearlyEquivalent - yearly) / yearlyEquivalent) * 100);
+};
+
+// Helper function to get price ID for specific currency and plan
+export const getPriceId = (
+  planType: 'pro' | 'teams',
+  billingFrequency: 'monthly' | 'yearly',
+  currency: CurrencyCode
+): string => {
+  return MULTI_CURRENCY_PRICING[planType][currency].priceIds[billingFrequency];
+};
+
+// Helper function to get raw price amount for specific currency
+export const getPriceAmount = (
+  planType: 'pro' | 'teams',
+  billingFrequency: 'monthly' | 'yearly',
+  currency: CurrencyCode
+): number => {
+  return MULTI_CURRENCY_PRICING[planType][currency][billingFrequency];
 };

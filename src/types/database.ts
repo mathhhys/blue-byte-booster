@@ -237,3 +237,48 @@ export interface InvitationResult {
   clerkInvitationId?: string;
   error?: string;
 }
+
+// Currency-related types
+export type CurrencyCode = 'EUR' | 'USD' | 'GBP';
+
+export interface CurrencyConfig {
+  code: CurrencyCode;
+  symbol: string;
+  flag: string;
+  locale: string;
+  isDefault?: boolean;
+}
+
+export interface CurrencyPrice {
+  monthly: number;
+  yearly: number;
+  priceIds: {
+    monthly: string;
+    yearly: string;
+  };
+}
+
+export interface MultiCurrencyPrice {
+  EUR: CurrencyPrice;
+  USD: CurrencyPrice;
+  GBP: CurrencyPrice;
+}
+
+// Updated PlanConfig to support multi-currency
+export interface MultiCurrencyPlanConfig {
+  id: 'pro' | 'teams' | 'enterprise';
+  name: string;
+  description: string;
+  pricing: MultiCurrencyPrice;
+  features: string[];
+  credits?: number;
+  maxSeats?: number;
+  isPopular?: boolean;
+  isContactSales?: boolean;
+}
+
+// Extended checkout data to include currency
+export interface StripeCheckoutDataWithCurrency extends StripeCheckoutData {
+  currency: CurrencyCode;
+  priceId: string;
+}

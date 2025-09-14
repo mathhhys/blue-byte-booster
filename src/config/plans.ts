@@ -1,6 +1,7 @@
-import { PlanConfig } from '@/types/database';
+import { PlanConfig, MultiCurrencyPlanConfig, CurrencyCode } from '@/types/database';
+import { MULTI_CURRENCY_PRICING } from '@/config/pricing';
 
-// Plan configurations matching the existing pricing structure
+// Legacy plan configurations for backward compatibility
 export const PLAN_CONFIGS: Record<'pro' | 'teams' | 'enterprise', PlanConfig> = {
   pro: {
     id: 'pro',
@@ -8,7 +9,7 @@ export const PLAN_CONFIGS: Record<'pro' | 'teams' | 'enterprise', PlanConfig> = 
     description: 'Perfect for individual developers',
     price: {
       monthly: 20,
-      yearly: 16,
+      yearly: 192,
     },
     features: [
       'Unlimited Agent Requests',
@@ -25,7 +26,7 @@ export const PLAN_CONFIGS: Record<'pro' | 'teams' | 'enterprise', PlanConfig> = 
     description: 'Ideal for development teams',
     price: {
       monthly: 30,
-      yearly: 24,
+      yearly: 288,
     },
     features: [
       'Everything in Pro +',
@@ -60,7 +61,62 @@ export const PLAN_CONFIGS: Record<'pro' | 'teams' | 'enterprise', PlanConfig> = 
   },
 };
 
-// Helper functions for plan operations
+// Multi-currency plan configurations
+export const PLAN_CONFIGS_MULTI_CURRENCY: Record<'pro' | 'teams' | 'enterprise', MultiCurrencyPlanConfig> = {
+  pro: {
+    id: 'pro',
+    name: 'Pro',
+    description: 'Perfect for individual developers',
+    pricing: MULTI_CURRENCY_PRICING.pro,
+    features: [
+      'Unlimited Agent Requests',
+      'Unlimited Tab Completion',
+      '500 requests per month included',
+      'Add more credits at API Price - No extra costs'
+    ],
+    credits: 500,
+    isPopular: true,
+  },
+  teams: {
+    id: 'teams',
+    name: 'Teams',
+    description: 'Ideal for development teams',
+    pricing: MULTI_CURRENCY_PRICING.teams,
+    features: [
+      'Everything in Pro +',
+      'Privacy mode',
+      'Centralized Billing',
+      'Admin dashboard with analytics',
+      'Priority support',
+    ],
+    credits: 500,
+    maxSeats: 100,
+    isPopular: false,
+  },
+  enterprise: {
+    id: 'enterprise',
+    name: 'Enterprise',
+    description: 'Custom solutions for large organizations',
+    pricing: {
+      EUR: { monthly: 0, yearly: 0, priceIds: { monthly: '', yearly: '' } },
+      USD: { monthly: 0, yearly: 0, priceIds: { monthly: '', yearly: '' } },
+      GBP: { monthly: 0, yearly: 0, priceIds: { monthly: '', yearly: '' } }
+    },
+    features: [
+      'Everything in Teams +',
+      'Custom deployment',
+      'SSO & SAML',
+      'Dedicated support',
+      'Advanced security',
+      'Custom SLA agreements',
+      'On-premise deployment'
+    ],
+    isContactSales: true,
+    isPopular: false,
+  },
+};
+
+// Helper functions for plan operations (legacy)
 export const getPlanConfig = (planId: 'pro' | 'teams' | 'enterprise'): PlanConfig => {
   return PLAN_CONFIGS[planId];
 };
@@ -73,6 +129,31 @@ export const getPaidPlans = (): PlanConfig[] => {
   return Object.values(PLAN_CONFIGS).filter(plan => plan.price.monthly && plan.price.monthly > 0);
 };
 
+// Multi-currency helper functions
+export const getMultiCurrencyPlanConfig = (planId: 'pro' | 'teams' | 'enterprise'): MultiCurrencyPlanConfig => {
+  return PLAN_CONFIGS_MULTI_CURRENCY[planId];
+};
+
+export const getAllMultiCurrencyPlans = (): MultiCurrencyPlanConfig[] => {
+  return Object.values(PLAN_CONFIGS_MULTI_CURRENCY);
+};
+
+export const getPaidMultiCurrencyPlans = (): MultiCurrencyPlanConfig[] => {
+  return Object.values(PLAN_CONFIGS_MULTI_CURRENCY).filter(plan => !plan.isContactSales);
+};
+
+// Helper function to get plan price for specific currency
+export const getPlanPrice = (
+  planId: 'pro' | 'teams' | 'enterprise',
+  currency: CurrencyCode,
+  billingFrequency: 'monthly' | 'yearly'
+): number => {
+  const plan = PLAN_CONFIGS_MULTI_CURRENCY[planId];
+  if (plan.isContactSales) return 0;
+  return plan.pricing[currency][billingFrequency];
+};
+
+// Legacy function for backward compatibility
 export const calculatePlanPrice = (
   planId: 'pro' | 'teams',
   billingFrequency: 'monthly' | 'yearly',
@@ -84,6 +165,30 @@ export const calculatePlanPrice = (
   return basePrice * seats;
 };
 
+// Multi-currency plan price calculation
+export const calculateMultiCurrencyPlanPrice = (
+  planId: 'pro' | 'teams',
+  currency: CurrencyCode,
+  billingFrequency: 'monthly' | 'yearly',
+  seats: number = 1
+): number => {
+  const price = getPlanPrice(planId, currency, billingFrequency);
+  return price * seats;
+};
+
+// Multi-currency savings calculation
+export const calculateMultiCurrencySavings = (
+  planId: 'pro' | 'teams',
+  currency: CurrencyCode
+): number => {
+  const plan = PLAN_CONFIGS_MULTI_CURRENCY[planId];
+  const monthlyPrice = plan.pricing[currency].monthly;
+  const yearlyPrice = plan.pricing[currency].yearly;
+  const monthlyTotal = monthlyPrice * 12;
+  return Math.round(((monthlyTotal - yearlyPrice) / monthlyTotal) * 100);
+};
+
+// Legacy function for backward compatibility
 export const calculateSavings = (planId: 'pro' | 'teams'): number => {
   const plan = PLAN_CONFIGS[planId];
   if (!plan.price.monthly || !plan.price.yearly) return 0;
@@ -92,6 +197,7 @@ export const calculateSavings = (planId: 'pro' | 'teams'): number => {
   return Math.round(((monthlyTotal - yearlyTotal) / monthlyTotal) * 100);
 };
 
+// Legacy formatting function
 export const formatPlanPrice = (
   planId: 'pro' | 'teams' | 'enterprise',
   billingFrequency: 'monthly' | 'yearly',
@@ -116,6 +222,31 @@ export const formatPlanPrice = (
   }
   
   return `$${price}/${period}`;
+};
+
+// Multi-currency formatting function
+export const formatMultiCurrencyPlanPrice = (
+  planId: 'pro' | 'teams' | 'enterprise',
+  currency: CurrencyCode,
+  billingFrequency: 'monthly' | 'yearly',
+  seats: number = 1
+): string => {
+  const plan = PLAN_CONFIGS_MULTI_CURRENCY[planId];
+  
+  if (plan.isContactSales) {
+    return 'Contact Sales';
+  }
+  
+  const price = calculateMultiCurrencyPlanPrice(planId as 'pro' | 'teams', currency, billingFrequency, seats);
+  const period = billingFrequency === 'monthly' ? 'mo' : 'yr';
+  const currencySymbol = currency === 'EUR' ? '€' : currency === 'GBP' ? '£' : '$';
+  
+  if (seats > 1) {
+    const perSeat = getPlanPrice(planId, currency, billingFrequency);
+    return `${currencySymbol}${price}/${period} (${currencySymbol}${perSeat}/seat)`;
+  }
+  
+  return `${currencySymbol}${price}/${period}`;
 };
 
 // Plan feature comparison helpers

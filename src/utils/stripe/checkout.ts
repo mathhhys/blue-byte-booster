@@ -1,9 +1,44 @@
-import { getStripe, getPriceConfig, calculateTotalAmount } from './client';
-import { StripeCheckoutData } from '@/types/database';
+import { getStripe, getPriceConfig, calculateTotalAmount, getPriceId } from './client';
+import { StripeCheckoutData, StripeCheckoutDataWithCurrency, CurrencyCode } from '@/types/database';
 
 const API_BASE = import.meta.env.VITE_API_URL || ''; // set VITE_API_URL in your .env (e.g. https://api.softcodes.ai) or leave empty to use relative paths
 
-// Checkout session creation using backend API
+// Multi-currency checkout session creation
+export const createMultiCurrencyCheckoutSession = async (checkoutData: StripeCheckoutDataWithCurrency) => {
+  try {
+    // Call backend API to create checkout session
+    const response = await fetch(`${API_BASE}/api/stripe/create-checkout-session`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(checkoutData),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to create checkout session');
+    }
+
+    const { sessionId, url } = await response.json();
+    
+    if (url) {
+      // Redirect to Stripe Checkout
+      window.location.href = url;
+      return { success: true, sessionId };
+    } else {
+      throw new Error('No checkout URL received');
+    }
+  } catch (error) {
+    console.error('Error creating checkout session:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error occurred'
+    };
+  }
+};
+
+// Legacy checkout session creation for backward compatibility
 export const createCheckoutSession = async (checkoutData: StripeCheckoutData) => {
   try {
     // Call backend API to create checkout session
@@ -63,7 +98,30 @@ export const redirectToCheckout = async (sessionId: string) => {
   }
 };
 
-// Helper function to prepare checkout data
+// Multi-currency checkout data preparation
+export const prepareMultiCurrencyCheckoutData = (
+  planType: 'pro' | 'teams',
+  billingFrequency: 'monthly' | 'yearly',
+  currency: CurrencyCode,
+  clerkUserId: string,
+  seats: number = 1
+): StripeCheckoutDataWithCurrency => {
+  const priceId = getPriceId(planType, billingFrequency, currency);
+  const baseUrl = window.location.origin;
+  
+  return {
+    planType,
+    billingFrequency,
+    currency,
+    priceId,
+    seats,
+    clerkUserId,
+    successUrl: `${baseUrl}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+    cancelUrl: `${baseUrl}/payment/cancelled`,
+  };
+};
+
+// Legacy helper function for backward compatibility
 export const prepareCheckoutData = (
   planType: 'pro' | 'teams',
   billingFrequency: 'monthly' | 'yearly',
@@ -82,7 +140,45 @@ export const prepareCheckoutData = (
   };
 };
 
-// Validate checkout data
+// Multi-currency checkout data validation
+export const validateMultiCurrencyCheckoutData = (data: StripeCheckoutDataWithCurrency): { valid: boolean; errors: string[] } => {
+  const errors: string[] = [];
+
+  if (!data.planType || !['pro', 'teams'].includes(data.planType)) {
+    errors.push('Invalid plan type');
+  }
+
+  if (!data.billingFrequency || !['monthly', 'yearly'].includes(data.billingFrequency)) {
+    errors.push('Invalid billing frequency');
+  }
+
+  if (!data.currency || !['EUR', 'USD', 'GBP'].includes(data.currency)) {
+    errors.push('Invalid currency');
+  }
+
+  if (!data.priceId || data.priceId.trim() === '') {
+    errors.push('Price ID is required');
+  }
+
+  if (!data.clerkUserId || data.clerkUserId.trim() === '') {
+    errors.push('User ID is required');
+  }
+
+  if (data.planType === 'teams' && (!data.seats || data.seats < 1 || data.seats > 100)) {
+    errors.push('Teams plan requires 1-100 seats');
+  }
+
+  if (!data.successUrl || !data.cancelUrl) {
+    errors.push('Success and cancel URLs are required');
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+  };
+};
+
+// Legacy validation function for backward compatibility
 export const validateCheckoutData = (data: StripeCheckoutData): { valid: boolean; errors: string[] } => {
   const errors: string[] = [];
 
@@ -131,14 +227,47 @@ export const getCheckoutSessionStatus = async (sessionId: string) => {
   }
 };
 
-// Calculate and format pricing display
+// Multi-currency pricing display
+export const getMultiCurrencyPricingDisplay = (
+  planType: 'pro' | 'teams',
+  billingFrequency: 'monthly' | 'yearly',
+  currency: CurrencyCode,
+  seats: number = 1
+) => {
+  const priceConfig = getPriceConfig(planType, billingFrequency, currency);
+  const totalAmount = calculateTotalAmount(planType, billingFrequency, currency, seats);
+  
+  const perSeatPrice = priceConfig.amount / 100;
+  const totalPrice = totalAmount / 100;
+  
+  const period = billingFrequency === 'monthly' ? 'month' : 'year';
+  const currencySymbol = currency === 'EUR' ? '€' : currency === 'GBP' ? '£' : '$';
+  
+  if (planType === 'teams' && seats > 1) {
+    return {
+      perSeat: `${currencySymbol}${perSeatPrice}/${period}`,
+      total: `${currencySymbol}${totalPrice}/${period}`,
+      description: `${seats} seats × ${currencySymbol}${perSeatPrice}/${period}`,
+      savings: billingFrequency === 'yearly' ? '20% off' : null,
+    };
+  }
+  
+  return {
+    perSeat: `${currencySymbol}${perSeatPrice}/${period}`,
+    total: `${currencySymbol}${totalPrice}/${period}`,
+    description: `${currencySymbol}${totalPrice}/${period}`,
+    savings: billingFrequency === 'yearly' ? '20% off' : null,
+  };
+};
+
+// Legacy pricing display for backward compatibility
 export const getPricingDisplay = (
   planType: 'pro' | 'teams',
   billingFrequency: 'monthly' | 'yearly',
   seats: number = 1
 ) => {
-  const priceConfig = getPriceConfig(planType, billingFrequency);
-  const totalAmount = calculateTotalAmount(planType, billingFrequency, seats);
+  const priceConfig = getPriceConfig(planType, billingFrequency, 'USD');
+  const totalAmount = calculateTotalAmount(planType, billingFrequency, 'USD', seats);
   
   const perSeatPrice = priceConfig.amount / 100;
   const totalPrice = totalAmount / 100;

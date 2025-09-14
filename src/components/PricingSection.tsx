@@ -6,17 +6,22 @@ import { Card } from "@/components/ui/card";
 import { Check, ArrowRight, Mail } from "lucide-react";
 import { SignedIn, SignedOut, useUser } from '@clerk/clerk-react';
 import { useNavigate } from 'react-router-dom';
-import { PLAN_CONFIGS } from '@/config/plans';
+import { PLAN_CONFIGS_MULTI_CURRENCY, getPlanPrice, calculateMultiCurrencySavings } from '@/config/plans';
+import { CurrencySelector } from '@/components/ui/CurrencySelector';
+import { useCurrency } from '@/hooks/useCurrency';
+import { formatPriceOnly } from '@/utils/currency';
+import { MultiCurrencyPlanConfig } from '@/types/database';
 
 export const PricingSection = () => {
   const [isYearly, setIsYearly] = useState(false);
   const navigate = useNavigate();
   const { isLoaded, isSignedIn } = useUser();
+  const { selectedCurrency, formatPrice } = useCurrency();
 
   const plans = [
-    PLAN_CONFIGS.pro,
-    PLAN_CONFIGS.teams,
-    PLAN_CONFIGS.enterprise,
+    PLAN_CONFIGS_MULTI_CURRENCY.pro,
+    PLAN_CONFIGS_MULTI_CURRENCY.teams,
+    PLAN_CONFIGS_MULTI_CURRENCY.enterprise,
   ];
 
   const handlePlanClick = (planId: 'pro' | 'teams' | 'enterprise') => {
@@ -29,6 +34,7 @@ export const PricingSection = () => {
       const params = new URLSearchParams({
         plan: planId,
         billing: isYearly ? 'yearly' : 'monthly',
+        currency: selectedCurrency,
       });
       navigate(`/sign-up?${params.toString()}`);
     } else {
@@ -36,11 +42,14 @@ export const PricingSection = () => {
     }
   };
 
-  const getPlanPrice = (plan: typeof PLAN_CONFIGS.pro | typeof PLAN_CONFIGS.enterprise) => {
+  const getPlanPriceDisplay = (plan: MultiCurrencyPlanConfig) => {
     if (plan.isContactSales) return 'Custom';
-    if (!plan.price.monthly) return 'Custom';
-    const price = isYearly ? plan.price.yearly : plan.price.monthly;
-    return `$${price}`;
+    const price = getPlanPrice(plan.id, selectedCurrency, isYearly ? 'yearly' : 'monthly');
+    return formatPriceOnly(price, selectedCurrency);
+  };
+
+  const getSavingsPercentage = (planId: 'pro' | 'teams') => {
+    return calculateMultiCurrencySavings(planId, selectedCurrency);
   };
 
   const getButtonText = (planId: 'pro' | 'teams' | 'enterprise') => {
@@ -65,7 +74,12 @@ export const PricingSection = () => {
   return (
     <section className="bg-transparent pb-24">
       <div className="max-w-7xl mx-auto px-6">
-        {/* Header - Toggle Only, Centered */}
+        {/* Currency Selector */}
+        <div className="flex justify-center items-center mb-6">
+          <CurrencySelector />
+        </div>
+
+        {/* Billing Toggle */}
         <div className="flex justify-center items-center -mt-8 md:mt-0 mb-12">
           <div className="flex items-center bg-gray-800 rounded-lg p-1 border border-gray-600">
             <button
@@ -86,7 +100,7 @@ export const PricingSection = () => {
                   : "text-gray-300 hover:text-white"
               }`}
             >
-              YEARLY <span className="text-gray-400">(SAVE 20%)</span>
+              YEARLY <span className="text-gray-400">(SAVE {getSavingsPercentage('pro')}%)</span>
             </button>
           </div>
         </div>
@@ -123,10 +137,10 @@ export const PricingSection = () => {
                   </h3>
                   <div className="flex items-baseline gap-1 mb-2">
                     <span className="text-3xl font-bold text-white">
-                      {getPlanPrice(plan)}
+                      {getPlanPriceDisplay(plan)}
                     </span>
                     <span className="text-gray-300">
-                      {plan.price.monthly && plan.price.monthly > 0 ? '/mo' : ''}
+                      {!plan.isContactSales ? (isYearly ? '/yr' : '/mo') : ''}
                     </span>
                   </div>
                   <p className="text-sm text-gray-300">
