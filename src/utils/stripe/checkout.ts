@@ -7,13 +7,13 @@ const API_BASE = import.meta.env.VITE_API_URL || ''; // set VITE_API_URL in your
 // Multi-currency checkout session creation
 export const createMultiCurrencyCheckoutSession = async (checkoutData: StripeCheckoutDataWithCurrency) => {
   try {
-    // In development mode with no API_BASE, use mock implementation
-    if (import.meta.env.DEV && !API_BASE) {
+    // Always use mock implementation in development to avoid CORS issues
+    if (import.meta.env.DEV) {
       console.log('Using development mock for multi-currency checkout');
       return await mockCreateMultiCurrencyCheckoutSession(checkoutData);
     }
 
-    // Call backend API to create checkout session
+    // Call backend API to create checkout session (production only)
     const response = await fetch(`${API_BASE}/api/stripe/create-checkout-session`, {
       method: 'POST',
       headers: {
@@ -38,13 +38,6 @@ export const createMultiCurrencyCheckoutSession = async (checkoutData: StripeChe
     }
   } catch (error) {
     console.error('Error creating checkout session:', error);
-    
-    // Fallback to mock in development if network fails
-    if (import.meta.env.DEV && error instanceof TypeError) {
-      console.log('Network error in development, falling back to mock');
-      return await mockCreateMultiCurrencyCheckoutSession(checkoutData);
-    }
-    
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error occurred'

@@ -7,17 +7,15 @@ import { Check, ArrowRight, Mail } from "lucide-react";
 import { SignedIn, SignedOut, useUser } from '@clerk/clerk-react';
 import { useNavigate } from 'react-router-dom';
 import { PLAN_CONFIGS_MULTI_CURRENCY, getPlanPrice, calculateMultiCurrencySavings } from '@/config/plans';
-import { CurrencySelector } from '@/components/ui/CurrencySelector';
-import { useCurrency } from '@/hooks/useCurrency';
 import { formatPriceOnly } from '@/utils/currency';
 import { MultiCurrencyPlanConfig, CurrencyCode } from '@/types/database';
+import { DEFAULT_CURRENCY } from '@/config/currencies';
 
 export const PricingSection = () => {
   const [isYearly, setIsYearly] = useState(false);
-  const [forceUpdate, setForceUpdate] = useState(0);
+  const [selectedCurrency, setSelectedCurrency] = useState<CurrencyCode>(DEFAULT_CURRENCY);
   const navigate = useNavigate();
   const { isLoaded, isSignedIn } = useUser();
-  const { selectedCurrency, setCurrency } = useCurrency();
 
   const plans = [
     PLAN_CONFIGS_MULTI_CURRENCY.pro,
@@ -26,8 +24,13 @@ export const PricingSection = () => {
   ];
 
   const handleCurrencyChange = (currency: CurrencyCode) => {
-    setCurrency(currency);
-    setForceUpdate(prev => prev + 1); // Force re-render
+    setSelectedCurrency(currency);
+    localStorage.setItem('selectedCurrency', currency);
+    
+    // Update URL without navigation
+    const url = new URL(window.location.href);
+    url.searchParams.set('currency', currency);
+    window.history.replaceState({}, '', url.toString());
   };
 
   const handlePlanClick = (planId: 'pro' | 'teams' | 'enterprise') => {
@@ -50,12 +53,22 @@ export const PricingSection = () => {
 
   const getPlanPriceDisplay = (plan: MultiCurrencyPlanConfig) => {
     if (plan.isContactSales) return 'Custom';
-    const price = getPlanPrice(plan.id, selectedCurrency, isYearly ? 'yearly' : 'monthly');
-    return formatPriceOnly(price, selectedCurrency);
+    
+    // Direct price lookup to ensure reactivity
+    const pricing = plan.pricing[selectedCurrency];
+    const price = isYearly ? pricing.yearly : pricing.monthly;
+    
+    // Direct formatting to ensure fresh calculation
+    const symbol = selectedCurrency === 'EUR' ? '€' : selectedCurrency === 'GBP' ? '£' : '$';
+    return `${symbol}${price}`;
   };
 
   const getSavingsPercentage = (planId: 'pro' | 'teams') => {
-    return calculateMultiCurrencySavings(planId, selectedCurrency);
+    const plan = PLAN_CONFIGS_MULTI_CURRENCY[planId];
+    const monthlyPrice = plan.pricing[selectedCurrency].monthly;
+    const yearlyPrice = plan.pricing[selectedCurrency].yearly;
+    const monthlyTotal = monthlyPrice * 12;
+    return Math.round(((monthlyTotal - yearlyPrice) / monthlyTotal) * 100);
   };
 
   const getButtonText = (planId: 'pro' | 'teams' | 'enterprise') => {
@@ -83,10 +96,10 @@ export const PricingSection = () => {
         {/* Currency Selector */}
         <div className="flex justify-center items-center mb-6">
           <div className="flex items-center bg-gray-800 rounded-lg p-1 border border-gray-600">
-            {['EUR', 'USD', 'GBP'].map((currency) => (
+            {(['EUR', 'USD', 'GBP'] as CurrencyCode[]).map((currency) => (
               <button
                 key={currency}
-                onClick={() => handleCurrencyChange(currency as CurrencyCode)}
+                onClick={() => handleCurrencyChange(currency)}
                 className={`px-3 py-2 text-sm font-medium rounded-md transition-all duration-200 flex items-center gap-2 ${
                   selectedCurrency === currency
                     ? "bg-white text-black"
@@ -133,7 +146,7 @@ export const PricingSection = () => {
         <div className="grid lg:grid-cols-3 gap-8 mb-8">
           {plans.map((plan) => (
             <Card
-              key={`${plan.name}-${selectedCurrency}-${isYearly}-${forceUpdate}`}
+              key={`${plan.name}-${selectedCurrency}-${isYearly}`}
               className={`relative p-8 border transition-all duration-300 hover:scale-105 ${
                 plan.isPopular
                   ? 'border-transparent'
