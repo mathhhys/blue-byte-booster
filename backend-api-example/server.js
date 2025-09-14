@@ -104,7 +104,17 @@ pool.on('error', (err) => {
   console.error('❌ PostgreSQL connection error:', err);
 });
 
-app.use(cors());
+// CORS configuration
+const corsOptions = {
+  origin: process.env.FRONTEND_URL || 'https://www.softcodes.ai', // Default to production URL
+  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+  optionsSuccessStatus: 204 // For preflight requests
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions)); // Enable preflight for all routes
 
 // For Stripe and Clerk webhooks, we need the raw body before JSON parsing
 app.use('/api/stripe/webhooks', express.raw({ type: 'application/json' }));
