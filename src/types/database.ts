@@ -190,22 +190,23 @@ export interface Database {
 
 // Plan configuration types
 export interface PlanConfig {
-  id: 'starter' | 'pro' | 'teams';
+  id: 'pro' | 'teams' | 'enterprise';
   name: string;
   description: string;
   price: {
-    monthly: number;
-    yearly: number;
+    monthly: number | null;
+    yearly: number | null;
   };
   features: string[];
-  credits: number;
+  credits?: number;
   maxSeats?: number;
   isPopular?: boolean;
+  isContactSales?: boolean;
 }
 
 // Stripe-related types
 export interface StripeCheckoutData {
-  planType: 'pro' | 'teams';
+  planType: 'pro' | 'teams' | 'enterprise';
   billingFrequency: 'monthly' | 'yearly';
   seats?: number;
   clerkUserId: string;
@@ -216,7 +217,7 @@ export interface StripeCheckoutData {
 // Authentication flow types
 export interface AuthFlowState {
   isOpen: boolean;
-  selectedPlan?: 'starter' | 'pro' | 'teams';
+  selectedPlan?: 'pro' | 'teams' | 'enterprise';
   billingFrequency: 'monthly' | 'yearly';
   seats: number;
   isLoading: boolean;

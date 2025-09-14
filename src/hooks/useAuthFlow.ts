@@ -15,7 +15,7 @@ export const useAuthFlow = () => {
     isLoading: false,
   });
 
-  const openModal = useCallback((plan?: 'starter' | 'pro' | 'teams') => {
+  const openModal = useCallback((plan?: 'pro' | 'teams' | 'enterprise') => {
     setState(prev => ({
       ...prev,
       isOpen: true,
@@ -32,7 +32,7 @@ export const useAuthFlow = () => {
     }));
   }, []);
 
-  const selectPlan = useCallback((planId: 'starter' | 'pro' | 'teams') => {
+  const selectPlan = useCallback((planId: 'pro' | 'teams' | 'enterprise') => {
     setState(prev => ({
       ...prev,
       selectedPlan: planId,
@@ -58,32 +58,15 @@ export const useAuthFlow = () => {
     setState(prev => ({ ...prev, error }));
   }, []);
 
-  const processStarterPlan = useCallback(async () => {
+  const processEnterprisePlan = useCallback(async () => {
     if (!user) throw new Error('User not authenticated');
 
     try {
-      const initResponse = await fetch('/api/user/initialize', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          clerkUser: {
-            id: user.id,
-            emailAddresses: user.emailAddresses,
-            firstName: user.firstName,
-            lastName: user.lastName,
-          },
-          planType: 'starter'
-        }),
-      });
-      
-      const { user: dbUser, error } = await initResponse.json();
-      if (error) throw new Error('Failed to initialize user account');
-
-      return { success: true, redirectUrl: '/dashboard' };
+      // For enterprise, redirect to contact sales instead of processing payment
+      window.location.href = 'mailto:sales@softcodes.ai?subject=Enterprise Plan Inquiry';
+      return { success: true, redirectUrl: null };
     } catch (error) {
-      throw new Error('Failed to set up starter plan');
+      throw new Error('Failed to initiate enterprise contact');
     }
   }, [user]);
 
@@ -204,13 +187,6 @@ export const useAuthFlow = () => {
       let result;
       
       switch (state.selectedPlan) {
-        case 'starter':
-          result = await processStarterPlan();
-          if (result.success && result.redirectUrl) {
-            closeModal();
-            window.location.href = result.redirectUrl;
-          }
-          break;
         case 'pro':
           result = await processProPlan();
           // Stripe checkout will handle the redirect
@@ -218,6 +194,10 @@ export const useAuthFlow = () => {
         case 'teams':
           result = await processTeamsPlan();
           // Stripe checkout will handle the redirect
+          break;
+        case 'enterprise':
+          result = await processEnterprisePlan();
+          // Enterprise contact will handle the redirect
           break;
       }
     } catch (error) {
@@ -232,7 +212,7 @@ export const useAuthFlow = () => {
     state.seats,
     isLoaded,
     user,
-    processStarterPlan,
+    processEnterprisePlan,
     processProPlan,
     processTeamsPlan,
     closeModal,
@@ -242,16 +222,16 @@ export const useAuthFlow = () => {
     if (state.isLoading) return 'Processing...';
     
     if (!isLoaded || !user) {
-      return state.selectedPlan === 'starter' ? 'Get Started Free' : 'Sign Up & Subscribe';
+      return state.selectedPlan === 'enterprise' ? 'Contact Sales' : 'Sign Up & Subscribe';
     }
     
     switch (state.selectedPlan) {
-      case 'starter':
-        return 'Get Started Free';
       case 'pro':
         return 'Subscribe to Pro';
       case 'teams':
         return 'Subscribe to Teams';
+      case 'enterprise':
+        return 'Contact Sales';
       default:
         return 'Continue';
     }

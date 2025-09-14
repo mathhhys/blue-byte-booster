@@ -3,124 +3,42 @@ import Navigation from "../components/Navigation";
 import Footer from "../components/Footer";
 import { ModelProvidersSection } from "../components/Features";
 import { PricingSection } from "@/components/PricingSection";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";
-import { Check, X, ChevronDown, ChevronUp, Star, Apple, ArrowRight } from "lucide-react";
+import { Check, X, ChevronDown, ChevronUp } from "lucide-react";
 import GradientBackground from "@/components/GradientBackground";
 
-// Pricing data structure
-const pricingPlans = [
-  {
-    id: "free",
-    name: "Free",
-    description: "Get started with limited access to agents and tab completions.",
-    monthlyPrice: 0,
-    annualPrice: 0,
-    popular: false,
-    features: [
-      "Limited Agent requests",
-      "Limited Tab completions"
-    ],
-    buttonText: "Get Started",
-    buttonVariant: "default" as const
-  },
-  {
-    id: "pro",
-    name: "Pro",
-    description: "Perfect for individual developers and freelancers",
-    monthlyPrice: 20,
-    annualPrice: 16,
-    popular: false,
-    features: [
-      "5,000 AI prompts/month",
-      "Access to GPT-4, Claude, Gemini",
-      "Code generation & completion",
-      "Basic code review",
-      "Community support",
-      "VS Code & JetBrains plugins",
-      "Basic analytics",
-      "Standard response time"
-    ],
-    buttonText: "Start Pro Plan",
-    buttonVariant: "outline" as const
-  },
-  {
-    id: "teams",
-    name: "Teams",
-    description: "Ideal for small to medium development teams",
-    monthlyPrice: 30,
-    annualPrice: 24,
-    popular: true,
-    features: [
-      "15,000 AI prompts/month per user",
-      "All Pro features included",
-      "Team collaboration tools",
-      "Advanced code review",
-      "Priority email support",
-      "Team analytics & insights",
-      "Shared code templates",
-      "Team workspace management",
-      "Advanced AI models access",
-      "Custom integrations"
-    ],
-    buttonText: "Start Teams Plan",
-    buttonVariant: "default" as const
-  },
-  {
-    id: "enterprise",
-    name: "Enterprise",
-    description: "Custom solutions for large organizations",
-    monthlyPrice: null,
-    annualPrice: null,
-    popular: false,
-    features: [
-      "Unlimited AI prompts",
-      "All Teams features included",
-      "Dedicated account manager",
-      "Custom SLA agreements",
-      "On-premise deployment",
-      "SSO & advanced security",
-      "Custom model training",
-      "24/7 phone support",
-      "Onboarding & training",
-      "Custom integrations",
-      "Compliance certifications",
-      "Volume discounts available"
-    ],
-    buttonText: "Contact Sales",
-    buttonVariant: "outline" as const
-  }
-];
+// Pricing data is now managed in PricingSection component
+// This removes the duplicate data structure
 
-// Feature comparison data
+// Feature comparison data - updated for Pro, Teams, Enterprise
 const comparisonFeatures = [
   {
     category: "AI & Coding",
     features: [
-      { name: "AI Prompts/month", pro: "5,000", teams: "15,000 per user", enterprise: "Unlimited" },
-      { name: "Model Access", pro: "GPT-4, Claude, Gemini", teams: "All models + advanced", enterprise: "All + custom models" },
-      { name: "Code Generation", pro: true, teams: true, enterprise: true },
-      { name: "Advanced AI Features", pro: false, teams: true, enterprise: true },
+      { name: "Agent Requests", pro: "Unlimited", teams: "Unlimited", enterprise: "Unlimited" },
+      { name: "Tab Completions", pro: "Unlimited", teams: "Unlimited", enterprise: "Unlimited" },
+      { name: "Monthly Credits", pro: "500 included", teams: "500 per user", enterprise: "Custom" },
+      { name: "Background Agents", pro: true, teams: true, enterprise: true },
       { name: "Custom Model Training", pro: false, teams: false, enterprise: true }
     ]
   },
   {
     category: "Collaboration",
     features: [
-      { name: "Team Members", pro: "1", teams: "Up to 50", enterprise: "Unlimited" },
-      { name: "Shared Workspaces", pro: false, teams: true, enterprise: true },
-      { name: "Team Analytics", pro: false, teams: true, enterprise: true },
-      { name: "Code Review Tools", pro: "Basic", teams: "Advanced", enterprise: "Enterprise" }
+      { name: "Team Members", pro: "1", teams: "Up to 100", enterprise: "Unlimited" },
+      { name: "Centralized Billing", pro: false, teams: true, enterprise: true },
+      { name: "Admin Dashboard", pro: false, teams: true, enterprise: "Advanced" },
+      { name: "Privacy Mode", pro: false, teams: true, enterprise: true },
+      { name: "SSO & SAML", pro: false, teams: false, enterprise: true }
     ]
   },
   {
     category: "Support & Security",
     features: [
-      { name: "Support Level", pro: "Community", teams: "Priority Email", enterprise: "24/7 Dedicated" },
-      { name: "SLA", pro: false, teams: false, enterprise: true },
-      { name: "SSO Integration", pro: false, teams: false, enterprise: true },
-      { name: "Compliance", pro: false, teams: "SOC 2", enterprise: "SOC 2 + Custom" }
+      { name: "Support Level", pro: "Standard", teams: "Priority", enterprise: "Dedicated" },
+      { name: "Custom SLA", pro: false, teams: false, enterprise: true },
+      { name: "On-premise Deployment", pro: false, teams: false, enterprise: true },
+      { name: "Advanced Security", pro: false, teams: false, enterprise: true },
+      { name: "API Price Credits", pro: true, teams: true, enterprise: true }
     ]
   }
 ];
@@ -179,22 +97,10 @@ const testimonials = [
 ];
 
 export default function Pricing() {
-  const [isAnnual, setIsAnnual] = useState(false);
   const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
 
   const toggleFaq = (index: number) => {
     setExpandedFaq(expandedFaq === index ? null : index);
-  };
-
-  const getPrice = (plan: typeof pricingPlans[0]) => {
-    if (plan.monthlyPrice === null) return "Custom";
-    const price = isAnnual ? plan.annualPrice : plan.monthlyPrice;
-    return `$${price}`;
-  };
-
-  const getSavings = () => {
-    if (!isAnnual) return null;
-    return "Save 20%";
   };
 
   return (
@@ -226,86 +132,6 @@ export default function Pricing() {
       {/* Replaced Pricing Cards Section with new PricingSection */}
       <PricingSection />
     </GradientBackground>
-
-
-      {/* Feature Comparison Table */}
-      <section className="py-24 px-4 bg-slate-900">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4 text-white">
-              Compare Plans
-            </h2>
-            <p className="text-xl text-gray-300">
-              See what's included in each plan
-            </p>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full border border-gray-700 border-collapse shadow-lg">
-              <thead className="bg-gray-800">
-                <tr className="border-b border-gray-700">
-                  <th className="text-left py-4 px-6 font-bold text-white uppercase tracking-wide border-r border-gray-700">Features</th>
-                  <th className="text-center py-4 px-6 font-bold text-white uppercase tracking-wide border-r border-gray-700">Pro</th>
-                  <th className="text-center py-4 px-6 font-bold text-white uppercase tracking-wide border-r border-gray-700">Teams</th>
-                  <th className="text-center py-4 px-6 font-bold text-white uppercase tracking-wide">Enterprise</th>
-                </tr>
-              </thead>
-              <tbody className="bg-gray-900 divide-y divide-gray-700">
-                {comparisonFeatures.map((category) => (
-                  <React.Fragment key={category.category}>
-                    <tr className="bg-gray-800/70">
-                              <td colSpan={4} className="py-3 px-6 font-semibold text-white text-sm uppercase tracking-wide border-b border-gray-700">
-                                {category.category}
-                              </td>
-                            </tr>
-                    {category.features.map((feature, index) => (
-                      <tr key={index} className="border-b border-border/50">
-                        <td className="py-4 px-6 text-gray-200 border-r border-gray-700">{feature.name}</td>
-                        <td className="py-4 px-6 text-center border-r border-gray-700">
-                          {typeof feature.pro === 'boolean' ? (
-                            feature.pro ? (
-                              <Check className="w-5 h-5 text-primary mx-auto" />
-                            ) : (
-                              <X className="w-5 h-5 text-muted-foreground mx-auto" />
-                            )
-                          ) : (
-                            <span className="text-foreground">{feature.pro}</span>
-                          )}
-                        </td>
-                        <td className="py-4 px-6 text-center border-r border-gray-700">
-                          {typeof feature.teams === 'boolean' ? (
-                            feature.teams ? (
-                              <Check className="w-5 h-5 text-primary mx-auto" />
-                            ) : (
-                              <X className="w-5 h-5 text-muted-foreground mx-auto" />
-                            )
-                          ) : (
-                            <span className="text-foreground">{feature.teams}</span>
-                          )}
-                        </td>
-                        <td className="py-4 px-6 text-center">
-                          {typeof feature.enterprise === 'boolean' ? (
-                            feature.enterprise ? (
-                              <Check className="w-5 h-5 text-primary mx-auto" />
-                            ) : (
-                              <X className="w-5 h-5 text-muted-foreground mx-auto" />
-                            )
-                          ) : (
-                            <span className="text-foreground">{feature.enterprise}</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </React.Fragment>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-
-      {/* Social Proof: Model Providers Section */}
-      <ModelProvidersSection />
 
       {/* FAQ Section */}
       <section className="py-24 px-4 bg-slate-900">
@@ -346,6 +172,9 @@ export default function Pricing() {
           </div>
         </div>
       </section>
+
+      {/* Social Proof: Model Providers Section */}
+      <ModelProvidersSection />
 
       <Footer />
     </>

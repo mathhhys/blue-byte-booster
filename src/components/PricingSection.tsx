@@ -1,76 +1,69 @@
 "use client";
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Check, Download, ArrowRight, Users } from "lucide-react";
+import { Check, ArrowRight, Mail } from "lucide-react";
 import { SignedIn, SignedOut, useUser } from '@clerk/clerk-react';
 import { useNavigate } from 'react-router-dom';
-import { AuthFlowModal } from '@/components/auth/AuthFlowModal';
-import { useAuthFlow } from '@/hooks/useAuthFlow';
+import { PLAN_CONFIGS } from '@/config/plans';
 
 export const PricingSection = () => {
   const [isYearly, setIsYearly] = useState(false);
   const navigate = useNavigate();
   const { isLoaded, isSignedIn } = useUser();
-  const { state, actions } = useAuthFlow();
 
   const plans = [
-    {
-      name: "Starter",
-      price: { monthly: 0, yearly: 0 },
-      features: [
-        "2 week Pro trial",
-        "Limited Agent requests",
-        "Limited Tab completions",
-        "Zero data retention by default"
-      ],
-      buttonText: "Get Started For Free",
-      buttonIcon: ArrowRight,
-      buttonVariant: "default" as const,
-      isPopular: false
-    },
-    {
-      name: "Pro",
-      price: { monthly: 20, yearly: 16 },
-      description: "Everything in Starter +",
-      features: [
-        "Unlimited Agent Requests",
-        "Unlimited Tab Completion",
-        "500 requests per month included",
-        "Add more credits at API Price - No extra costs"
-      ],
-      buttonText: "Get Softcodes Pro",
-      buttonIcon: ArrowRight,
-      buttonVariant: "default" as const,
-      isPopular: true
-    },
-    {
-      name: "Teams",
-      price: { monthly: 30, yearly: 24 },
-      description: "Everything in Pro +",
-      features: [
-        "Privacy mode",
-        "Centralized Billing",
-        "Admin dashboard with analytics",
-        "Priority support",
-      ],
-      buttonText: "Get Softcodes for Teams",
-      buttonIcon: ArrowRight,
-      buttonVariant: "default" as const,
-      isPopular: false
-    }
+    PLAN_CONFIGS.pro,
+    PLAN_CONFIGS.teams,
+    PLAN_CONFIGS.enterprise,
   ];
 
-  const enterpriseFeatures = [
-    "Custom deployment",
-    "SSO & SAML",
-    "Dedicated support",
-    "Advanced security"
-  ];
+  const handlePlanClick = (planId: 'pro' | 'teams' | 'enterprise') => {
+    if (planId === 'enterprise') {
+      window.location.href = 'mailto:sales@softcodes.ai?subject=Enterprise Plan Inquiry';
+      return;
+    }
+
+    if (!isLoaded || !isSignedIn) {
+      const params = new URLSearchParams({
+        plan: planId,
+        billing: isYearly ? 'yearly' : 'monthly',
+      });
+      navigate(`/sign-up?${params.toString()}`);
+    } else {
+      navigate('/dashboard');
+    }
+  };
+
+  const getPlanPrice = (plan: typeof PLAN_CONFIGS.pro | typeof PLAN_CONFIGS.enterprise) => {
+    if (plan.isContactSales) return 'Custom';
+    if (!plan.price.monthly) return 'Custom';
+    const price = isYearly ? plan.price.yearly : plan.price.monthly;
+    return `$${price}`;
+  };
+
+  const getButtonText = (planId: 'pro' | 'teams' | 'enterprise') => {
+    if (planId === 'enterprise') {
+      return 'Contact Sales';
+    }
+    
+    if (!isLoaded || !isSignedIn) {
+      return `Get ${planId === 'pro' ? 'Pro' : 'Teams'}`;
+    }
+    
+    return 'Go to Dashboard';
+  };
+
+  const getButtonIcon = (planId: 'pro' | 'teams' | 'enterprise') => {
+    if (planId === 'enterprise') {
+      return Mail;
+    }
+    return ArrowRight;
+  };
 
   return (
-    <section className="bg-transparent">
+    <section className="bg-transparent pb-24">
       <div className="max-w-7xl mx-auto px-6">
         {/* Header - Toggle Only, Centered */}
         <div className="flex justify-center items-center -mt-8 md:mt-0 mb-12">
@@ -98,7 +91,7 @@ export const PricingSection = () => {
           </div>
         </div>
 
-        {/* Main Cards */}
+        {/* Main Cards - Pro, Teams, and Enterprise in a 3-column grid */}
         <div className="grid lg:grid-cols-3 gap-8 mb-8">
           {plans.map((plan) => (
             <Card
@@ -114,6 +107,14 @@ export const PricingSection = () => {
                 background: "linear-gradient(135deg, #0A0F1C 0%, #0F1929 25%, #1A2332 50%, #0F1929 75%, #0A0F1C 100%)"
               }}
             >
+              {plan.isPopular && (
+                <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
+                  <span className="bg-blue-600 text-white px-3 py-1 rounded-full text-xs font-medium">
+                    Most Popular
+                  </span>
+                </div>
+              )}
+
               <div className="space-y-6">
                 {/* Header */}
                 <div>
@@ -122,10 +123,10 @@ export const PricingSection = () => {
                   </h3>
                   <div className="flex items-baseline gap-1 mb-2">
                     <span className="text-3xl font-bold text-white">
-                      ${isYearly ? plan.price.yearly : plan.price.monthly}
+                      {getPlanPrice(plan)}
                     </span>
                     <span className="text-gray-300">
-                      {plan.price.monthly > 0 ? '/mo' : ''}
+                      {plan.price.monthly && plan.price.monthly > 0 ? '/mo' : ''}
                     </span>
                   </div>
                   <p className="text-sm text-gray-300">
@@ -144,94 +145,23 @@ export const PricingSection = () => {
                 </div>
 
                 {/* Button */}
-                {!isLoaded || !isSignedIn ? (
-                  <Button
-                    onClick={() => actions.openModal(plan.name.toLowerCase() as 'starter' | 'pro' | 'teams')}
-                    variant={plan.buttonVariant}
-                    className={`w-full group ${
-                      plan.isPopular
-                        ? 'bg-white text-black hover:bg-gray-100'
-                        : (plan.buttonVariant as string) === 'outline'
-                        ? 'border-gray-600 text-white hover:bg-gray-800'
-                        : ''
-                    }`}
-                  >
-                    <plan.buttonIcon className="w-4 h-4 mr-2 group-hover:translate-x-0.5 transition-transform" />
-                    {plan.buttonText}
-                  </Button>
-                ) : (
-                  <Button
-                    onClick={() => navigate('/dashboard')}
-                    variant={plan.buttonVariant}
-                    className={`w-full group ${
-                      plan.isPopular
-                        ? 'bg-white text-black hover:bg-gray-100'
-                        : (plan.buttonVariant as string) === 'outline'
-                        ? 'border-gray-600 text-white hover:bg-gray-800'
-                        : ''
-                    }`}
-                  >
-                    <plan.buttonIcon className="w-4 h-4 mr-2 group-hover:translate-x-0.5 transition-transform" />
-                    Go to Dashboard
-                  </Button>
-                )}
+                <Button
+                  onClick={() => handlePlanClick(plan.id)}
+                  variant={plan.isPopular ? "default" : "outline"}
+                  className={`w-full group ${
+                    plan.isPopular
+                      ? 'bg-white text-black hover:bg-gray-100'
+                      : 'border-gray-600 text-white hover:bg-gray-800'
+                  }`}
+                >
+                  {React.createElement(getButtonIcon(plan.id), { className: "w-4 h-4 mr-2 group-hover:translate-x-0.5 transition-transform" })}
+                  {getButtonText(plan.id)}
+                </Button>
               </div>
             </Card>
           ))}
         </div>
-
-        {/* Enterprise Card - Made Larger */}
-        <Card 
-          className="border-transparent p-12 transition-all duration-300 hover:scale-[1.02]"
-          style={{
-            background: "linear-gradient(135deg, #0A0F1C 0%, #0F1929 25%, #1A2332 50%, #0F1929 75%, #0A0F1C 100%)"
-          }}
-        >
-          <div className="flex flex-col lg:flex-row lg:items-center gap-8">
-            {/* Left Content */}
-            <div className="flex-1">
-              <div className="flex items-center gap-6 mb-8">
-                <Users className="w-8 h-8 text-purple-400" />
-                <h3 className="text-3xl font-semibold text-white">Enterprise</h3>
-                <span className="text-3xl font-bold text-white ml-auto lg:ml-0">
-                  Custom pricing
-                </span>
-              </div>
-              
-              <p className="text-lg text-gray-300 mb-8">
-                Everything in Teams plus :
-              </p>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
-                {enterpriseFeatures.map((feature, index) => (
-                  <div key={index} className="flex items-center gap-3">
-                    <Check className="w-5 h-5 text-green-400 flex-shrink-0" />
-                    <span className="text-base text-gray-200">{feature}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Right Button */}
-            <div className="lg:ml-12">
-              <Button
-                variant={"default" as const}
-                size="lg"
-                className="border-gray-600 text-white hover:bg-gray-800 px-12 py-4 text-lg"
-              >
-                Contact Sales
-              </Button>
-            </div>
-          </div>
-        </Card>
       </div>
-
-      {/* Auth Flow Modal */}
-      <AuthFlowModal
-        isOpen={state.isOpen}
-        onClose={actions.closeModal}
-        triggerPlan={state.selectedPlan}
-      />
     </section>
   );
 };

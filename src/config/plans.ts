@@ -1,35 +1,19 @@
 import { PlanConfig } from '@/types/database';
 
 // Plan configurations matching the existing pricing structure
-export const PLAN_CONFIGS: Record<'starter' | 'pro' | 'teams', PlanConfig> = {
-  starter: {
-    id: 'starter',
-    name: 'Starter',
-    description: 'Pro two-week trial',
-    price: {
-      monthly: 0,
-      yearly: 0,
-    },
-    features: [
-      'Limited Agent requests',
-      'Limited Tab completions'
-    ],
-    credits: 25,
-    isPopular: false,
-  },
+export const PLAN_CONFIGS: Record<'pro' | 'teams' | 'enterprise', PlanConfig> = {
   pro: {
     id: 'pro',
     name: 'Pro',
-    description: 'Extended limits on Agent',
+    description: 'Perfect for individual developers',
     price: {
       monthly: 20,
       yearly: 16,
     },
     features: [
-      'Unlimited Tab completions',
-      'Access to Background Agents',
-      'Access to Bugbot',
-      'Access to maximum context windows',
+      'Unlimited Agent Requests',
+      'Unlimited Tab Completion',
+      '500 requests per month included',
       'Add more credits at API Price - No extra costs'
     ],
     credits: 500,
@@ -38,25 +22,46 @@ export const PLAN_CONFIGS: Record<'starter' | 'pro' | 'teams', PlanConfig> = {
   teams: {
     id: 'teams',
     name: 'Teams',
-    description: '20x usage on all OpenAI/Claude/Gemini models',
+    description: 'Ideal for development teams',
     price: {
       monthly: 30,
       yearly: 24,
     },
     features: [
-      'Automated zero data retention',
+      'Everything in Pro +',
+      'Privacy mode',
       'Centralized Billing',
       'Admin dashboard with analytics',
-      'Priority support'
+      'Priority support',
     ],
     credits: 500,
     maxSeats: 100,
     isPopular: false,
   },
+  enterprise: {
+    id: 'enterprise',
+    name: 'Enterprise',
+    description: 'Custom solutions for large organizations',
+    price: {
+      monthly: null,
+      yearly: null,
+    },
+    features: [
+      'Everything in Teams +',
+      'Custom deployment',
+      'SSO & SAML',
+      'Dedicated support',
+      'Advanced security',
+      'Custom SLA agreements',
+      'On-premise deployment'
+    ],
+    isContactSales: true,
+    isPopular: false,
+  },
 };
 
 // Helper functions for plan operations
-export const getPlanConfig = (planId: 'starter' | 'pro' | 'teams'): PlanConfig => {
+export const getPlanConfig = (planId: 'pro' | 'teams' | 'enterprise'): PlanConfig => {
   return PLAN_CONFIGS[planId];
 };
 
@@ -65,7 +70,7 @@ export const getAllPlans = (): PlanConfig[] => {
 };
 
 export const getPaidPlans = (): PlanConfig[] => {
-  return Object.values(PLAN_CONFIGS).filter(plan => plan.price.monthly > 0);
+  return Object.values(PLAN_CONFIGS).filter(plan => plan.price.monthly && plan.price.monthly > 0);
 };
 
 export const calculatePlanPrice = (
@@ -75,25 +80,31 @@ export const calculatePlanPrice = (
 ): number => {
   const plan = PLAN_CONFIGS[planId];
   const basePrice = billingFrequency === 'monthly' ? plan.price.monthly : plan.price.yearly;
+  if (!basePrice) return 0;
   return basePrice * seats;
 };
 
 export const calculateSavings = (planId: 'pro' | 'teams'): number => {
   const plan = PLAN_CONFIGS[planId];
+  if (!plan.price.monthly || !plan.price.yearly) return 0;
   const monthlyTotal = plan.price.monthly * 12;
   const yearlyTotal = plan.price.yearly * 12;
   return Math.round(((monthlyTotal - yearlyTotal) / monthlyTotal) * 100);
 };
 
 export const formatPlanPrice = (
-  planId: 'starter' | 'pro' | 'teams',
+  planId: 'pro' | 'teams' | 'enterprise',
   billingFrequency: 'monthly' | 'yearly',
   seats: number = 1
 ): string => {
   const plan = PLAN_CONFIGS[planId];
   
-  if (plan.price.monthly === 0) {
-    return 'Free';
+  if (plan.isContactSales) {
+    return 'Contact Sales';
+  }
+  
+  if (!plan.price.monthly) {
+    return 'Custom';
   }
   
   const price = calculatePlanPrice(planId as 'pro' | 'teams', billingFrequency, seats);
@@ -116,33 +127,39 @@ export const getFeatureComparison = () => {
         features: [
           {
             name: 'Agent Requests',
-            starter: 'Limited',
             pro: 'Unlimited',
             teams: 'Unlimited',
+            enterprise: 'Unlimited',
           },
           {
             name: 'Tab Completions',
-            starter: 'Limited',
             pro: 'Unlimited',
             teams: 'Unlimited',
+            enterprise: 'Unlimited',
           },
           {
             name: 'Background Agents',
-            starter: false,
             pro: true,
             teams: true,
+            enterprise: true,
           },
           {
             name: 'Bugbot Access',
-            starter: false,
             pro: true,
             teams: true,
+            enterprise: true,
           },
           {
             name: 'Maximum Context Windows',
-            starter: false,
             pro: true,
             teams: true,
+            enterprise: true,
+          },
+          {
+            name: 'Custom Model Training',
+            pro: false,
+            teams: false,
+            enterprise: true,
           },
         ],
       },
@@ -151,50 +168,68 @@ export const getFeatureComparison = () => {
         features: [
           {
             name: 'Team Members',
-            starter: '1',
             pro: '1',
             teams: 'Up to 100',
+            enterprise: 'Unlimited',
           },
           {
             name: 'Centralized Billing',
-            starter: false,
             pro: false,
             teams: true,
+            enterprise: true,
           },
           {
             name: 'Admin Dashboard',
-            starter: false,
             pro: false,
             teams: true,
+            enterprise: 'Advanced',
           },
           {
             name: 'Zero Data Retention',
-            starter: false,
             pro: false,
             teams: true,
+            enterprise: true,
+          },
+          {
+            name: 'SSO & SAML',
+            pro: false,
+            teams: false,
+            enterprise: true,
           },
         ],
       },
       {
-        name: 'Support & Pricing',
+        name: 'Support & Security',
         features: [
           {
             name: 'Support Level',
-            starter: 'Community',
             pro: 'Standard',
             teams: 'Priority',
+            enterprise: 'Dedicated',
           },
           {
             name: 'API Price Credits',
-            starter: false,
             pro: true,
             teams: true,
+            enterprise: true,
           },
           {
             name: 'Usage Analytics',
-            starter: false,
             pro: 'Basic',
             teams: 'Advanced',
+            enterprise: 'Enterprise',
+          },
+          {
+            name: 'Custom SLA',
+            pro: false,
+            teams: false,
+            enterprise: true,
+          },
+          {
+            name: 'On-premise Deployment',
+            pro: false,
+            teams: false,
+            enterprise: true,
           },
         ],
       },
@@ -210,7 +245,7 @@ export const validatePlanSelection = (
 ): { valid: boolean; errors: string[] } => {
   const errors: string[] = [];
 
-  if (!['starter', 'pro', 'teams'].includes(planId)) {
+  if (!['pro', 'teams', 'enterprise'].includes(planId)) {
     errors.push('Invalid plan selected');
   }
 
@@ -222,6 +257,11 @@ export const validatePlanSelection = (
     if (!seats || seats < 1 || seats > 100) {
       errors.push('Teams plan requires 1-100 seats');
     }
+  }
+
+  if (planId === 'enterprise') {
+    // Enterprise plan has different validation rules
+    // No seats validation needed for enterprise
   }
 
   return {
