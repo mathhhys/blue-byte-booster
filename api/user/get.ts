@@ -1,4 +1,4 @@
-import { userOperations } from '../../src/utils/supabase/database';
+import { userOperations } from '../../src/utils/supabase/database.js';
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'GET') {
