@@ -1,15 +1,46 @@
 // API functions for Stripe operations
 // Note: In a production app, these would call your actual backend API
 
-import { StripeCheckoutData } from '@/types/database';
-import { STRIPE_PRODUCTS } from '@/utils/stripe/client';
+import { StripeCheckoutData, StripeCheckoutDataWithCurrency, CurrencyCode } from '@/types/database';
+import { STRIPE_PRODUCTS, STRIPE_PRODUCTS_MULTI_CURRENCY, getPriceConfig } from '@/utils/stripe/client';
 
 // API base URL - use environment variable or fallback to relative paths for local dev
 const API_BASE_URL = import.meta.env.VITE_API_URL || (
   import.meta.env.DEV ? '' : 'https://api.softcodes.ai'
 );
 
-// Create Stripe checkout session
+// Create multi-currency Stripe checkout session
+export const createMultiCurrencyStripeCheckoutSession = async (checkoutData: StripeCheckoutDataWithCurrency) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/stripe/create-checkout-session`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(checkoutData),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Failed to create checkout session');
+    }
+
+    const data = await response.json();
+    return {
+      success: true,
+      sessionId: data.sessionId,
+      url: data.url,
+    };
+  } catch (error) {
+    console.error('Error creating checkout session:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error occurred',
+    };
+  }
+};
+
+// Legacy create Stripe checkout session
 export const createStripeCheckoutSession = async (checkoutData: StripeCheckoutData) => {
   try {
     // In a real implementation, this would call your backend
@@ -199,11 +230,18 @@ export const mockGetSessionStatus = async (sessionId: string) => {
     const storedData = mockSessionStore.get(sessionId);
     const planType = storedData?.planType || 'pro';
     const billingFrequency = storedData?.billingFrequency || 'monthly';
+    const currency = storedData?.currency || 'EUR';
     const seats = storedData?.seats || 1;
     
-    // Calculate amount based on plan
-    const priceConfig = STRIPE_PRODUCTS[planType][billingFrequency];
-    const amount = priceConfig.amount * seats;
+    // Calculate amount based on plan and currency
+    let amount;
+    if (storedData?.amount) {
+      amount = storedData.amount;
+    } else {
+      // Fallback to legacy calculation
+      const priceConfig = STRIPE_PRODUCTS[planType][billingFrequency];
+      amount = priceConfig.amount * seats;
+    }
 
     return {
       success: true,
@@ -211,13 +249,15 @@ export const mockGetSessionStatus = async (sessionId: string) => {
         status: 'complete',
         payment_status: 'paid',
         amount_total: amount,
-        currency: 'usd',
+        currency: currency.toLowerCase(),
         customer_email: 'user@example.com',
         subscription_id: `sub_mock_${Date.now()}`,
         metadata: {
           planType,
           billingFrequency,
+          currency,
           seats: seats.toString(),
+          priceId: storedData?.priceId || '',
         },
       },
     };
@@ -229,8 +269,73 @@ export const mockGetSessionStatus = async (sessionId: string) => {
   };
 };
 
-// Mock implementation for development/testing
-// This simulates what your backend would do
+// Multi-currency mock implementation for development/testing
+export const mockCreateMultiCurrencyCheckoutSession = async (checkoutData: StripeCheckoutDataWithCurrency) => {
+  // Simulate API delay
+  await new Promise(resolve => setTimeout(resolve, 1000));
+
+  try {
+    // Validate the checkout data
+    if (!checkoutData.planType || !['pro', 'teams', 'enterprise'].includes(checkoutData.planType)) {
+      throw new Error('Invalid plan type');
+    }
+
+    if (!checkoutData.billingFrequency || !['monthly', 'yearly'].includes(checkoutData.billingFrequency)) {
+      throw new Error('Invalid billing frequency');
+    }
+
+    if (!checkoutData.currency || !['EUR', 'USD', 'GBP'].includes(checkoutData.currency)) {
+      throw new Error('Invalid currency');
+    }
+
+    if (!checkoutData.clerkUserId) {
+      throw new Error('User ID is required');
+    }
+
+    // Enterprise plans should not reach this point as they are contact sales
+    if (checkoutData.planType === 'enterprise') {
+      throw new Error('Enterprise plans require direct contact with sales');
+    }
+
+    // Get price configuration using multi-currency pricing
+    const priceConfig = getPriceConfig(checkoutData.planType, checkoutData.billingFrequency, checkoutData.currency);
+    const totalAmount = priceConfig.amount * (checkoutData.seats || 1);
+
+    // Mock session data
+    const mockSessionId = `cs_mock_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Store session data for later retrieval
+    mockSessionStore.set(mockSessionId, {
+      planType: checkoutData.planType,
+      billingFrequency: checkoutData.billingFrequency,
+      currency: checkoutData.currency,
+      seats: checkoutData.seats,
+      amount: totalAmount,
+      priceId: checkoutData.priceId,
+    });
+
+    return {
+      success: true,
+      sessionId: mockSessionId,
+      url: null, // Don't provide a URL, let the checkout handler manage the redirect
+      metadata: {
+        planType: checkoutData.planType,
+        billingFrequency: checkoutData.billingFrequency,
+        currency: checkoutData.currency,
+        seats: checkoutData.seats,
+        amount: totalAmount,
+        priceId: checkoutData.priceId,
+      },
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error occurred',
+    };
+  }
+};
+
+// Legacy mock implementation for development/testing
 export const mockCreateCheckoutSession = async (checkoutData: StripeCheckoutData) => {
   // Simulate API delay
   await new Promise(resolve => setTimeout(resolve, 1000));

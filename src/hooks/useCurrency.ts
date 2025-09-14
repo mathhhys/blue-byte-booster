@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { CurrencyCode } from '@/types/database';
 import { DEFAULT_CURRENCY, getCurrencyConfig, isSupportedCurrency } from '@/config/currencies';
 import { formatPrice } from '@/utils/currency';
@@ -22,7 +22,7 @@ export const useCurrency = () => {
     return DEFAULT_CURRENCY;
   });
 
-  const setCurrency = useCallback((currency: CurrencyCode) => {
+  const setCurrency = (currency: CurrencyCode) => {
     setSelectedCurrency(currency);
     localStorage.setItem('selectedCurrency', currency);
     
@@ -30,27 +30,15 @@ export const useCurrency = () => {
     const url = new URL(window.location.href);
     url.searchParams.set('currency', currency);
     window.history.replaceState({}, '', url.toString());
-  }, []);
+  };
 
-  const formatCurrencyPrice = useCallback((amount: number) => {
+  const formatCurrencyPrice = (amount: number) => {
     return formatPrice(amount, selectedCurrency);
-  }, [selectedCurrency]);
+  };
 
-  const getCurrentConfig = useCallback(() => {
+  const getCurrentConfig = () => {
     return getCurrencyConfig(selectedCurrency);
-  }, [selectedCurrency]);
-
-  // Update URL on mount if currency was loaded from localStorage
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const urlCurrency = urlParams.get('currency');
-    
-    if (!urlCurrency || urlCurrency !== selectedCurrency) {
-      const url = new URL(window.location.href);
-      url.searchParams.set('currency', selectedCurrency);
-      window.history.replaceState({}, '', url.toString());
-    }
-  }, [selectedCurrency]);
+  };
 
   return {
     selectedCurrency,

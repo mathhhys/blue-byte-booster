@@ -26,9 +26,9 @@ export const CurrencySelector: React.FC<CurrencySelectorProps> = ({
           }`}
           aria-label={`Select ${currency.code} currency`}
         >
-          <span 
-            className="text-base" 
-            role="img" 
+          <span
+            className="text-base"
+            role="img"
             aria-label={`${currency.code} flag`}
           >
             {currency.flag}

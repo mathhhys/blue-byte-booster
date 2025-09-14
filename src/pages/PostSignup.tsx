@@ -4,9 +4,11 @@ import { useUser } from '@clerk/clerk-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Loader2, CheckCircle, XCircle } from 'lucide-react';
-import { createCheckoutSession, prepareCheckoutData } from '@/utils/stripe/checkout';
+import { createMultiCurrencyCheckoutSession, prepareMultiCurrencyCheckoutData, createCheckoutSession, prepareCheckoutData } from '@/utils/stripe/checkout';
 // Removed direct database import - now using API routes
 import { processStarterSignup, prepareStarterSignupData } from '@/utils/starter/signup';
+import { CurrencyCode } from '@/types/database';
+import { isSupportedCurrency } from '@/config/currencies';
 
 const PostSignup = () => {
   const [searchParams] = useSearchParams();
@@ -18,6 +20,8 @@ const PostSignup = () => {
   
   const plan = searchParams.get('plan') as 'starter' | 'pro' | 'teams' | null;
   const billing = searchParams.get('billing') as 'monthly' | 'yearly' || 'monthly';
+  const currencyParam = searchParams.get('currency');
+  const currency: CurrencyCode = (currencyParam && isSupportedCurrency(currencyParam)) ? currencyParam : 'EUR';
   const seats = parseInt(searchParams.get('seats') || '1');
   const originalRedirect = searchParams.get('original_redirect');
 
@@ -83,18 +87,19 @@ const PostSignup = () => {
         throw new Error(initError.message || 'Failed to initialize user');
       }
 
-      // For paid plans, create checkout session
-      const checkoutData = prepareCheckoutData(
+      // For paid plans, create checkout session with currency support
+      const checkoutData = prepareMultiCurrencyCheckoutData(
         plan,
         billing,
+        currency,
         user.id,
         seats
       );
 
-      const result = await createCheckoutSession(checkoutData);
+      const result = await createMultiCurrencyCheckoutSession(checkoutData);
       
       if (!result.success) {
-        throw new Error(result.error || 'Failed to create checkout session');
+        throw new Error((result as any).error || 'Failed to create checkout session');
       }
 
       setStatus('success');
@@ -208,6 +213,7 @@ const PostSignup = () => {
               <p className="text-blue-300 text-sm">
                 Plan: <span className="font-semibold capitalize">{plan}</span>
                 {billing && <span className="ml-2">({billing})</span>}
+                {currency && <span className="ml-2">- {currency}</span>}
                 {seats > 1 && <span className="ml-2">- {seats} seats</span>}
               </p>
             </div>

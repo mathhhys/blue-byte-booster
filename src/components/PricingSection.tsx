@@ -10,19 +10,25 @@ import { PLAN_CONFIGS_MULTI_CURRENCY, getPlanPrice, calculateMultiCurrencySaving
 import { CurrencySelector } from '@/components/ui/CurrencySelector';
 import { useCurrency } from '@/hooks/useCurrency';
 import { formatPriceOnly } from '@/utils/currency';
-import { MultiCurrencyPlanConfig } from '@/types/database';
+import { MultiCurrencyPlanConfig, CurrencyCode } from '@/types/database';
 
 export const PricingSection = () => {
   const [isYearly, setIsYearly] = useState(false);
+  const [forceUpdate, setForceUpdate] = useState(0);
   const navigate = useNavigate();
   const { isLoaded, isSignedIn } = useUser();
-  const { selectedCurrency, formatPrice } = useCurrency();
+  const { selectedCurrency, setCurrency } = useCurrency();
 
   const plans = [
     PLAN_CONFIGS_MULTI_CURRENCY.pro,
     PLAN_CONFIGS_MULTI_CURRENCY.teams,
     PLAN_CONFIGS_MULTI_CURRENCY.enterprise,
   ];
+
+  const handleCurrencyChange = (currency: CurrencyCode) => {
+    setCurrency(currency);
+    setForceUpdate(prev => prev + 1); // Force re-render
+  };
 
   const handlePlanClick = (planId: 'pro' | 'teams' | 'enterprise') => {
     if (planId === 'enterprise') {
@@ -76,7 +82,25 @@ export const PricingSection = () => {
       <div className="max-w-7xl mx-auto px-6">
         {/* Currency Selector */}
         <div className="flex justify-center items-center mb-6">
-          <CurrencySelector />
+          <div className="flex items-center bg-gray-800 rounded-lg p-1 border border-gray-600">
+            {['EUR', 'USD', 'GBP'].map((currency) => (
+              <button
+                key={currency}
+                onClick={() => handleCurrencyChange(currency as CurrencyCode)}
+                className={`px-3 py-2 text-sm font-medium rounded-md transition-all duration-200 flex items-center gap-2 ${
+                  selectedCurrency === currency
+                    ? "bg-white text-black"
+                    : "text-gray-300 hover:text-white hover:bg-gray-700"
+                }`}
+                aria-label={`Select ${currency} currency`}
+              >
+                <span className="text-base" role="img">
+                  {currency === 'EUR' ? '🇪🇺' : currency === 'USD' ? '🇺🇸' : '🇬🇧'}
+                </span>
+                <span className="font-semibold">{currency}</span>
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Billing Toggle */}
@@ -109,7 +133,7 @@ export const PricingSection = () => {
         <div className="grid lg:grid-cols-3 gap-8 mb-8">
           {plans.map((plan) => (
             <Card
-              key={plan.name}
+              key={`${plan.name}-${selectedCurrency}-${isYearly}-${forceUpdate}`}
               className={`relative p-8 border transition-all duration-300 hover:scale-105 ${
                 plan.isPopular
                   ? 'border-transparent'

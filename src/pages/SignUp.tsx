@@ -8,6 +8,7 @@ const SignUp = () => {
   const [searchParams] = useSearchParams();
   const plan = searchParams.get('plan');
   const billing = searchParams.get('billing');
+  const currency = searchParams.get('currency');
   const seats = searchParams.get('seats');
   const redirectUrl = searchParams.get('redirect_url');
 
@@ -24,6 +25,7 @@ const SignUp = () => {
     params.set('plan', plan || 'starter');
     
     if (billing) params.set('billing', billing);
+    if (currency) params.set('currency', currency);
     if (seats) params.set('seats', seats);
     if (redirectUrl) params.set('original_redirect', redirectUrl);
     
@@ -50,6 +52,7 @@ const SignUp = () => {
               <p className="text-blue-300 text-sm">
                 Selected plan: <span className="font-semibold capitalize">{plan}</span>
                 {billing && <span className="ml-2">({billing})</span>}
+                {currency && <span className="ml-2">- {currency}</span>}
                 {seats && seats !== '1' && <span className="ml-2">- {seats} seats</span>}
               </p>
             </div>

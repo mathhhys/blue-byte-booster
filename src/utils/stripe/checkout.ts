@@ -1,11 +1,18 @@
 import { getStripe, getPriceConfig, calculateTotalAmount, getPriceId } from './client';
 import { StripeCheckoutData, StripeCheckoutDataWithCurrency, CurrencyCode } from '@/types/database';
+import { createMultiCurrencyStripeCheckoutSession, mockCreateMultiCurrencyCheckoutSession } from '@/api/stripe';
 
 const API_BASE = import.meta.env.VITE_API_URL || ''; // set VITE_API_URL in your .env (e.g. https://api.softcodes.ai) or leave empty to use relative paths
 
 // Multi-currency checkout session creation
 export const createMultiCurrencyCheckoutSession = async (checkoutData: StripeCheckoutDataWithCurrency) => {
   try {
+    // In development mode with no API_BASE, use mock implementation
+    if (import.meta.env.DEV && !API_BASE) {
+      console.log('Using development mock for multi-currency checkout');
+      return await mockCreateMultiCurrencyCheckoutSession(checkoutData);
+    }
+
     // Call backend API to create checkout session
     const response = await fetch(`${API_BASE}/api/stripe/create-checkout-session`, {
       method: 'POST',
@@ -31,6 +38,13 @@ export const createMultiCurrencyCheckoutSession = async (checkoutData: StripeChe
     }
   } catch (error) {
     console.error('Error creating checkout session:', error);
+    
+    // Fallback to mock in development if network fails
+    if (import.meta.env.DEV && error instanceof TypeError) {
+      console.log('Network error in development, falling back to mock');
+      return await mockCreateMultiCurrencyCheckoutSession(checkoutData);
+    }
+    
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error occurred'
