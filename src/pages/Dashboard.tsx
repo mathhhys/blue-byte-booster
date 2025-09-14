@@ -121,7 +121,20 @@ const Dashboard = () => {
         console.log('Fetching user from Supabase database...');
         
         // Use API route to avoid RLS issues in browser
+        console.log('🌐 Making API call to:', `/api/user/get?clerkId=${encodeURIComponent(user.id)}`);
+        console.log('🌐 Current window location:', window.location.href);
+        
         const response = await fetch(`/api/user/get?clerkId=${encodeURIComponent(user.id)}`);
+        console.log('🌐 API Response status:', response.status);
+        console.log('🌐 API Response headers:', Object.fromEntries(response.headers.entries()));
+        
+        if (!response.ok) {
+          console.error('❌ API call failed with status:', response.status);
+          const errorText = await response.text();
+          console.error('❌ API error response:', errorText);
+          throw new Error(`API call failed: ${response.status} - ${errorText}`);
+        }
+        
         const { data, error } = await response.json();
         
         console.log('Database query result:');

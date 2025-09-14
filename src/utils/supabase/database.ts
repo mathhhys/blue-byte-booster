@@ -4,25 +4,61 @@ import { createClient } from '@supabase/supabase-js';
 // Check if we're in a server environment (Node.js/API routes)
 const isServerEnvironment = typeof window === 'undefined';
 
+// Get environment variables with proper fallbacks
+const getSupabaseConfig = () => {
+  const url = process.env.SUPABASE_URL ||
+              process.env.VITE_SUPABASE_URL ||
+              process.env.NEXT_PUBLIC_SUPABASE_URL;
+  
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  
+  console.log('🔧 Supabase Server Config Debug:');
+  console.log('- Environment:', isServerEnvironment ? 'Server' : 'Browser');
+  console.log('- URL available:', !!url);
+  console.log('- Service key available:', !!serviceKey);
+  console.log('- Service key prefix:', serviceKey ? serviceKey.substring(0, 20) + '...' : 'Not set');
+  
+  return { url, serviceKey };
+};
+
 // Create server-side client with service role key if available
 let serverSupabase: any = null;
-if (isServerEnvironment && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-  console.log('🔧 Creating server-side client with service role key');
-  serverSupabase = createClient(
-    process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+if (isServerEnvironment) {
+  const { url, serviceKey } = getSupabaseConfig();
+  
+  if (url && serviceKey) {
+    console.log('🔧 Creating server-side client with service role key');
+    serverSupabase = createClient(url, serviceKey);
+  } else {
+    console.error('❌ Missing required environment variables for server client:');
+    console.error('- SUPABASE_URL or VITE_SUPABASE_URL:', !!url);
+    console.error('- SUPABASE_SERVICE_ROLE_KEY:', !!serviceKey);
+  }
 }
 
 // Helper function to get appropriate client with authentication
 async function getAuthenticatedClient() {
+  console.log('🔧 getAuthenticatedClient() called');
+  console.log('- isServerEnvironment:', isServerEnvironment);
+  console.log('- serverSupabase exists:', !!serverSupabase);
+  console.log('- SUPABASE_SERVICE_ROLE_KEY exists:', !!process.env.SUPABASE_SERVICE_ROLE_KEY);
+  console.log('- window exists:', typeof window !== 'undefined');
+  
   if (serverSupabase) {
     console.log('🔧 Using server-side client (bypasses RLS)');
     return serverSupabase;
   }
   
+  // If we're in server environment but don't have service key, that's an error
+  if (isServerEnvironment) {
+    console.error('❌ ERROR: Running in server environment but no service role key available!');
+    throw new Error('Server environment requires SUPABASE_SERVICE_ROLE_KEY environment variable');
+  }
+  
   // Browser environment - need to check Clerk authentication
   console.log('🔧 Using browser client - checking authentication');
+  console.log('⚠️ WARNING: Browser client requires proper Clerk JWT for RLS');
+  console.log('💡 Consider calling API routes instead of direct database operations');
   
   // For now, we'll need to handle this differently
   // The browser client needs proper Clerk JWT token set
