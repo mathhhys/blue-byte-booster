@@ -2,7 +2,7 @@ import { getStripe, getPriceConfig, calculateTotalAmount, getPriceId } from './c
 import { StripeCheckoutData, StripeCheckoutDataWithCurrency, CurrencyCode } from '@/types/database';
 import { createMultiCurrencyStripeCheckoutSession, mockCreateMultiCurrencyCheckoutSession } from '@/api/stripe';
 
-const API_BASE = import.meta.env.VITE_API_URL || ''; // set VITE_API_URL in your .env (e.g. https://api.softcodes.ai) or leave empty to use relative paths
+const API_BASE = import.meta.env.VITE_API_URL || ''; // set VITE_API_URL in your .env for external API or leave empty to use relative paths (same domain)
 
 // Multi-currency checkout session creation
 export const createMultiCurrencyCheckoutSession = async (checkoutData: StripeCheckoutDataWithCurrency) => {

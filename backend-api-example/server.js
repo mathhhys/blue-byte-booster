@@ -76,7 +76,7 @@ function verifyToken(token) {
 
 // Supabase client for auth and real-time features
 const supabase = createClient(
-  process.env.SUPABASE_URL,
+  process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY // Use service role key for server-side operations
 );
 
@@ -121,6 +121,34 @@ app.use('/api/stripe/webhooks', express.raw({ type: 'application/json' }));
 app.use('/api/clerk/webhooks', express.raw({ type: 'application/json' }));
 app.use(express.json());
 
+// Add a middleware for logging incoming requests to debug CORS
+app.use((req, res, next) => {
+  console.log('=== CORS DEBUG: Incoming Request ===');
+  console.log('Method:', req.method);
+  console.log('URL:', req.originalUrl);
+  console.log('Origin Header:', req.headers.origin);
+  console.log('CORS Options Origin:', corsOptions.origin);
+  console.log('FRONTEND_URL env:', process.env.FRONTEND_URL);
+  console.log('All CORS headers:');
+  console.log('  - Access-Control-Request-Method:', req.headers['access-control-request-method']);
+  console.log('  - Access-Control-Request-Headers:', req.headers['access-control-request-headers']);
+  
+  // Check if origin matches CORS policy
+  const originMatches = req.headers.origin === corsOptions.origin;
+  console.log('Origin matches CORS policy:', originMatches);
+  
+  if (req.method === 'OPTIONS') {
+    console.log('This is a preflight request');
+    // Add temporary response logging for preflight
+    const originalSend = res.send;
+    res.send = function(data) {
+      console.log('Preflight response headers:', res.getHeaders());
+      return originalSend.call(this, data);
+    };
+  }
+  console.log('=====================================');
+  next();
+});
 // Register API routes
 app.use('/api/vscode', vscodeRoutes);
 app.use('/api/users', usersRoutes);

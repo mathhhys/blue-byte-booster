@@ -4,10 +4,8 @@
 import { StripeCheckoutData, StripeCheckoutDataWithCurrency, CurrencyCode } from '@/types/database';
 import { STRIPE_PRODUCTS, STRIPE_PRODUCTS_MULTI_CURRENCY, getPriceConfig } from '@/utils/stripe/client';
 
-// API base URL - use environment variable or fallback to relative paths for local dev
-const API_BASE_URL = import.meta.env.VITE_API_URL || (
-  import.meta.env.DEV ? '' : 'https://api.softcodes.ai'
-);
+// API base URL - use relative paths since APIs are now on same domain
+const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
 // Create multi-currency Stripe checkout session
 export const createMultiCurrencyStripeCheckoutSession = async (checkoutData: StripeCheckoutDataWithCurrency) => {

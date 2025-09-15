@@ -1,5 +1,8 @@
 {
   "version": 2,
+  "env": {
+    "FRONTEND_URL": "https://www.softcodes.ai"
+  },
   "builds": [
     {
       "src": "server.js",
