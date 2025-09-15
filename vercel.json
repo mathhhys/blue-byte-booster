@@ -25,6 +25,24 @@
     },
     "api/user/initialize.ts": {
       "maxDuration": 10
+    },
+    "api/stripe/create-checkout-session.js": {
+      "maxDuration": 30,
+      "memory": 512
+    },
+    "api/stripe/session-status.js": {
+      "maxDuration": 10
+    },
+    "api/stripe/process-payment-success.js": {
+      "maxDuration": 30,
+      "memory": 512
+    },
+    "api/stripe/create-customer-portal-session.js": {
+      "maxDuration": 10
+    },
+    "api/starter/process-signup.js": {
+      "maxDuration": 30,
+      "memory": 512
     }
   },
   "crons": [],

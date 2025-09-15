@@ -1,30 +1,37 @@
-import { NextRequest, NextResponse } from 'next/server';
+// Vercel serverless function for processing payment success
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const { createClient } = require('@supabase/supabase-js');
 
-export async function POST(request: NextRequest) {
+export default async function handler(req, res) {
+  console.log('=== STRIPE PROCESS PAYMENT SUCCESS API ROUTE ENTRY ===');
+  
   try {
-    const { sessionId, clerkUserId } = await request.json();
-
-    if (!sessionId || !clerkUserId) {
-      return NextResponse.json({ error: 'Session ID and Clerk User ID are required' }, { status: 400 });
+    // Only allow POST method
+    if (req.method !== 'POST') {
+      return res.status(405).json({ error: 'Method not allowed' });
     }
 
-    console.log('=== STRIPE PROCESS PAYMENT SUCCESS ===');
-    console.log('Session ID:', sessionId);
-    console.log('Clerk User ID:', clerkUserId);
+    console.log('Step 1: Parsing request body...');
+    const { sessionId, clerkUserId } = req.body;
+    console.log('Request body:', req.body);
 
-    // Import dependencies
-    const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-    const { createClient } = require('@supabase/supabase-js');
+    if (!sessionId || !clerkUserId) {
+      console.log('❌ Missing required parameters');
+      return res.status(400).json({ error: 'Session ID and Clerk User ID are required' });
+    }
 
+    console.log('Step 2: Initializing dependencies...');
     // Initialize Supabase client
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
       process.env.SUPABASE_SERVICE_ROLE_KEY
     );
+    console.log('✅ Supabase client initialized');
 
     // Handle mock sessions for development
-    let session: any;
+    let session;
     if (sessionId.startsWith('cs_mock_')) {
+      console.log('Step 3: Creating mock session data...');
       // Create mock session data for development
       session = {
         id: sessionId,
@@ -45,18 +52,21 @@ export async function POST(request: NextRequest) {
         }
       };
     } else {
+      console.log('Step 3: Retrieving real session from Stripe...');
       // Get real session details from Stripe
       if (!process.env.STRIPE_SECRET_KEY) {
-        return NextResponse.json({ error: 'Stripe not configured' }, { status: 500 });
+        console.log('❌ Stripe not configured');
+        return res.status(500).json({ error: 'Stripe not configured' });
       }
 
       try {
         session = await stripe.checkout.sessions.retrieve(sessionId, {
           expand: ['subscription'],
         });
+        console.log('✅ Session retrieved:', session.id);
       } catch (stripeError) {
-        console.error('Error retrieving Stripe session:', stripeError);
-        return NextResponse.json({ error: 'Invalid session ID' }, { status: 400 });
+        console.error('❌ Error retrieving Stripe session:', stripeError);
+        return res.status(400).json({ error: 'Invalid session ID' });
       }
     }
 
@@ -69,11 +79,13 @@ export async function POST(request: NextRequest) {
     const { plan_type, billing_frequency, seats = 1 } = metadata;
 
     if (!plan_type || !billing_frequency) {
-      return NextResponse.json({ error: 'Missing payment metadata' }, { status: 400 });
+      console.log('❌ Missing payment metadata');
+      return res.status(400).json({ error: 'Missing payment metadata' });
     }
 
+    console.log('Step 4: Processing user...');
     // Check if user exists, create if not
-    let user: any;
+    let user;
     try {
       const { data: existingUser, error: fetchError } = await supabase
         .from('users')
@@ -86,6 +98,7 @@ export async function POST(request: NextRequest) {
       }
 
       if (!existingUser) {
+        console.log('Creating new user...');
         // Create user if doesn't exist
         const { data: newUser, error: createError } = await supabase.rpc('upsert_user', {
           p_clerk_id: clerkUserId,
@@ -108,10 +121,11 @@ export async function POST(request: NextRequest) {
         user = existingUser;
       }
     } catch (error) {
-      console.error('Error handling user:', error);
-      return NextResponse.json({ error: 'Failed to process user' }, { status: 500 });
+      console.error('❌ Error handling user:', error);
+      return res.status(500).json({ error: 'Failed to process user' });
     }
 
+    console.log('Step 5: Updating user plan...');
     // Update user plan
     try {
       const { error: updateError } = await supabase
@@ -120,11 +134,13 @@ export async function POST(request: NextRequest) {
         .eq('clerk_id', clerkUserId);
 
       if (updateError) throw updateError;
+      console.log('✅ User plan updated');
     } catch (error) {
-      console.error('Error updating user plan:', error);
-      return NextResponse.json({ error: 'Failed to update user plan' }, { status: 500 });
+      console.error('❌ Error updating user plan:', error);
+      return res.status(500).json({ error: 'Failed to update user plan' });
     }
 
+    console.log('Step 6: Creating subscription record...');
     // Create subscription record
     try {
       const { error: subError } = await supabase
@@ -139,11 +155,13 @@ export async function POST(request: NextRequest) {
         });
 
       if (subError) throw subError;
+      console.log('✅ Subscription record created');
     } catch (error) {
-      console.error('Error creating subscription:', error);
-      return NextResponse.json({ error: 'Failed to create subscription' }, { status: 500 });
+      console.error('❌ Error creating subscription:', error);
+      return res.status(500).json({ error: 'Failed to create subscription' });
     }
 
+    console.log('Step 7: Granting credits...');
     // Grant credits
     try {
       const creditsPerSeat = 500;
@@ -157,12 +175,13 @@ export async function POST(request: NextRequest) {
       });
 
       if (creditError) throw creditError;
+      console.log('✅ Credits granted:', totalCredits);
     } catch (error) {
-      console.error('Error granting credits:', error);
-      return NextResponse.json({ error: 'Failed to grant credits' }, { status: 500 });
+      console.error('❌ Error granting credits:', error);
+      return res.status(500).json({ error: 'Failed to grant credits' });
     }
 
-    return NextResponse.json({
+    const response = {
       success: true,
       message: 'Payment processed successfully',
       data: {
@@ -171,10 +190,17 @@ export async function POST(request: NextRequest) {
         seats: parseInt(seats) || 1,
         creditsGranted: 500 * (parseInt(seats) || 1)
       }
-    });
+    };
+
+    console.log('✅ Payment processing completed:', response);
+    return res.status(200).json(response);
 
   } catch (error) {
-    console.error('Error processing payment success:', error);
-    return NextResponse.json({ error: 'Failed to process payment' }, { status: 500 });
+    console.error('❌ FATAL ERROR in process-payment-success:', error);
+    console.error('Error stack:', error.stack);
+    return res.status(500).json({ 
+      error: 'Failed to process payment',
+      details: error.message 
+    });
   }
 }

@@ -1,14 +1,19 @@
-import { NextRequest, NextResponse } from 'next/server';
+// Vercel serverless function for Stripe checkout session creation
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const { createClient } = require('@supabase/supabase-js');
 
-export async function POST(request: NextRequest) {
+export default async function handler(req, res) {
   console.log('=== STRIPE API ROUTE ENTRY ===');
   
   try {
+    // Only allow POST method
+    if (req.method !== 'POST') {
+      return res.status(405).json({ error: 'Method not allowed' });
+    }
+
     console.log('Step 1: Parsing request body...');
-    const body = await request.json();
-    console.log('Request body:', body);
-    
-    const { planType, billingFrequency, seats = 1, clerkUserId, successUrl, cancelUrl, currency, priceId } = body;
+    const { planType, billingFrequency, seats = 1, clerkUserId, successUrl, cancelUrl, currency, priceId } = req.body;
+    console.log('Request body:', req.body);
 
     console.log('Step 2: Validating input...');
     console.log('planType:', planType);
@@ -18,7 +23,7 @@ export async function POST(request: NextRequest) {
     // Validate input
     if (!planType || !billingFrequency || !clerkUserId) {
       console.log('❌ Missing required parameters');
-      return NextResponse.json({ error: 'Missing required parameters' }, { status: 400 });
+      return res.status(400).json({ error: 'Missing required parameters' });
     }
 
     console.log('Step 3: Checking environment variables...');
@@ -28,15 +33,10 @@ export async function POST(request: NextRequest) {
 
     if (!process.env.STRIPE_SECRET_KEY) {
       console.log('❌ Stripe not configured');
-      return NextResponse.json({ error: 'Stripe not configured' }, { status: 500 });
+      return res.status(500).json({ error: 'Stripe not configured' });
     }
 
-    console.log('Step 4: Importing dependencies...');
-    // Import Stripe on demand
-    const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-    const { createClient } = require('@supabase/supabase-js');
-
-    console.log('Step 5: Initializing Supabase client...');
+    console.log('Step 4: Initializing Supabase client...');
     // Initialize Supabase client
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -44,12 +44,12 @@ export async function POST(request: NextRequest) {
     );
     console.log('✅ Supabase client initialized');
 
-    console.log('Step 6: Determining price ID...');
+    console.log('Step 5: Determining price ID...');
     // Get price ID based on plan and billing frequency (fallback for legacy requests)
     let finalPriceId = priceId;
     if (!finalPriceId) {
       console.log('No priceId provided, looking up from plan/billing');
-      const priceIds: Record<string, Record<string, string>> = {
+      const priceIds = {
         pro: {
           monthly: 'price_1RvKJcH6gWxKcaTXQ4PITKei',
           yearly: 'price_1RvKJtH6gWxKcaTXfeLXklqU',
@@ -67,14 +67,14 @@ export async function POST(request: NextRequest) {
 
     if (!finalPriceId) {
       console.log('❌ Invalid plan or billing frequency');
-      return NextResponse.json({ error: 'Invalid plan or billing frequency' }, { status: 400 });
+      return res.status(400).json({ error: 'Invalid plan or billing frequency' });
     }
 
-    console.log('Step 7: Creating or finding Stripe customer...');
+    console.log('Step 6: Creating or finding Stripe customer...');
     // Create or get Stripe customer
     let customer;
     try {
-      console.log('7a: Listing existing customers...');
+      console.log('6a: Listing existing customers...');
       // Try to find existing customer by Clerk user ID
       const customers = await stripe.customers.list({
         limit: 100,
@@ -82,14 +82,14 @@ export async function POST(request: NextRequest) {
       console.log('Found', customers.data.length, 'existing customers');
 
       // Find customer with matching clerk_user_id in metadata
-      customer = customers.data.find((c: any) => c.metadata?.clerk_user_id === clerkUserId);
+      customer = customers.data.find((c) => c.metadata?.clerk_user_id === clerkUserId);
       console.log('Existing customer found:', !!customer);
 
       if (!customer) {
-        console.log('7b: Creating new customer...');
+        console.log('6b: Creating new customer...');
         // Optionally fetch email from Supabase
         let customerEmail;
-        console.log('7b1: Fetching user email from Supabase...');
+        console.log('6b1: Fetching user email from Supabase...');
         const { data: userData, error: fetchError } = await supabase
           .from('users')
           .select('email')
@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
           console.log('No email found in Supabase or error occurred');
         }
 
-        console.log('7b2: Creating Stripe customer...');
+        console.log('6b2: Creating Stripe customer...');
         // Create new customer
         customer = await stripe.customers.create({
           email: customerEmail || undefined,
@@ -120,10 +120,10 @@ export async function POST(request: NextRequest) {
       }
     } catch (error) {
       console.error('❌ Error creating/finding customer:', error);
-      return NextResponse.json({ error: 'Failed to create customer' }, { status: 500 });
+      return res.status(500).json({ error: 'Failed to create customer' });
     }
 
-    console.log('Step 8: Creating Stripe checkout session...');
+    console.log('Step 7: Creating Stripe checkout session...');
     // Create checkout session
     const sessionData = {
       customer: customer.id,
@@ -135,8 +135,8 @@ export async function POST(request: NextRequest) {
         },
       ],
       mode: 'subscription',
-      success_url: successUrl || `${request.nextUrl.origin}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: cancelUrl || `${request.nextUrl.origin}/payment-cancelled`,
+      success_url: successUrl || `${req.headers.origin || 'https://www.softcodes.ai'}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: cancelUrl || `${req.headers.origin || 'https://www.softcodes.ai'}/payment-cancelled`,
       metadata: {
         clerk_user_id: clerkUserId,
         plan_type: planType,
@@ -167,25 +167,14 @@ export async function POST(request: NextRequest) {
     };
     
     console.log('✅ Returning success response:', response);
-    return NextResponse.json(response);
+    return res.status(200).json(response);
 
   } catch (error) {
     console.error('❌ FATAL ERROR in create-checkout-session:', error);
-    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
-    return NextResponse.json({
+    console.error('Error stack:', error.stack);
+    return res.status(500).json({ 
       error: 'Failed to create checkout session',
-      details: error instanceof Error ? error.message : String(error)
-    }, { status: 500 });
+      details: error.message 
+    });
   }
-}
-
-export async function OPTIONS(request: NextRequest) {
-  return new NextResponse(null, {
-    status: 200,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    },
-  });
 }

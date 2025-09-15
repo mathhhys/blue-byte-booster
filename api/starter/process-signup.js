@@ -1,29 +1,40 @@
-import { NextRequest, NextResponse } from 'next/server';
+// Vercel serverless function for starter plan signup processing
+const { createClient } = require('@supabase/supabase-js');
 
-export async function POST(request: NextRequest) {
+export default async function handler(req, res) {
+  console.log('=== STARTER SIGNUP API ROUTE ENTRY ===');
+  
   try {
-    const { clerkUserId, email, firstName, lastName } = await request.json();
-
-    if (!clerkUserId) {
-      return NextResponse.json({ error: 'Clerk User ID is required' }, { status: 400 });
+    // Only allow POST method
+    if (req.method !== 'POST') {
+      return res.status(405).json({ error: 'Method not allowed' });
     }
 
-    console.log('=== STARTER PLAN PROCESS SIGNUP ===');
-    console.log('Clerk User ID:', clerkUserId);
-    console.log('Email:', email);
+    console.log('Step 1: Parsing request body...');
+    const { clerkUserId, email, firstName, lastName } = req.body;
+    console.log('Request body:', req.body);
 
-    // Import Supabase
-    const { createClient } = require('@supabase/supabase-js');
+    if (!clerkUserId) {
+      console.log('❌ Missing Clerk User ID');
+      return res.status(400).json({ error: 'Clerk User ID is required' });
+    }
 
+    console.log('Step 2: Checking environment variables...');
+    console.log('NEXT_PUBLIC_SUPABASE_URL present:', !!process.env.NEXT_PUBLIC_SUPABASE_URL);
+    console.log('SUPABASE_SERVICE_ROLE_KEY present:', !!process.env.SUPABASE_SERVICE_ROLE_KEY);
+
+    console.log('Step 3: Initializing Supabase client...');
     // Initialize Supabase client
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
       process.env.SUPABASE_SERVICE_ROLE_KEY
     );
+    console.log('✅ Supabase client initialized');
 
     // Check if user already exists
-    let user: any;
+    let user;
     try {
+      console.log('Step 4: Checking if user exists...');
       const { data: existingUser, error: fetchError } = await supabase
         .from('users')
         .select('id, plan_type, credits')
@@ -35,8 +46,9 @@ export async function POST(request: NextRequest) {
       }
 
       if (existingUser) {
+        console.log('✅ User already exists');
         // User already exists, just return success
-        return NextResponse.json({
+        return res.status(200).json({
           success: true,
           message: 'User already exists',
           data: {
@@ -47,6 +59,7 @@ export async function POST(request: NextRequest) {
         });
       }
 
+      console.log('Step 5: Creating new user...');
       // Create new user with starter plan
       const { data: newUserId, error: createError } = await supabase.rpc('upsert_user', {
         p_clerk_id: clerkUserId,
@@ -58,6 +71,7 @@ export async function POST(request: NextRequest) {
 
       if (createError) throw createError;
 
+      console.log('Step 6: Fetching created user...');
       // Fetch the created user to verify credits
       const { data: createdUser, error: fetchNewError } = await supabase
         .from('users')
@@ -89,11 +103,12 @@ export async function POST(request: NextRequest) {
       }
 
     } catch (error) {
-      console.error('Error handling user:', error);
-      return NextResponse.json({ error: 'Failed to process user' }, { status: 500 });
+      console.error('❌ Error handling user:', error);
+      return res.status(500).json({ error: 'Failed to process user' });
     }
 
-    return NextResponse.json({
+    console.log('✅ Starter plan signup completed successfully');
+    return res.status(200).json({
       success: true,
       message: 'Starter plan activated successfully',
       data: {
@@ -104,7 +119,11 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error processing starter signup:', error);
-    return NextResponse.json({ error: 'Failed to process starter signup' }, { status: 500 });
+    console.error('❌ FATAL ERROR in process-signup:', error);
+    console.error('Error stack:', error.stack);
+    return res.status(500).json({ 
+      error: 'Failed to process starter signup',
+      details: error.message 
+    });
   }
 }
