@@ -49,14 +49,33 @@ export default async function handler(req, res) {
 
     console.log('Step 4: Initializing Supabase client...');
     // Initialize Supabase client (try multiple env var names)
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-    console.log('Using Supabase URL:', supabaseUrl ? 'Found' : 'Not found');
+    const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-    const supabase = createClient(
-      supabaseUrl,
-      process.env.SUPABASE_SERVICE_ROLE_KEY
-    );
-    console.log('✅ Supabase client initialized');
+    console.log('Supabase URL check:');
+    console.log('- SUPABASE_URL present:', !!process.env.SUPABASE_URL);
+    console.log('- NEXT_PUBLIC_SUPABASE_URL present:', !!process.env.NEXT_PUBLIC_SUPABASE_URL);
+    console.log('- VITE_SUPABASE_URL present:', !!process.env.VITE_SUPABASE_URL);
+    console.log('- SUPABASE_SERVICE_ROLE_KEY present:', !!supabaseKey);
+
+    if (!supabaseUrl) {
+      console.error('❌ No Supabase URL found in environment variables');
+      return res.status(500).json({
+        error: 'Failed to create checkout session',
+        details: 'supabaseUrl is required.'
+      });
+    }
+
+    if (!supabaseKey) {
+      console.error('❌ SUPABASE_SERVICE_ROLE_KEY environment variable is not set');
+      return res.status(500).json({
+        error: 'Failed to create checkout session',
+        details: 'supabaseKey is required.'
+      });
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseKey);
+    console.log('✅ Supabase client initialized with URL:', supabaseUrl);
 
     console.log('Step 5: Validating price ID...');
     // Price ID must be provided by the frontend (supports multi-currency)

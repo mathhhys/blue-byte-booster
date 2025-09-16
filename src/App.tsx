@@ -18,6 +18,8 @@ import Organizations from "./pages/Organizations";
 import Profile from "./pages/Profile";
 import PaymentSuccess from "./pages/PaymentSuccess";
 import PaymentCancelled from "./pages/PaymentCancelled";
+import Billing from "./pages/Billing";
+import BillingSuccess from "./pages/BillingSuccess";
 import { VscodeInitiateAuth } from "./pages/VscodeInitiateAuth";
 import { VscodeAuthCallback } from "./pages/VscodeAuthCallback";
 import ExtensionSignIn from "./pages/ExtensionSignIn";
@@ -46,6 +48,7 @@ const App = () => (
           {/* Payment Routes */}
           <Route path="/payment/success" element={<PaymentSuccess />} />
           <Route path="/payment/cancelled" element={<PaymentCancelled />} />
+          <Route path="/billing/success" element={<BillingSuccess />} />
           
           {/* Protected Routes */}
           <Route
@@ -80,6 +83,19 @@ const App = () => (
               <>
                 <SignedIn>
                   <Profile />
+                </SignedIn>
+                <SignedOut>
+                  <RedirectToSignIn />
+                </SignedOut>
+              </>
+            }
+          />
+          <Route
+            path="/billing"
+            element={
+              <>
+                <SignedIn>
+                  <Billing />
                 </SignedIn>
                 <SignedOut>
                   <RedirectToSignIn />

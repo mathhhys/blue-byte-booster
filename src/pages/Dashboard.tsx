@@ -342,18 +342,38 @@ const Dashboard = () => {
       const creditsToAdd = parseInt(creditAmount);
       const amount = CREDIT_CONVERSION.creditsToDollars(creditsToAdd);
 
-      // Temporarily disabled - API function moved to reduce Vercel function count
-      console.log('🔧 Credits functionality temporarily disabled for 406 error debugging');
-      toast({
-        title: "Credits Feature Temporarily Disabled",
-        description: "Focusing on fixing 406 database error. Credits feature will be restored after fix.",
-        variant: "destructive",
+      // Create Stripe checkout session for credit purchase
+      const response = await fetch('/api/billing/credit-purchase', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          clerkUserId: user.id,
+          credits: creditsToAdd,
+          amount: amount,
+          currency: 'EUR', // Default to EUR, can be made configurable later
+        }),
       });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to create checkout session');
+      }
+
+      const data = await response.json();
+
+      if (data.url) {
+        // Redirect to Stripe checkout
+        window.location.href = data.url;
+      } else {
+        throw new Error('No checkout URL received');
+      }
     } catch (error) {
       console.error('Error adding credits:', error);
       toast({
         title: "Error",
-        description: "Failed to process credit addition",
+        description: error instanceof Error ? error.message : "Failed to process credit addition",
         variant: "destructive",
       });
     } finally {
@@ -481,15 +501,14 @@ const Dashboard = () => {
               
               <SidebarMenuItem>
                 <SidebarMenuButton
+                  asChild
                   className="text-white/70 hover:text-white hover:bg-white/10"
-                  onClick={handleBillingPortalRedirect}
-                  disabled={isBillingPortalLoading}
                 >
-                  <CreditCard className="w-4 h-4" />
-                  <span>
-                    {isBillingPortalLoading ? 'Loading...' : 'Billing'}
-                  </span>
-                  <SidebarMenuBadge></SidebarMenuBadge>
+                  <Link to="/billing">
+                    <CreditCard className="w-4 h-4" />
+                    <span>Billing</span>
+                    <SidebarMenuBadge></SidebarMenuBadge>
+                  </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
 

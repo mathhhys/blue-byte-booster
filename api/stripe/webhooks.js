@@ -32,28 +32,48 @@ export default async function handler(req, res) {
     console.log('Step 2: Processing webhook event:', event.type);
 
     // Initialize Supabase client
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY
-    );
+    const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl) {
+      console.error('❌ No Supabase URL found in environment variables');
+      return res.status(500).json({
+        error: 'Webhook processing failed',
+        details: 'supabaseUrl is required.'
+      });
+    }
+
+    if (!supabaseKey) {
+      console.error('❌ SUPABASE_SERVICE_ROLE_KEY environment variable is not set');
+      return res.status(500).json({
+        error: 'Webhook processing failed',
+        details: 'supabaseKey is required.'
+      });
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseKey);
 
     switch (event.type) {
       case 'invoice.payment_succeeded':
         await handleInvoicePaymentSucceeded(event.data.object, supabase);
         break;
-      
+
       case 'checkout.session.completed':
         await handleCheckoutSessionCompleted(event.data.object, supabase);
         break;
-      
+
+      case 'payment_intent.succeeded':
+        await handlePaymentIntentSucceeded(event.data.object, supabase);
+        break;
+
       case 'customer.subscription.updated':
         await handleSubscriptionUpdated(event.data.object, supabase);
         break;
-      
+
       case 'customer.subscription.deleted':
         await handleSubscriptionDeleted(event.data.object, supabase);
         break;
-      
+
       default:
         console.log(`Unhandled event type: ${event.type}`);
     }
@@ -226,7 +246,7 @@ async function handleSubscriptionUpdated(subscription, supabase) {
 // Handle subscription cancellation
 async function handleSubscriptionDeleted(subscription, supabase) {
   console.log('🗑️ Processing subscription deleted:', subscription.id);
-  
+
   try {
     // Get user from Stripe customer
     const clerkUserId = await getUserFromStripeCustomer(subscription.customer, supabase);
@@ -269,6 +289,71 @@ async function handleSubscriptionDeleted(subscription, supabase) {
 
   } catch (error) {
     console.error('❌ Error processing subscription deleted:', error);
+    throw error;
+  }
+}
+
+// Handle credit purchase payment success
+async function handlePaymentIntentSucceeded(paymentIntent, supabase) {
+  console.log('💰 Processing payment intent succeeded:', paymentIntent.id);
+
+  try {
+    // Get user from Stripe customer
+    const clerkUserId = await getUserFromStripeCustomer(paymentIntent.customer, supabase);
+    if (!clerkUserId) {
+      console.log('❌ Could not find user for customer:', paymentIntent.customer);
+      return;
+    }
+
+    // Check if this is a credit purchase by looking at metadata
+    const metadata = paymentIntent.metadata || {};
+    if (metadata.purchase_type !== 'credit_purchase') {
+      console.log('Skipping non-credit purchase payment');
+      return;
+    }
+
+    // Check for idempotency to prevent duplicate processing
+    const alreadyProcessed = await checkIdempotency(paymentIntent.id, supabase);
+    if (alreadyProcessed) {
+      console.log('Payment intent already processed, skipping');
+      return;
+    }
+
+    const credits = parseInt(metadata.credits || '0');
+    if (credits <= 0) {
+      console.log('❌ Invalid credits amount in metadata');
+      return;
+    }
+
+    console.log('Granting credits:', {
+      clerkUserId,
+      credits,
+      paymentIntentId: paymentIntent.id
+    });
+
+    // Grant credits to user
+    const { error: creditError } = await supabase.rpc('grant_credits', {
+      p_clerk_id: clerkUserId,
+      p_amount: credits,
+      p_description: `Credit purchase: ${credits} credits`,
+      p_reference_id: paymentIntent.id,
+    });
+
+    if (creditError) {
+      throw new Error(`Failed to grant credits: ${creditError.message}`);
+    }
+
+    // Record webhook processing to prevent duplicates
+    await recordWebhookProcessing(paymentIntent.id, 'payment_intent.succeeded', {
+      clerkUserId,
+      creditsGranted: credits,
+      purchaseType: 'credit_purchase'
+    }, supabase);
+
+    console.log('✅ Credit purchase processed successfully');
+
+  } catch (error) {
+    console.error('❌ Error processing payment intent succeeded:', error);
     throw error;
   }
 }

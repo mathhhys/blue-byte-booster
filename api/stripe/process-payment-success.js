@@ -22,10 +22,26 @@ export default async function handler(req, res) {
 
     console.log('Step 2: Initializing dependencies...');
     // Initialize Supabase client
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY
-    );
+    const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl) {
+      console.error('❌ No Supabase URL found in environment variables');
+      return res.status(500).json({
+        error: 'Failed to process payment',
+        details: 'supabaseUrl is required.'
+      });
+    }
+
+    if (!supabaseKey) {
+      console.error('❌ SUPABASE_SERVICE_ROLE_KEY environment variable is not set');
+      return res.status(500).json({
+        error: 'Failed to process payment',
+        details: 'supabaseKey is required.'
+      });
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseKey);
     console.log('✅ Supabase client initialized');
 
     // Handle mock sessions for development
