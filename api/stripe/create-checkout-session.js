@@ -71,6 +71,36 @@ export default async function handler(req, res) {
     console.log('Using priceId:', finalPriceId, 'for currency:', currency || 'not specified');
     console.log('Plan:', planType, 'Billing:', billingFrequency, 'Seats:', seats);
 
+    // Validate price exists in Stripe
+    console.log('5a: Retrieving price from Stripe to validate...');
+    try {
+      const priceData = await stripe.prices.retrieve(finalPriceId);
+      console.log('✅ Price retrieved successfully:', {
+        id: priceData.id,
+        currency: priceData.currency,
+        unit_amount: priceData.unit_amount,
+        recurring: priceData.recurring,
+        active: priceData.active
+      });
+    } catch (priceError) {
+      console.error('❌ Error retrieving price:', priceError);
+      console.error('Price error details:', {
+        name: priceError.name,
+        message: priceError.message,
+        type: priceError.type,
+        code: priceError.code
+      });
+      return res.status(400).json({
+        error: 'Invalid price ID',
+        details: 'The provided price ID does not exist in Stripe',
+        stripeError: {
+          type: priceError.type,
+          code: priceError.code,
+          message: priceError.message
+        }
+      });
+    }
+
     console.log('Step 6: Creating or finding Stripe customer...');
     // Create or get Stripe customer
     let customer;
