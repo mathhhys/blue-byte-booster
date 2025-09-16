@@ -53,14 +53,19 @@ export default async function handler(req, res) {
     console.log('✅ Supabase client initialized');
 
     console.log('Step 5: Validating price ID...');
-    // Price ID must be provided by the frontend
+    // Price ID must be provided by the frontend (supports multi-currency)
     if (!priceId) {
-      console.log('❌ No priceId provided');
-      return res.status(400).json({ error: 'Price ID is required' });
+      console.log('❌ No priceId provided - required for multi-currency support');
+      console.log('Request included currency:', currency);
+      return res.status(400).json({
+        error: 'Price ID is required',
+        details: 'The frontend must provide the correct price ID for the selected currency and plan'
+      });
     }
 
     const finalPriceId = priceId;
-    console.log('Using priceId:', finalPriceId);
+    console.log('Using priceId:', finalPriceId, 'for currency:', currency || 'not specified');
+    console.log('Plan:', planType, 'Billing:', billingFrequency, 'Seats:', seats);
 
     console.log('Step 6: Creating or finding Stripe customer...');
     // Create or get Stripe customer
