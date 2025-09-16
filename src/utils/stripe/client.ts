@@ -141,7 +141,13 @@ export const getPriceId = (
   billingFrequency: 'monthly' | 'yearly',
   currency: CurrencyCode
 ): string => {
-  return MULTI_CURRENCY_PRICING[planType][currency].priceIds[billingFrequency];
+  const priceId = MULTI_CURRENCY_PRICING[planType][currency].priceIds[billingFrequency];
+  console.log('=== GET PRICE ID DEBUG ===');
+  console.log('Plan Type:', planType);
+  console.log('Billing Frequency:', billingFrequency);
+  console.log('Currency:', currency);
+  console.log('Returned Price ID:', priceId);
+  return priceId;
 };
 
 // Helper function to get raw price amount for specific currency

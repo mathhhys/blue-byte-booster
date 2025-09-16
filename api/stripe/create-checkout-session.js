@@ -70,7 +70,9 @@ export default async function handler(req, res) {
     }
 
     const finalPriceId = priceId;
-    console.log('Using priceId:', finalPriceId, 'for currency:', currency || 'not specified');
+    console.log('=== PRICE ID DEBUG ===');
+    console.log('PriceId from frontend:', finalPriceId);
+    console.log('Currency from frontend:', currency || 'not specified');
     console.log('Plan:', planType, 'Billing:', billingFrequency, 'Seats:', seats);
 
     // Validate price exists in Stripe
