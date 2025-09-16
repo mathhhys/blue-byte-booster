@@ -116,14 +116,6 @@ export const prepareMultiCurrencyCheckoutData = (
   const priceId = getPriceId(planType, billingFrequency, currency);
   const baseUrl = window.location.origin;
 
-  console.log('=== CHECKOUT DATA PREPARATION DEBUG ===');
-  console.log('Plan Type:', planType);
-  console.log('Billing Frequency:', billingFrequency);
-  console.log('Currency:', currency);
-  console.log('Price ID:', priceId);
-  console.log('Seats:', seats);
-  console.log('Clerk User ID:', clerkUserId);
-
   return {
     planType,
     billingFrequency,

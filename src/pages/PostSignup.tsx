@@ -25,13 +25,6 @@ const PostSignup = () => {
   const seats = parseInt(searchParams.get('seats') || '1');
   const originalRedirect = searchParams.get('original_redirect');
 
-  console.log('=== POSTSIGNUP DEBUG ===');
-  console.log('Plan:', plan);
-  console.log('Billing:', billing);
-  console.log('Currency param:', currencyParam);
-  console.log('Currency (processed):', currency);
-  console.log('Seats:', seats);
-
   useEffect(() => {
     if (isLoaded && user && plan) {
       processPlanSelection();

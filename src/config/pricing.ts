@@ -6,7 +6,7 @@ export const MULTI_CURRENCY_PRICING: Record<'pro' | 'teams', MultiCurrencyPrice>
       monthly: 20,
       yearly: 192,
       priceIds: {
-        monthly: 'price_1RvK8KH6gWxKcaTXCWyv035N',
+        monthly: 'price_1RvK8KH6gWxKcaTXO4AlW0MQ',
         yearly: 'price_1RvK8LH6gWxKcaTXqqNXiuus'
       }
     },
