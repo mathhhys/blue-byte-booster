@@ -29,6 +29,7 @@ export default async function handler(req, res) {
     console.log('Step 3: Checking environment variables...');
     console.log('STRIPE_SECRET_KEY present:', !!process.env.STRIPE_SECRET_KEY);
     console.log('NEXT_PUBLIC_SUPABASE_URL present:', !!process.env.NEXT_PUBLIC_SUPABASE_URL);
+    console.log('VITE_SUPABASE_URL present:', !!process.env.VITE_SUPABASE_URL);
     console.log('SUPABASE_SERVICE_ROLE_KEY present:', !!process.env.SUPABASE_SERVICE_ROLE_KEY);
 
     if (!process.env.STRIPE_SECRET_KEY) {
@@ -45,9 +46,12 @@ export default async function handler(req, res) {
     console.log('- Contains test/live indicator:', stripeKey.includes('test') || stripeKey.includes('live'));
 
     console.log('Step 4: Initializing Supabase client...');
-    // Initialize Supabase client
+    // Initialize Supabase client (try multiple env var names)
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+    console.log('Using Supabase URL:', supabaseUrl ? 'Found' : 'Not found');
+
     const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      supabaseUrl,
       process.env.SUPABASE_SERVICE_ROLE_KEY
     );
     console.log('✅ Supabase client initialized');
@@ -208,7 +212,9 @@ export default async function handler(req, res) {
     console.error('- STRIPE_SECRET_KEY present:', !!process.env.STRIPE_SECRET_KEY);
     console.error('- STRIPE_SECRET_KEY length:', process.env.STRIPE_SECRET_KEY?.length || 0);
     console.error('- NEXT_PUBLIC_SUPABASE_URL present:', !!process.env.NEXT_PUBLIC_SUPABASE_URL);
+    console.error('- VITE_SUPABASE_URL present:', !!process.env.VITE_SUPABASE_URL);
     console.error('- SUPABASE_SERVICE_ROLE_KEY present:', !!process.env.SUPABASE_SERVICE_ROLE_KEY);
+    console.error('- Supabase URL used:', supabaseUrl ? 'Found' : 'Not found');
     
     // Check if it's a Stripe-specific error
     if (error.type) {
