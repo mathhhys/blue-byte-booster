@@ -32,9 +32,17 @@ export default async function handler(req, res) {
     console.log('SUPABASE_SERVICE_ROLE_KEY present:', !!process.env.SUPABASE_SERVICE_ROLE_KEY);
 
     if (!process.env.STRIPE_SECRET_KEY) {
-      console.log('❌ Stripe not configured');
+      console.log('❌ Stripe not configured - STRIPE_SECRET_KEY missing');
+      console.log('Available env vars starting with STRIPE:', Object.keys(process.env).filter(key => key.startsWith('STRIPE')));
       return res.status(500).json({ error: 'Stripe not configured' });
     }
+    
+    // Validate Stripe key format
+    const stripeKey = process.env.STRIPE_SECRET_KEY;
+    console.log('STRIPE_SECRET_KEY format check:');
+    console.log('- Starts with sk_:', stripeKey.startsWith('sk_'));
+    console.log('- Length:', stripeKey.length);
+    console.log('- Contains test/live indicator:', stripeKey.includes('test') || stripeKey.includes('live'));
 
     console.log('Step 4: Initializing Supabase client...');
     // Initialize Supabase client
@@ -44,31 +52,15 @@ export default async function handler(req, res) {
     );
     console.log('✅ Supabase client initialized');
 
-    console.log('Step 5: Determining price ID...');
-    // Get price ID based on plan and billing frequency (fallback for legacy requests)
-    let finalPriceId = priceId;
-    if (!finalPriceId) {
-      console.log('No priceId provided, looking up from plan/billing');
-      const priceIds = {
-        pro: {
-          monthly: 'price_1RvKJcH6gWxKcaTXQ4PITKei',
-          yearly: 'price_1RvKJtH6gWxKcaTXfeLXklqU',
-        },
-        teams: {
-          monthly: 'price_teams_monthly', // You need to create this in Stripe
-          yearly: 'price_teams_yearly',   // You need to create this in Stripe
-        },
-      };
-      finalPriceId = priceIds[planType]?.[billingFrequency];
-      console.log('Resolved priceId:', finalPriceId);
-    } else {
-      console.log('Using provided priceId:', finalPriceId);
+    console.log('Step 5: Validating price ID...');
+    // Price ID must be provided by the frontend
+    if (!priceId) {
+      console.log('❌ No priceId provided');
+      return res.status(400).json({ error: 'Price ID is required' });
     }
 
-    if (!finalPriceId) {
-      console.log('❌ Invalid plan or billing frequency');
-      return res.status(400).json({ error: 'Invalid plan or billing frequency' });
-    }
+    const finalPriceId = priceId;
+    console.log('Using priceId:', finalPriceId);
 
     console.log('Step 6: Creating or finding Stripe customer...');
     // Create or get Stripe customer
@@ -106,15 +98,28 @@ export default async function handler(req, res) {
         }
 
         console.log('6b2: Creating Stripe customer...');
-        // Create new customer
-        customer = await stripe.customers.create({
+        const customerData = {
           email: customerEmail || undefined,
           description: `Customer for Clerk user ${clerkUserId}`,
           metadata: {
             clerk_user_id: clerkUserId
           }
-        });
-        console.log('✅ New customer created:', customer.id);
+        };
+        console.log('Customer creation data:', customerData);
+        
+        try {
+          customer = await stripe.customers.create(customerData);
+          console.log('✅ New customer created:', customer.id);
+        } catch (customerError) {
+          console.error('❌ Error creating Stripe customer:', customerError);
+          console.error('Customer error details:', {
+            name: customerError.name,
+            message: customerError.message,
+            type: customerError.type,
+            code: customerError.code
+          });
+          throw customerError;
+        }
       } else {
         console.log('✅ Using existing customer:', customer.id);
       }
@@ -158,9 +163,24 @@ export default async function handler(req, res) {
     
     console.log('Session data:', JSON.stringify(sessionData, null, 2));
     
-    const session = await stripe.checkout.sessions.create(sessionData);
-    console.log('✅ Checkout session created:', session.id);
-
+    let session;
+    try {
+      session = await stripe.checkout.sessions.create(sessionData);
+      console.log('✅ Checkout session created:', session.id);
+      console.log('Session URL:', session.url);
+    } catch (sessionError) {
+      console.error('❌ Error creating Stripe checkout session:', sessionError);
+      console.error('Session error details:', {
+        name: sessionError.name,
+        message: sessionError.message,
+        type: sessionError.type,
+        code: sessionError.code,
+        param: sessionError.param
+      });
+      console.error('Session data that caused error:', JSON.stringify(sessionData, null, 2));
+      throw sessionError;
+    }
+    
     const response = {
       sessionId: session.id,
       url: session.url,
@@ -171,10 +191,41 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error('❌ FATAL ERROR in create-checkout-session:', error);
+    console.error('Error name:', error.name);
+    console.error('Error message:', error.message);
     console.error('Error stack:', error.stack);
-    return res.status(500).json({ 
+    console.error('Error code:', error.code);
+    console.error('Error type:', error.type);
+    
+    // Additional context for debugging
+    console.error('Request body that caused error:', JSON.stringify(req.body, null, 2));
+    console.error('Environment check:');
+    console.error('- STRIPE_SECRET_KEY present:', !!process.env.STRIPE_SECRET_KEY);
+    console.error('- STRIPE_SECRET_KEY length:', process.env.STRIPE_SECRET_KEY?.length || 0);
+    console.error('- NEXT_PUBLIC_SUPABASE_URL present:', !!process.env.NEXT_PUBLIC_SUPABASE_URL);
+    console.error('- SUPABASE_SERVICE_ROLE_KEY present:', !!process.env.SUPABASE_SERVICE_ROLE_KEY);
+    
+    // Check if it's a Stripe-specific error
+    if (error.type) {
+      console.error('This is a Stripe API error');
+      console.error('Stripe error details:', {
+        type: error.type,
+        code: error.code,
+        decline_code: error.decline_code,
+        param: error.param,
+        message: error.message
+      });
+    }
+    
+    return res.status(500).json({
       error: 'Failed to create checkout session',
-      details: error.message 
+      details: error.message,
+      errorType: error.name || 'Unknown',
+      stripeError: error.type ? {
+        type: error.type,
+        code: error.code,
+        param: error.param
+      } : null
     });
   }
 }
