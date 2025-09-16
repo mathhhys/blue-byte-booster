@@ -319,4 +319,60 @@ function aggregateByProvider(data) {
   return Object.values(providers).sort((a, b) => b.requests - a.requests);
 }
 
+// Get user subscription
+router.get('/subscription', async (req, res) => {
+  try {
+    const { userId } = req.query;
+
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+
+    console.log('Getting subscription for user:', userId);
+
+    // Get user subscription from database
+    const { data: subscription, error } = await supabase
+      .from('subscriptions')
+      .select(`
+        *,
+        users (
+          email,
+          stripe_customer_id
+        )
+      `)
+      .eq('user_id', (
+        supabase
+          .from('users')
+          .select('id')
+          .eq('clerk_id', userId)
+          .single()
+      ))
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (error && error.code !== 'PGRST116') {
+      console.error('Database error:', error);
+      return res.status(500).json({ error: 'Database error' });
+    }
+
+    if (!subscription) {
+      return res.json({
+        hasSubscription: false,
+        subscription: null
+      });
+    }
+
+    res.json({
+      hasSubscription: true,
+      subscription: subscription
+    });
+
+  } catch (error) {
+    console.error('Error getting user subscription:', error);
+    res.status(500).json({ error: 'Failed to get subscription' });
+  }
+});
+
 module.exports = router;

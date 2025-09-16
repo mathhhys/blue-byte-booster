@@ -24,6 +24,7 @@ console.log('server.js: FRONTEND_URL:', process.env.FRONTEND_URL ? 'Loaded' : 'N
 const vscodeRoutes = require('./routes/vscode');
 const usersRoutes = require('./routes/users');
 const authRoutes = require('./routes/auth');
+const organizationsRoutes = require('./routes/organizations');
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -153,6 +154,7 @@ app.use((req, res, next) => {
 app.use('/api/vscode', vscodeRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/organizations', organizationsRoutes);
 
 // Create Stripe checkout session
 app.post('/api/stripe/create-checkout-session', async (req, res) => {
@@ -930,62 +932,113 @@ app.post('/api/stripe/webhooks', async (req, res) => {
 
 // Webhook event handlers
 async function handleCheckoutSessionCompleted(session) {
-  const { clerk_user_id, plan_type, billing_frequency, seats } = session.metadata || {};
-  
+  const { clerk_user_id, clerk_org_id, plan_type, billing_frequency, seats, seats_total, type } = session.metadata || {};
+
   try {
-    if (!clerk_user_id || !plan_type || !billing_frequency) {
-      console.error('Missing required metadata in checkout session:', session.metadata);
-      return;
-    }
- 
-    // Get user first
-    const { data: userData, error: userFetchError } = await supabase
-      .from('users')
-      .select('id')
-      .eq('clerk_id', clerk_user_id)
-      .single();
+    if (type === 'organization') {
+      // Handle organization subscription
+      if (!clerk_org_id || !plan_type || !billing_frequency || !seats_total) {
+        console.error('Missing required metadata for organization checkout:', session.metadata);
+        return;
+      }
 
-    if (userFetchError || !userData) {
-      console.error('User not found for clerk_id:', clerk_user_id);
-      return;
-    }
+      console.log('Processing organization checkout for:', clerk_org_id);
 
-    // Update user plan in Supabase
-    const { error: userError } = await supabase
-      .from('users')
-      .update({ plan_type })
-      .eq('clerk_id', clerk_user_id);
-
-    if (userError) throw userError;
-
-    // Create subscription record
-    const { error: subError } = await supabase
-      .from('subscriptions')
-      .insert({
-        user_id: userData.id,
-        stripe_subscription_id: session.subscription,
-        plan_type,
-        billing_frequency,
-        seats: parseInt(seats) || 1,
-        status: 'active',
+      // Ensure organization exists
+      const { data: orgId, error: orgError } = await supabase.rpc('upsert_organization', {
+        p_clerk_org_id: clerk_org_id,
+        p_stripe_customer_id: session.customer
       });
 
-    if (subError) throw subError;
+      if (orgError) {
+        console.error('Error upserting organization:', orgError);
+        return;
+      }
 
-    // Grant credits
-    const creditsPerSeat = 500;
-    const totalCredits = creditsPerSeat * (parseInt(seats) || 1);
-    
-    const { error: creditError } = await supabase.rpc('grant_credits', {
-      p_clerk_id: clerk_user_id,
-      p_amount: totalCredits,
-      p_description: `${plan_type} plan credits (${seats || 1} seat${(seats || 1) > 1 ? 's' : ''})`,
-      p_reference_id: session.subscription,
-    });
+      // Create organization subscription record
+      const { error: subError } = await supabase
+        .from('organization_subscriptions')
+        .insert({
+          organization_id: orgId,
+          clerk_org_id: clerk_org_id,
+          stripe_customer_id: session.customer,
+          stripe_subscription_id: session.subscription,
+          plan_type,
+          billing_frequency,
+          seats_total: parseInt(seats_total),
+          seats_used: 0,
+          status: 'active',
+          current_period_start: new Date(session.subscription.current_period_start * 1000),
+          current_period_end: new Date(session.subscription.current_period_end * 1000)
+        });
 
-    if (creditError) throw creditError;
+      if (subError) {
+        console.error('Error creating organization subscription:', subError);
+        return;
+      }
 
-    console.log(`Successfully processed checkout for user ${clerk_user_id}`);
+      console.log(`Successfully processed organization checkout for ${clerk_org_id}`);
+
+    } else {
+      // Handle individual user subscription
+      if (!clerk_user_id || !plan_type || !billing_frequency) {
+        console.error('Missing required metadata for individual checkout:', session.metadata);
+        return;
+      }
+
+      console.log('Processing individual checkout for:', clerk_user_id);
+
+      // Get user first
+      const { data: userData, error: userFetchError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('clerk_id', clerk_user_id)
+        .single();
+
+      if (userFetchError || !userData) {
+        console.error('User not found for clerk_id:', clerk_user_id);
+        return;
+      }
+
+      // Update user plan in Supabase
+      const { error: userError } = await supabase
+        .from('users')
+        .update({ plan_type, stripe_customer_id: session.customer })
+        .eq('clerk_id', clerk_user_id);
+
+      if (userError) throw userError;
+
+      // Create subscription record
+      const { error: subError } = await supabase
+        .from('subscriptions')
+        .insert({
+          user_id: userData.id,
+          stripe_subscription_id: session.subscription,
+          plan_type,
+          billing_frequency,
+          seats: parseInt(seats) || 1,
+          status: 'active',
+          current_period_start: new Date(session.subscription.current_period_start * 1000),
+          current_period_end: new Date(session.subscription.current_period_end * 1000)
+        });
+
+      if (subError) throw subError;
+
+      // Grant credits
+      const creditsPerSeat = 500;
+      const totalCredits = creditsPerSeat * (parseInt(seats) || 1);
+
+      const { error: creditError } = await supabase.rpc('grant_credits', {
+        p_clerk_id: clerk_user_id,
+        p_amount: totalCredits,
+        p_description: `${plan_type} plan credits (${seats || 1} seat${(seats || 1) > 1 ? 's' : ''})`,
+        p_reference_id: session.subscription,
+      });
+
+      if (creditError) throw creditError;
+
+      console.log(`Successfully processed individual checkout for user ${clerk_user_id}`);
+    }
   } catch (error) {
     console.error('Error processing checkout completion:', error);
   }
@@ -1003,12 +1056,82 @@ async function handlePaymentFailed(invoice) {
 
 async function handleSubscriptionUpdated(subscription) {
   console.log('Subscription updated:', subscription.id);
-  // Handle subscription changes
+
+  try {
+    const metadata = subscription.metadata || {};
+
+    if (metadata.type === 'organization') {
+      // Update organization subscription
+      const { error } = await supabase
+        .from('organization_subscriptions')
+        .update({
+          status: subscription.status,
+          current_period_start: new Date(subscription.current_period_start * 1000),
+          current_period_end: new Date(subscription.current_period_end * 1000),
+          updated_at: new Date()
+        })
+        .eq('stripe_subscription_id', subscription.id);
+
+      if (error) {
+        console.error('Error updating organization subscription:', error);
+      }
+    } else {
+      // Update individual subscription
+      const { error } = await supabase
+        .from('subscriptions')
+        .update({
+          status: subscription.status,
+          current_period_start: new Date(subscription.current_period_start * 1000),
+          current_period_end: new Date(subscription.current_period_end * 1000),
+          updated_at: new Date()
+        })
+        .eq('stripe_subscription_id', subscription.id);
+
+      if (error) {
+        console.error('Error updating individual subscription:', error);
+      }
+    }
+  } catch (error) {
+    console.error('Error handling subscription update:', error);
+  }
 }
 
 async function handleSubscriptionDeleted(subscription) {
   console.log('Subscription deleted:', subscription.id);
-  // Handle subscription cancellation
+
+  try {
+    const metadata = subscription.metadata || {};
+
+    if (metadata.type === 'organization') {
+      // Mark organization subscription as canceled
+      const { error } = await supabase
+        .from('organization_subscriptions')
+        .update({
+          status: 'canceled',
+          updated_at: new Date()
+        })
+        .eq('stripe_subscription_id', subscription.id);
+
+      if (error) {
+        console.error('Error canceling organization subscription:', error);
+      }
+    } else {
+      // Mark individual subscription as canceled
+      const { error } = await supabase
+        .from('subscriptions')
+        .update({
+          status: 'canceled',
+          updated_at: new Date()
+        })
+        .eq('stripe_subscription_id', subscription.id);
+
+      if (error) {
+        console.error('Error canceling individual subscription:', error);
+      }
+    }
+  } catch (error) {
+    console.error('Error handling subscription deletion:', error);
+  }
 }
 
 

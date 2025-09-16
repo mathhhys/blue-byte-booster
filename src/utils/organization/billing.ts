@@ -16,10 +16,11 @@ export const getOrganizationSubscription = async (orgId: string) => {
       throw new Error('Failed to fetch subscription data');
     }
 
-    return await response.json();
+    const data = await response.json();
+    return data;
   } catch (error) {
     console.error('Error fetching organization subscription:', error);
-    
+
     // Fallback to mock data for development
     return {
       hasSubscription: false,
@@ -46,7 +47,12 @@ export const createOrganizationSubscription = async (
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        clerk_org_id: request.clerk_org_id,
+        plan_type: request.plan_type,
+        billing_frequency: request.billing_frequency,
+        seats_total: request.seats_total
+      }),
     });
 
     console.log('API response status:', response.status);
@@ -94,21 +100,36 @@ export const createOrganizationSubscription = async (
 export const createOrganizationBillingPortal = async (
   orgId: string
 ): Promise<{ success: boolean; url?: string; error?: string }> => {
-  // Mock implementation
-  await new Promise(resolve => setTimeout(resolve, 800));
+  try {
+    console.log('Creating billing portal for organization:', orgId);
 
-  // In development, show alert instead of redirect
-  if (import.meta.env.DEV) {
+    const response = await fetch('/api/organizations/create-billing-portal', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        clerk_org_id: orgId
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to create billing portal');
+    }
+
     return {
       success: true,
-      url: null, // Handle in component
+      url: data.url
+    };
+  } catch (error) {
+    console.error('Error creating organization billing portal:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to create billing portal'
     };
   }
-
-  return {
-    success: true,
-    url: 'https://billing.stripe.com/p/session/test_org_portal',
-  };
 };
 
 export const assignSeatToMember = async (
