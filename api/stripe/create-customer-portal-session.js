@@ -1,6 +1,10 @@
 // Vercel serverless function for creating Stripe customer portal session
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-const { createClient } = require('@supabase/supabase-js');
+import Stripe from 'stripe';
+import { createClient } from '@supabase/supabase-js';
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+  apiVersion: '2024-11-20.acacia',
+});
 
 export default async function handler(req, res) {
   console.log('=== STRIPE CUSTOMER PORTAL SESSION API ROUTE ENTRY ===');
