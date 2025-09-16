@@ -106,6 +106,9 @@ const Dashboard = () => {
   const [isAddingCredits, setIsAddingCredits] = useState(false);
   const [validationError, setValidationError] = useState<string>('');
 
+  // Billing portal state
+  const [isBillingPortalLoading, setIsBillingPortalLoading] = useState(false);
+
   useEffect(() => {
     setAuthPageMeta('dashboard');
   }, []);
@@ -334,11 +337,11 @@ const Dashboard = () => {
     }
 
     setIsAddingCredits(true);
-    
+
     try {
       const creditsToAdd = parseInt(creditAmount);
       const amount = CREDIT_CONVERSION.creditsToDollars(creditsToAdd);
-      
+
       // Temporarily disabled - API function moved to reduce Vercel function count
       console.log('🔧 Credits functionality temporarily disabled for 406 error debugging');
       toast({
@@ -355,6 +358,63 @@ const Dashboard = () => {
       });
     } finally {
       setIsAddingCredits(false);
+    }
+  };
+
+  // Billing portal redirect function
+  const handleBillingPortalRedirect = async () => {
+    if (!user?.id) {
+      toast({
+        title: "Authentication Required",
+        description: "Please sign in to access billing information",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsBillingPortalLoading(true);
+
+    try {
+      console.log('🔧 Initiating billing portal redirect for user:', user.id);
+
+      const result = await createStripeCustomerPortalSession(user.id);
+
+      if (result.success) {
+        if (result.url) {
+          console.log('✅ Billing portal session created, redirecting to:', result.url);
+          window.location.href = result.url;
+        } else if ('mock' in result && result.mock && import.meta.env.DEV) {
+          // Handle development mock case
+          console.log('🔧 Development mode: Mock billing portal session');
+          toast({
+            title: "Development Mode",
+            description: "Billing portal would redirect in production. Using mock implementation.",
+          });
+        } else {
+          console.error('❌ Failed to create billing portal session: No URL provided');
+          toast({
+            title: "Billing Portal Error",
+            description: "Failed to access billing portal. Please try again.",
+            variant: "destructive",
+          });
+        }
+      } else {
+        console.error('❌ Failed to create billing portal session:', 'error' in result ? result.error : 'Unknown error');
+        toast({
+          title: "Billing Portal Error",
+          description: ('error' in result ? result.error : null) || "Failed to access billing portal. Please try again.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('❌ Error accessing billing portal:', error);
+      toast({
+        title: "Billing Portal Error",
+        description: "An unexpected error occurred. Please try again later.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsBillingPortalLoading(false);
     }
   };
 
@@ -422,13 +482,13 @@ const Dashboard = () => {
               <SidebarMenuItem>
                 <SidebarMenuButton
                   className="text-white/70 hover:text-white hover:bg-white/10"
-                  onClick={() => {
-                    console.log('🔧 Billing functionality temporarily disabled for 406 error debugging');
-                    alert('Billing feature temporarily disabled while fixing 406 database error. Will be restored after fix.');
-                  }}
+                  onClick={handleBillingPortalRedirect}
+                  disabled={isBillingPortalLoading}
                 >
                   <CreditCard className="w-4 h-4" />
-                  <span>Billing</span>
+                  <span>
+                    {isBillingPortalLoading ? 'Loading...' : 'Billing'}
+                  </span>
                   <SidebarMenuBadge></SidebarMenuBadge>
                 </SidebarMenuButton>
               </SidebarMenuItem>

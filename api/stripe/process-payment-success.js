@@ -162,15 +162,16 @@ export default async function handler(req, res) {
     }
 
     console.log('Step 7: Granting credits...');
-    // Grant credits
+    // Grant credits based on billing frequency
     try {
-      const creditsPerSeat = 500;
-      const totalCredits = creditsPerSeat * (parseInt(seats) || 1);
+      // Calculate credits based on billing frequency and seats
+      const baseCredits = billing_frequency === 'yearly' ? 6000 : 500;
+      const totalCredits = baseCredits * (parseInt(seats) || 1);
       
       const { error: creditError } = await supabase.rpc('grant_credits', {
         p_clerk_id: clerkUserId,
         p_amount: totalCredits,
-        p_description: `${plan_type} plan credits (${seats || 1} seat${(seats || 1) > 1 ? 's' : ''})`,
+        p_description: `${plan_type} plan ${billing_frequency} credits (${seats || 1} seat${(seats || 1) > 1 ? 's' : ''})`,
         p_reference_id: session.subscription?.id,
       });
 
@@ -188,7 +189,7 @@ export default async function handler(req, res) {
         planType: plan_type,
         billingFrequency: billing_frequency,
         seats: parseInt(seats) || 1,
-        creditsGranted: 500 * (parseInt(seats) || 1)
+        creditsGranted: (billing_frequency === 'yearly' ? 6000 : 500) * (parseInt(seats) || 1)
       }
     };
 
