@@ -38,47 +38,76 @@ export default async function handler(req, res) {
     // Find the Stripe customer for this user
     let customer;
     try {
-      // Try to find existing customer by Clerk user ID
-      const customers = await stripe.customers.list({
-        limit: 100,
-      });
+      // First, check if user already has a stripe_customer_id in database
+      console.log('Checking for existing stripe_customer_id in database...');
+      const { data: userData, error: fetchError } = await supabase
+        .from('users')
+        .select('email, stripe_customer_id')
+        .eq('clerk_id', userId)
+        .single();
 
-      // Find customer with matching clerk_user_id in metadata
-      customer = customers.data.find((c) => c.metadata?.clerk_user_id === userId);
-      console.log('Existing customer found:', !!customer);
+      if (fetchError) {
+        console.error('❌ Database error fetching user:', fetchError);
+        return res.status(500).json({ error: 'Database error' });
+      }
 
-      if (!customer) {
-        console.log('No customer found, checking Supabase for email...');
-        // Try to get user email from Supabase to create customer
-        const { data: userData, error: fetchError } = await supabase
-          .from('users')
-          .select('email')
-          .eq('clerk_id', userId)
-          .single();
+      if (!userData) {
+        console.log('❌ User not found in database');
+        return res.status(404).json({ error: 'User not found' });
+      }
 
-        if (fetchError || !userData?.email) {
-          console.log('❌ No customer or email found');
-          return res.status(404).json({ 
-            error: 'No Stripe customer found for this user. Please make a purchase first.' 
+      // If user already has a stripe_customer_id, use it
+      if (userData.stripe_customer_id) {
+        console.log('✅ Found existing stripe_customer_id:', userData.stripe_customer_id);
+        try {
+          customer = await stripe.customers.retrieve(userData.stripe_customer_id);
+          console.log('✅ Customer retrieved from Stripe');
+        } catch (stripeError) {
+          console.log('⚠️ Customer not found in Stripe, will create new one');
+          userData.stripe_customer_id = null; // Reset to trigger creation
+        }
+      }
+
+      // If no stripe_customer_id or retrieval failed, create/find customer
+      if (!userData.stripe_customer_id) {
+        console.log('No stripe_customer_id found, searching by email...');
+
+        // Try to find existing customer by email first
+        const existingCustomers = await stripe.customers.list({
+          email: userData.email,
+          limit: 1,
+        });
+
+        if (existingCustomers.data.length > 0) {
+          customer = existingCustomers.data[0];
+          console.log('✅ Found existing customer by email:', customer.id);
+        } else {
+          console.log('Creating new customer...');
+          // Create new customer
+          customer = await stripe.customers.create({
+            email: userData.email,
+            description: `Customer for Clerk user ${userId}`,
+            metadata: {
+              clerk_user_id: userId
+            }
           });
+          console.log('✅ New customer created:', customer.id);
         }
 
-        console.log('Creating new customer...');
-        // Create new customer
-        customer = await stripe.customers.create({
-          email: userData.email,
-          description: `Customer for Clerk user ${userId}`,
-          metadata: {
-            clerk_user_id: userId
-          }
-        });
-        console.log('✅ New customer created:', customer.id);
-      } else {
-        console.log('✅ Using existing customer:', customer.id);
+        // Update database with stripe_customer_id
+        const { error: updateError } = await supabase
+          .from('users')
+          .update({ stripe_customer_id: customer.id })
+          .eq('clerk_id', userId);
+
+        if (updateError) {
+          console.error('⚠️ Failed to update stripe_customer_id in database:', updateError);
+          // Don't fail the request, just log the error
+        }
       }
     } catch (error) {
       console.error('❌ Error finding/creating customer:', error);
-      return res.status(500).json({ error: 'Failed to find customer' });
+      return res.status(500).json({ error: 'Failed to find or create customer' });
     }
 
     console.log('Step 5: Creating customer portal session...');

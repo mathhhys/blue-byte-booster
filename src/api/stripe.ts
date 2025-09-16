@@ -4,6 +4,28 @@
 import { StripeCheckoutData, StripeCheckoutDataWithCurrency, CurrencyCode } from '@/types/database';
 import { STRIPE_PRODUCTS, STRIPE_PRODUCTS_MULTI_CURRENCY, getPriceConfig } from '@/utils/stripe/client';
 
+// TypeScript types for billing portal responses
+export interface StripeCustomerPortalResponse {
+  success: true;
+  url: string;
+}
+
+export interface StripeCustomerPortalErrorResponse {
+  success: false;
+  error: string;
+}
+
+export interface StripeCustomerPortalMockResponse {
+  success: true;
+  url: null;
+  mock: true;
+}
+
+export type StripeCustomerPortalResult =
+  | StripeCustomerPortalResponse
+  | StripeCustomerPortalErrorResponse
+  | StripeCustomerPortalMockResponse;
+
 // API base URL - use relative paths since APIs are now on same domain
 const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
@@ -75,7 +97,7 @@ export const createStripeCheckoutSession = async (checkoutData: StripeCheckoutDa
 };
 
 // Create Stripe customer portal session
-export const createStripeCustomerPortalSession = async (clerkUserId: string) => {
+export const createStripeCustomerPortalSession = async (clerkUserId: string): Promise<StripeCustomerPortalResult> => {
   try {
     console.log('=== STRIPE API DEBUG START ===');
     console.log('API_BASE_URL:', API_BASE_URL);
@@ -147,15 +169,15 @@ export const createStripeCustomerPortalSession = async (clerkUserId: string) => 
 };
 
 // Mock implementation for development
-const mockCreateBillingPortalSession = async (clerkUserId: string) => {
+const mockCreateBillingPortalSession = async (clerkUserId: string): Promise<StripeCustomerPortalMockResponse> => {
   // Simulate API delay
   await new Promise(resolve => setTimeout(resolve, 500));
-  
+
   console.log('Mock billing portal session created for user:', clerkUserId);
-  
+
   // For development, we'll show an alert instead of redirecting
   return {
-    success: true,
+    success: true as const,
     url: null, // We'll handle this differently in the dashboard
     mock: true,
   };
