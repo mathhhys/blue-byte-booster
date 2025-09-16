@@ -501,14 +501,15 @@ const Dashboard = () => {
               
               <SidebarMenuItem>
                 <SidebarMenuButton
-                  asChild
                   className="text-white/70 hover:text-white hover:bg-white/10"
+                  onClick={handleBillingPortalRedirect}
+                  disabled={isBillingPortalLoading}
                 >
-                  <Link to="/billing">
-                    <CreditCard className="w-4 h-4" />
-                    <span>Billing</span>
-                    <SidebarMenuBadge></SidebarMenuBadge>
-                  </Link>
+                  <CreditCard className="w-4 h-4" />
+                  <span>
+                    {isBillingPortalLoading ? 'Loading...' : 'Billing'}
+                  </span>
+                  <SidebarMenuBadge></SidebarMenuBadge>
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
