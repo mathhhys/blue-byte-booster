@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const { createClient } = require('@supabase/supabase-js');
+const axios = require('axios');
 
 console.log('middleware/auth.js: SUPABASE_URL:', process.env.SUPABASE_URL ? 'Loaded' : 'Not Loaded');
 console.log('middleware/auth.js: SUPABASE_SERVICE_ROLE_KEY:', process.env.SUPABASE_SERVICE_ROLE_KEY ? 'Loaded' : 'Not Loaded');
@@ -11,23 +12,82 @@ const supabase = createClient(
 console.log('middleware/auth.js: JWT_SECRET:', process.env.JWT_SECRET ? 'Loaded' : 'Not Loaded');
 const JWT_SECRET = process.env.JWT_SECRET;
 
+// Cache for Clerk's public keys
+let clerkPublicKeys = null;
+let keysLastFetched = 0;
+const KEYS_CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+
+// Fetch Clerk's public keys from JWKS endpoint
+async function fetchClerkPublicKeys() {
+  try {
+    const now = Date.now();
+    if (clerkPublicKeys && (now - keysLastFetched) < KEYS_CACHE_DURATION) {
+      return clerkPublicKeys;
+    }
+
+    const response = await axios.get('https://softcodes.ai/.well-known/jwks.json');
+    const jwks = response.data;
+    clerkPublicKeys = jwks.keys;
+    keysLastFetched = now;
+
+    return clerkPublicKeys;
+  } catch (error) {
+    console.error('Error fetching Clerk public keys:', error);
+    // Fallback to decode-only mode if JWKS fetch fails
+    return null;
+  }
+}
+
 // Helper function to verify Clerk session token
 async function verifyClerkToken(token) {
   try {
-    // For now, we'll use a simple JWT decode for Clerk tokens
-    // In production, you might want to verify against Clerk's public keys
-    const decoded = jwt.decode(token);
-    
-    if (!decoded || !decoded.sub) {
-      throw new Error('Invalid Clerk token structure');
+    // Try to get Clerk's public keys for proper verification
+    const publicKeys = await fetchClerkPublicKeys();
+
+    if (publicKeys && publicKeys.length > 0) {
+      // Use proper JWT verification with Clerk's public key
+      const decoded = jwt.verify(token, publicKeys[0], {
+        algorithms: ['RS256'],
+        issuer: 'https://softcodes.ai'
+      });
+
+      if (!decoded || !decoded.sub) {
+        throw new Error('Invalid Clerk token structure');
+      }
+
+      return {
+        clerkUserId: decoded.sub,
+        sessionId: decoded.sid,
+        exp: decoded.exp
+      };
+    } else {
+      // Fallback: decode and manually check expiration
+      const decoded = jwt.decode(token, { complete: true });
+
+      if (!decoded || !decoded.payload || !decoded.payload.sub) {
+        throw new Error('Invalid Clerk token structure');
+      }
+
+      // Check if token has expired
+      const currentTime = Math.floor(Date.now() / 1000);
+      if (decoded.payload.exp && decoded.payload.exp < currentTime) {
+        throw new Error('Clerk token has expired. Please generate a new token from the dashboard.');
+      }
+
+      return {
+        clerkUserId: decoded.payload.sub,
+        sessionId: decoded.payload.sid,
+        exp: decoded.payload.exp
+      };
     }
-    
-    return {
-      clerkUserId: decoded.sub,
-      sessionId: decoded.sid,
-      exp: decoded.exp
-    };
   } catch (error) {
+    if (error.name === 'TokenExpiredError' || error.message.includes('expired')) {
+      throw new Error('Clerk token has expired. Please generate a new token from the dashboard.');
+    } else if (error.name === 'JsonWebTokenError') {
+      throw new Error('Invalid Clerk token signature');
+    } else if (error.name === 'NotBeforeError') {
+      throw new Error('Clerk token not yet valid');
+    }
     throw new Error('Invalid Clerk token: ' + error.message);
   }
 }
