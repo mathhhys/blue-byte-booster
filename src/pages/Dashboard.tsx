@@ -237,24 +237,37 @@ const Dashboard = () => {
 
     setIsGenerating(true);
     try {
-      // Generate a Clerk session token
-      const clerkToken = await getToken();
+      // Generate a long-lived JWT token (4 months) via our API
+      const response = await fetch('/api/extension/auth/generate-token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Token generation failed: ${response.status}`);
+      }
+
+      const data = await response.json();
       
-      if (clerkToken) {
-        setExtensionToken(clerkToken);
-        console.log('Generated Clerk token for VSCode extension');
+      if (data.access_token) {
+        setExtensionToken(data.access_token);
+        console.log('Generated 4-month JWT token for VSCode extension');
+        toast({
+          title: "Token Generated",
+          description: "Extension token generated successfully (valid for 4 months)",
+        });
       } else {
-        // Fallback to a mock token for development
-        const mockToken = `clerk_mock_token_${user.id}_${Date.now()}`;
-        setExtensionToken(mockToken);
-        console.log('Using mock Clerk token for development:', mockToken);
+        throw new Error('No access token received');
       }
     } catch (error) {
-      console.error('Clerk token generation error:', error);
-      // Fallback to a mock token for development
-      const mockToken = `clerk_mock_token_${user.id}_${Date.now()}`;
-      setExtensionToken(mockToken);
-      console.log('Using mock Clerk token due to error:', mockToken);
+      console.error('Token generation error:', error);
+      toast({
+        title: "Token Generation Failed",
+        description: error instanceof Error ? error.message : "Failed to generate extension token",
+        variant: "destructive",
+      });
     } finally {
       setIsGenerating(false);
     }
@@ -850,7 +863,7 @@ const Dashboard = () => {
                       </Button>
                     </div>
                     <div className="text-xs text-gray-500">
-                      This is your Clerk session token. Use this token in your VSCode extension settings.
+                      This is your 4-month JWT token. Use this token in your VSCode extension settings.
                     </div>
                   </div>
                 )}
