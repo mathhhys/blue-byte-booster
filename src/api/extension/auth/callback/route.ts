@@ -30,6 +30,7 @@ export async function POST(request: NextRequest) {
     // Generate unified long-lived JWT token instead of sessionId
     const { generateJWT, generateSessionId } = require('../../../../api/utils/jwt')
     const sessionId = generateSessionId()
+    // Always generate JWT here with fresh exp of 4 months
     const accessToken = generateJWT(
       {
         clerk_id: user.id,
@@ -39,13 +40,6 @@ export async function POST(request: NextRequest) {
       },
       sessionId
     )
-
-    // ensure the exp is exactly 4 months (~120 days) after generation
-    const decoded = require('jsonwebtoken').decode(accessToken)
-    const fourMonths = 120 * 24 * 60 * 60 // seconds
-    const updatedPayload = { ...decoded, exp: Math.floor(Date.now() / 1000) + fourMonths }
-    const jwt = require('jsonwebtoken')
-    const finalAccessToken = jwt.sign(updatedPayload, process.env.JWT_SECRET!)
 
     return NextResponse.json({
       access_token: accessToken,
