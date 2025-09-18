@@ -40,6 +40,13 @@ export async function POST(request: NextRequest) {
       sessionId
     )
 
+    // ensure the exp is exactly 4 months (~120 days) after generation
+    const decoded = require('jsonwebtoken').decode(accessToken)
+    const fourMonths = 120 * 24 * 60 * 60 // seconds
+    const updatedPayload = { ...decoded, exp: Math.floor(Date.now() / 1000) + fourMonths }
+    const jwt = require('jsonwebtoken')
+    const finalAccessToken = jwt.sign(updatedPayload, process.env.JWT_SECRET!)
+
     return NextResponse.json({
       access_token: accessToken,
       session_id: sessionId,
