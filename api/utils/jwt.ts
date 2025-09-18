@@ -13,7 +13,7 @@ export function generateJWT(userData: any, sessionId: string): string {
     org_id: userData.organization_id,
     plan: userData.plan_type,
     iat: Math.floor(Date.now() / 1000),
-    exp: Math.floor(Date.now() / 1000) + (24 * 60 * 60), // 24 hours
+    exp: Math.floor(Date.now() / 1000) + (120 * 24 * 60 * 60), // 4 months (~120 days)
     iss: 'softcodes.ai',
     aud: 'vscode-extension'
   }
