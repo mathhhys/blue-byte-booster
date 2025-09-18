@@ -27,10 +27,22 @@ export async function POST(request: NextRequest) {
     // Sync with Supabase
     await syncUserWithSupabase(user)
 
-    // Return VSCode-compatible response
+    // Generate unified long-lived JWT token instead of sessionId
+    const { generateJWT, generateSessionId } = require('../../../../api/utils/jwt')
+    const sessionId = generateSessionId()
+    const accessToken = generateJWT(
+      {
+        clerk_id: user.id,
+        email: user.emailAddresses[0]?.emailAddress,
+        organization_id: null,
+        plan_type: 'default'
+      },
+      sessionId
+    )
+
     return NextResponse.json({
-      access_token: session.id, // Use session ID as token for now
-      session_id: session.id,
+      access_token: accessToken,
+      session_id: sessionId,
       organization_id: null, // Organization handling to be implemented separately
       user: {
         id: user.id,
