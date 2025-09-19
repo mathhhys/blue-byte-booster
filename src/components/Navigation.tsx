@@ -170,6 +170,7 @@ const Navigation = () => {
               </Link>
               <div className="relative group">
                 <button
+                  onClick={() => window.location.href = "https://docs.softcodes.ai/"}
                   className={`flex items-center text-sm font-medium transition-colors hover:text-blue-600 ${
                     isScrolled ? "text-gray-700" : "text-white"
                   }`}
@@ -338,9 +339,7 @@ const Navigation = () => {
               </Link>
 
               <button
-                onClick={() => {
-                  scrollToSection("documentation");
-                }}
+                onClick={() => window.location.href = "https://docs.softcodes.ai/"}
                 className="w-full flex justify-center text-xl font-bold tracking-wide text-gray-200 hover:text-white transition-colors focus:outline-none text-center"
                 style={{ letterSpacing: "0.02em" }}
               >
