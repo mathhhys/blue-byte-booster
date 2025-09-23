@@ -1,23 +1,27 @@
-import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@clerk/backend';
 import { createClient } from '@supabase/supabase-js';
-import { generateSessionId, generateJWT } from '../../../api/utils/jwt';
+import { generateSessionId, generateJWT } from '../../../api/utils/jwt.js';
+import type { NextApiRequest, NextApiResponse } from 'next';
 
-export async function POST(request: NextRequest) {
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
   try {
-    const authHeader = request.headers.get('Authorization');
+    const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Missing or invalid Authorization header' }, { status: 401 });
+      return res.status(401).json({ error: 'Missing or invalid Authorization header' });
     }
 
     const clerkToken = authHeader.substring(7);
-    const claims = await verifyToken(clerkToken, {
+    const claims = await verifyToken(clerkToken, { 
       jwtKey: process.env.CLERK_JWT_KEY!
     });
 
     const clerkId = claims.sub;
     if (!clerkId) {
-      return NextResponse.json({ error: 'Invalid Clerk token' }, { status: 401 });
+      return res.status(401).json({ error: 'Invalid Clerk token' });
     }
 
     // Fetch user data from Supabase (using service role for server-side)
@@ -40,7 +44,7 @@ export async function POST(request: NextRequest) {
 
     if (error || !userData) {
       console.error('User fetch error:', error);
-      return NextResponse.json({ error: 'User not found in database' }, { status: 404 });
+      return res.status(404).json({ error: 'User not found in database' });
     }
 
     const sessionId = generateSessionId();
@@ -49,7 +53,7 @@ export async function POST(request: NextRequest) {
     const expiresIn = 24 * 60 * 60; // 24 hours in seconds
     const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
 
-    return NextResponse.json({
+    res.status(200).json({
       success: true,
       access_token: accessToken,
       expires_in: expiresIn,
@@ -59,6 +63,6 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('Token generation error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    res.status(500).json({ error: 'Internal server error' });
   }
 }

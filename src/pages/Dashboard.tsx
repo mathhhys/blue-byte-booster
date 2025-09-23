@@ -255,7 +255,7 @@ const Dashboard = () => {
       console.log('Got Clerk auth token, calling backend to generate JWT...');
       
       // Call backend to generate backend JWT token
-      const response = await fetch('/api/dashboard-token/generate', {
+      const response = await fetch('/api/extension/auth/token', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
