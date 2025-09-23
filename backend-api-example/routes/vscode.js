@@ -9,6 +9,21 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
+// Unified time calculation functions (matching auth.js)
+function getCurrentEpochTime() {
+  return Math.floor(Date.now() / 1000);
+}
+
+function calculateExpiryEpoch(durationSeconds) {
+  return getCurrentEpochTime() + durationSeconds;
+}
+
+function epochToISOString(epochTime) {
+  return new Date(epochTime * 1000).toISOString();
+}
+
+const VSCODE_SESSION_EXPIRES_SECONDS = 24 * 60 * 60; // 24 hours in seconds
+
 // Validate VS Code session
 router.post('/session/validate', authenticateClerkToken, rateLimitMiddleware, async (req, res) => {
   try {
@@ -229,13 +244,23 @@ async function getOrCreateVSCodeSession(clerkUserId, sessionToken, extensionVers
     throw new Error('User not found');
   }
 
+  const sessionExp = calculateExpiryEpoch(VSCODE_SESSION_EXPIRES_SECONDS);
+  const sessionExpiresAt = epochToISOString(sessionExp);
+  
+  console.log('VSCode Session Creation: Session timing:', {
+    currentEpoch: getCurrentEpochTime(),
+    sessionExpEpoch: sessionExp,
+    sessionExpiresAtISO: sessionExpiresAt,
+    validityHours: VSCODE_SESSION_EXPIRES_SECONDS / 3600
+  });
+
   const { data: newSession, error } = await supabase
     .from('vscode_sessions')
     .insert({
       user_id: userData.id,
       session_token: sessionToken,
       extension_version: extensionVersion,
-      expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24 hours
+      expires_at: sessionExpiresAt
     })
     .select()
     .single();

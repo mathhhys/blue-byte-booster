@@ -2,6 +2,7 @@ const express = require('express');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const { createClient } = require('@supabase/supabase-js');
+const { tokenMonitor } = require('../utils/token-monitoring');
 const router = express.Router();
 
 console.log('routes/auth.js: SUPABASE_URL:', process.env.SUPABASE_URL ? 'Loaded' : 'Not Loaded');
@@ -31,21 +32,80 @@ async function generateCodeChallenge(code_verifier) {
 // JWT Utility Functions
 console.log('routes/auth.js: JWT_SECRET:', process.env.JWT_SECRET ? 'Loaded' : 'Not Loaded');
 const JWT_SECRET = process.env.JWT_SECRET;
-const JWT_EXPIRES_IN = '1h';
-const REFRESH_TOKEN_EXPIRES_IN = '7d';
+const ACCESS_TOKEN_EXPIRES_SECONDS = 60 * 60; // 1 hour in seconds
+const REFRESH_TOKEN_EXPIRES_SECONDS = 7 * 24 * 60 * 60; // 7 days in seconds
+
+// Unified time calculation functions
+function getCurrentEpochTime() {
+  return Math.floor(Date.now() / 1000);
+}
+
+function calculateExpiryEpoch(durationSeconds) {
+  return getCurrentEpochTime() + durationSeconds;
+}
+
+function epochToISOString(epochTime) {
+  return new Date(epochTime * 1000).toISOString();
+}
+
+function logTokenTiming(tokenType, exp, expiresAtISO, clerkUserId) {
+  const currentTime = getCurrentEpochTime();
+  const serverTimeISO = new Date().toISOString();
+  console.log(`routes/auth.js: ${tokenType} token timing:`, {
+    currentServerEpoch: currentTime,
+    currentServerUTC: serverTimeISO,
+    tokenExpEpoch: exp,
+    tokenExpiresAtISO: expiresAtISO,
+    validitySeconds: exp - currentTime
+  });
+  
+  // Add production monitoring
+  tokenMonitor.logTokenGeneration(tokenType, clerkUserId, exp, expiresAtISO);
+}
 
 function generateAccessToken(clerkUserId) {
-  return jwt.sign({ clerkUserId, type: 'access' }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+  const exp = calculateExpiryEpoch(ACCESS_TOKEN_EXPIRES_SECONDS);
+  const accessToken = jwt.sign({ clerkUserId, type: 'access', exp }, JWT_SECRET);
+  
+  const expiresAtISO = epochToISOString(exp);
+  logTokenTiming('Access', exp, expiresAtISO, clerkUserId);
+  
+  return { token: accessToken, exp, expiresAtISO };
 }
 
 function generateRefreshToken(clerkUserId) {
-  return jwt.sign({ clerkUserId, type: 'refresh' }, JWT_SECRET, { expiresIn: REFRESH_TOKEN_EXPIRES_IN });
+  const exp = calculateExpiryEpoch(REFRESH_TOKEN_EXPIRES_SECONDS);
+  const refreshToken = jwt.sign({ clerkUserId, type: 'refresh', exp }, JWT_SECRET);
+  
+  const expiresAtISO = epochToISOString(exp);
+  logTokenTiming('Refresh', exp, expiresAtISO, clerkUserId);
+  
+  return { token: refreshToken, exp, expiresAtISO };
 }
 
-function verifyToken(token) {
+function verifyToken(token, clerkUserId = null) {
   try {
-    return jwt.verify(token, JWT_SECRET);
+    const decoded = jwt.verify(token, JWT_SECRET, { clockTolerance: 5 });
+    
+    // Log successful validation
+    if (clerkUserId) {
+      tokenMonitor.logTokenValidation(decoded.type || 'unknown', clerkUserId, decoded.exp, {
+        valid: true
+      });
+    }
+    
+    return decoded;
   } catch (error) {
+    console.error('routes/auth.js: Token verification failed:', error.message);
+    
+    // Log failed validation
+    if (clerkUserId) {
+      tokenMonitor.logTokenValidation('unknown', clerkUserId, null, {
+        valid: false,
+        error: error.message
+      });
+    }
+    
     return null;
   }
 }
@@ -130,16 +190,15 @@ router.post('/token', async (req, res) => {
 
     // Get the Clerk user ID from the OAuth record
     const clerkUserId = oauthCode.clerk_user_id;
-    const accessToken = generateAccessToken(clerkUserId);
-    const refreshToken = generateRefreshToken(clerkUserId);
-    const refreshTokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    const accessTokenData = generateAccessToken(clerkUserId);
+    const refreshTokenData = generateRefreshToken(clerkUserId);
 
     const { error: refreshError } = await supabase
       .from('refresh_tokens')
       .insert({
         clerk_user_id: clerkUserId,
-        token: refreshToken,
-        expires_at: refreshTokenExpiresAt.toISOString(),
+        token: refreshTokenData.token,
+        expires_at: refreshTokenData.expiresAtISO,
       });
 
     if (refreshError) {
@@ -153,9 +212,9 @@ router.post('/token', async (req, res) => {
 
     res.json({
       success: true,
-      access_token: accessToken,
-      refresh_token: refreshToken,
-      expires_in: 3600,
+      access_token: accessTokenData.token,
+      refresh_token: refreshTokenData.token,
+      expires_in: ACCESS_TOKEN_EXPIRES_SECONDS,
     });
 
   } catch (error) {
@@ -209,16 +268,15 @@ router.post('/refresh-token', async (req, res) => {
       .update({ revoked_at: new Date().toISOString() })
       .eq('id', storedToken.id);
 
-    const newAccessToken = generateAccessToken(clerkUserId);
-    const newRefreshToken = generateRefreshToken(clerkUserId);
-    const newRefreshTokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    const newAccessTokenData = generateAccessToken(clerkUserId);
+    const newRefreshTokenData = generateRefreshToken(clerkUserId);
 
     const { error: insertError } = await supabase
       .from('refresh_tokens')
       .insert({
         clerk_user_id: clerkUserId,
-        token: newRefreshToken,
-        expires_at: newRefreshTokenExpiresAt.toISOString(),
+        token: newRefreshTokenData.token,
+        expires_at: newRefreshTokenData.expiresAtISO,
       });
 
     if (insertError) {
@@ -229,9 +287,9 @@ router.post('/refresh-token', async (req, res) => {
 
     res.json({
       success: true,
-      access_token: newAccessToken,
-      refresh_token: newRefreshToken,
-      expires_in: 3600,
+      access_token: newAccessTokenData.token,
+      refresh_token: newRefreshTokenData.token,
+      expires_in: ACCESS_TOKEN_EXPIRES_SECONDS,
     });
 
   } catch (error) {

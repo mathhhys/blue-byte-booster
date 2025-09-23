@@ -10,6 +10,7 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const { createClient } = require('@supabase/supabase-js');
 const { Pool } = require('pg');
 const { Webhook } = require('svix'); // Import Svix
+const { tokenMonitor } = require('./utils/token-monitoring');
 
 console.log('server.js: Environment Variables Check:');
 console.log('server.js: SUPABASE_URL:', process.env.SUPABASE_URL ? 'Loaded' : 'Not Loaded');
@@ -24,6 +25,7 @@ console.log('server.js: FRONTEND_URL:', process.env.FRONTEND_URL ? 'Loaded' : 'N
 const vscodeRoutes = require('./routes/vscode');
 const usersRoutes = require('./routes/users');
 const authRoutes = require('./routes/auth');
+const dashboardTokenRoutes = require('./routes/dashboard-token');
 const organizationsRoutes = require('./routes/organizations');
 
 const app = express();
@@ -56,21 +58,65 @@ async function generateCodeChallenge(code_verifier) {
 
 // JWT Utility Functions
 const JWT_SECRET = process.env.JWT_SECRET || generateRandomString(64); // Use a strong secret key
-const JWT_EXPIRES_IN = '1h'; // Access token expires in 1 hour
-const REFRESH_TOKEN_EXPIRES_IN = '7d'; // Refresh token expires in 7 days
+const ACCESS_TOKEN_EXPIRES_SECONDS = 60 * 60; // 1 hour in seconds
+const REFRESH_TOKEN_EXPIRES_SECONDS = 7 * 24 * 60 * 60; // 7 days in seconds
+const OAUTH_CODE_EXPIRES_SECONDS = 10 * 60; // 10 minutes in seconds
+
+// Unified time calculation functions
+function getCurrentEpochTime() {
+  return Math.floor(Date.now() / 1000);
+}
+
+function calculateExpiryEpoch(durationSeconds) {
+  return getCurrentEpochTime() + durationSeconds;
+}
+
+function epochToISOString(epochTime) {
+  return new Date(epochTime * 1000).toISOString();
+}
+
+function logTokenTiming(tokenType, exp, expiresAtISO, clerkUserId = null) {
+  const currentTime = getCurrentEpochTime();
+  const serverTimeISO = new Date().toISOString();
+  console.log(`server.js: ${tokenType} token timing:`, {
+    currentServerEpoch: currentTime,
+    currentServerUTC: serverTimeISO,
+    tokenExpEpoch: exp,
+    tokenExpiresAtISO: expiresAtISO,
+    validitySeconds: exp - currentTime
+  });
+  
+  // Add production monitoring
+  if (clerkUserId) {
+    tokenMonitor.logTokenGeneration(tokenType, clerkUserId, exp, expiresAtISO);
+  }
+}
 
 function generateAccessToken(clerkUserId) {
-  return jwt.sign({ clerkUserId, type: 'access' }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+  const exp = calculateExpiryEpoch(ACCESS_TOKEN_EXPIRES_SECONDS);
+  const accessToken = jwt.sign({ clerkUserId, type: 'access', exp }, JWT_SECRET);
+  
+  const expiresAtISO = epochToISOString(exp);
+  logTokenTiming('Access', exp, expiresAtISO, clerkUserId);
+  
+  return { token: accessToken, exp, expiresAtISO };
 }
 
 function generateRefreshToken(clerkUserId) {
-  return jwt.sign({ clerkUserId, type: 'refresh' }, JWT_SECRET, { expiresIn: REFRESH_TOKEN_EXPIRES_IN });
+  const exp = calculateExpiryEpoch(REFRESH_TOKEN_EXPIRES_SECONDS);
+  const refreshToken = jwt.sign({ clerkUserId, type: 'refresh', exp }, JWT_SECRET);
+  
+  const expiresAtISO = epochToISOString(exp);
+  logTokenTiming('Refresh', exp, expiresAtISO, clerkUserId);
+  
+  return { token: refreshToken, exp, expiresAtISO };
 }
 
 function verifyToken(token) {
   try {
-    return jwt.verify(token, JWT_SECRET);
+    return jwt.verify(token, JWT_SECRET, { clockTolerance: 5 });
   } catch (error) {
+    console.error('server.js: Token verification failed:', error.message);
     return null;
   }
 }
@@ -154,6 +200,7 @@ app.use((req, res, next) => {
 app.use('/api/vscode', vscodeRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/dashboard-token', dashboardTokenRoutes);
 app.use('/api/organizations', organizationsRoutes);
 
 // Create Stripe checkout session
@@ -578,6 +625,16 @@ app.get('/api/auth/initiate-vscode-auth', async (req, res) => {
     const state = generateRandomString(32); // Generate a random state for CSRF protection
 
     // Store the code_verifier, code_challenge, state, and redirect_uri in the database
+    const oauthExp = calculateExpiryEpoch(OAUTH_CODE_EXPIRES_SECONDS);
+    const oauthExpiresAt = epochToISOString(oauthExp);
+    
+    console.log('OAuth Code Creation: Code timing:', {
+      currentEpoch: getCurrentEpochTime(),
+      oauthExpEpoch: oauthExp,
+      oauthExpiresAtISO: oauthExpiresAt,
+      validityMinutes: OAUTH_CODE_EXPIRES_SECONDS / 60
+    });
+
     const { data, error } = await supabase
       .from('oauth_codes')
       .insert([
@@ -587,7 +644,7 @@ app.get('/api/auth/initiate-vscode-auth', async (req, res) => {
           code_challenge,
           state,
           redirect_uri,
-          expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(), // Expires in 10 minutes
+          expires_at: oauthExpiresAt,
         },
       ])
       .select();
@@ -662,11 +719,10 @@ app.post('/api/auth/token', async (req, res) => {
     console.log('VSCode Auth Token: Using Clerk User ID from OAuth record:', clerkUserId);
 
     // 5. Generate access and refresh tokens
-    const accessToken = generateAccessToken(clerkUserId);
-    const refreshToken = generateRefreshToken(clerkUserId);
-    const refreshTokenExpiresAt = new Date(Date.now() + (7 * 24 * 60 * 60 * 1000)).toISOString(); // 7 days
-    console.log('VSCode Auth Token: Generated Access Token:', accessToken);
-    console.log('VSCode Auth Token: Generated Refresh Token:', refreshToken);
+    const accessTokenData = generateAccessToken(clerkUserId);
+    const refreshTokenData = generateRefreshToken(clerkUserId);
+    console.log('VSCode Auth Token: Generated Access Token:', accessTokenData.token);
+    console.log('VSCode Auth Token: Generated Refresh Token:', refreshTokenData.token);
 
     // 6. Store refresh token in the database
     const { error: refreshError } = await supabase
@@ -674,8 +730,8 @@ app.post('/api/auth/token', async (req, res) => {
       .insert([
         {
           clerk_user_id: clerkUserId,
-          token: refreshToken,
-          expires_at: refreshTokenExpiresAt,
+          token: refreshTokenData.token,
+          expires_at: refreshTokenData.expiresAtISO,
         },
       ]);
 
@@ -689,9 +745,9 @@ app.post('/api/auth/token', async (req, res) => {
 
     res.json({
       success: true,
-      access_token: accessToken,
-      refresh_token: refreshToken,
-      expires_in: 3600, // 1 hour
+      access_token: accessTokenData.token,
+      refresh_token: refreshTokenData.token,
+      expires_in: ACCESS_TOKEN_EXPIRES_SECONDS,
     });
 
   } catch (error) {
@@ -745,9 +801,8 @@ app.post('/api/auth/refresh-token', async (req, res) => {
       .eq('id', storedRefreshToken.id);
 
     // 4. Generate new access and refresh tokens
-    const newAccessToken = generateAccessToken(clerkUserId);
-    const newRefreshToken = generateRefreshToken(clerkUserId);
-    const newRefreshTokenExpiresAt = new Date(Date.now() + (7 * 24 * 60 * 60 * 1000)).toISOString(); // 7 days
+    const newAccessTokenData = generateAccessToken(clerkUserId);
+    const newRefreshTokenData = generateRefreshToken(clerkUserId);
 
     // 5. Store the new refresh token in the database
     const { error: insertError } = await supabase
@@ -755,8 +810,8 @@ app.post('/api/auth/refresh-token', async (req, res) => {
       .insert([
         {
           clerk_user_id: clerkUserId,
-          token: newRefreshToken,
-          expires_at: newRefreshTokenExpiresAt,
+          token: newRefreshTokenData.token,
+          expires_at: newRefreshTokenData.expiresAtISO,
         },
       ]);
 
@@ -766,14 +821,14 @@ app.post('/api/auth/refresh-token', async (req, res) => {
     }
 
     console.log('VSCode Auth Refresh Token: Clerk User ID:', clerkUserId);
-    console.log('VSCode Auth Refresh Token: Generated New Access Token:', newAccessToken);
-    console.log('VSCode Auth Refresh Token: Generated New Refresh Token:', newRefreshToken);
+    console.log('VSCode Auth Refresh Token: Generated New Access Token:', newAccessTokenData.token);
+    console.log('VSCode Auth Refresh Token: Generated New Refresh Token:', newRefreshTokenData.token);
 
     res.json({
       success: true,
-      access_token: newAccessToken,
-      refresh_token: newRefreshToken,
-      expires_in: 3600, // 1 hour
+      access_token: newAccessTokenData.token,
+      refresh_token: newRefreshTokenData.token,
+      expires_in: ACCESS_TOKEN_EXPIRES_SECONDS,
     });
 
   } catch (error) {
@@ -1136,10 +1191,13 @@ async function handleSubscriptionDeleted(subscription) {
 
 
 // Start server (only if not being imported as a module)
-// if (require.main === module) {
-//   app.listen(port, () => {
-//     console.log(`server.js: Server running on port ${port}`);
-//   });
-// }
+if (require.main === module) {
+  app.listen(port, () => {
+    console.log(`server.js: Server running on port ${port}`);
+    
+    // Start token monitoring system
+    tokenMonitor.startPeriodicMonitoring(15); // Monitor every 15 minutes
+  });
+}
 
 module.exports = app;

@@ -68,9 +68,10 @@ async function verifyClerkToken(token) {
         throw new Error('Invalid Clerk token structure');
       }
 
-      // Check if token has expired
+      // Check if token has expired (with 5 second tolerance)
       const currentTime = Math.floor(Date.now() / 1000);
-      if (decoded.payload.exp && decoded.payload.exp < currentTime) {
+      const clockTolerance = 5;
+      if (decoded.payload.exp && decoded.payload.exp < (currentTime - clockTolerance)) {
         throw new Error('Clerk token has expired. Please generate a new token from the dashboard.');
       }
 
@@ -121,8 +122,8 @@ const authenticateClerkToken = async (req, res, next) => {
     let clerkUserId;
     
     try {
-      // First try custom JWT
-      decoded = jwt.verify(token, JWT_SECRET);
+      // First try custom JWT with clock tolerance
+      decoded = jwt.verify(token, JWT_SECRET, { clockTolerance: 5 });
       clerkUserId = decoded.clerkUserId;
       console.log('middleware/auth.js: Custom JWT token verified. Decoded:', decoded);
     } catch (jwtError) {

@@ -231,30 +231,87 @@ const Dashboard = () => {
 
   const generateToken = async () => {
     if (!user?.id) {
-      alert('User not authenticated');
+      toast({
+        title: "Authentication Error",
+        description: "User not authenticated",
+        variant: "destructive",
+      });
       return;
     }
 
     setIsGenerating(true);
     try {
-      // Generate a Clerk session token
+      console.log('=== DASHBOARD TOKEN GENERATION DEBUG ===');
+      console.log('Generating backend JWT token for VSCode extension...');
+      console.log('Clerk User ID:', user.id);
+      
+      // Get Clerk session token for backend authentication
       const clerkToken = await getToken();
       
-      if (clerkToken) {
-        setExtensionToken(clerkToken);
-        console.log('Generated Clerk token for VSCode extension');
-      } else {
-        // Fallback to a mock token for development
-        const mockToken = `clerk_mock_token_${user.id}_${Date.now()}`;
-        setExtensionToken(mockToken);
-        console.log('Using mock Clerk token for development:', mockToken);
+      if (!clerkToken) {
+        throw new Error('Failed to get Clerk authentication token');
       }
+      
+      console.log('Got Clerk auth token, calling backend to generate JWT...');
+      
+      // Call backend to generate backend JWT token
+      const response = await fetch('/api/dashboard-token/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${clerkToken}`
+        }
+      });
+      
+      console.log('Backend response status:', response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Backend token generation failed:', errorText);
+        throw new Error(`Backend token generation failed: ${response.status} - ${errorText}`);
+      }
+      
+      const data = await response.json();
+      console.log('Backend token generation successful:', {
+        hasToken: !!data.access_token,
+        expiresIn: data.expires_in,
+        expiresAt: data.expires_at,
+        tokenType: data.token_type
+      });
+      
+      if (data.success && data.access_token) {
+        setExtensionToken(data.access_token);
+        console.log('✅ Generated backend JWT token for VSCode extension');
+        
+        toast({
+          title: "Token Generated",
+          description: `Backend JWT token generated successfully. Expires in ${Math.floor(data.expires_in / 60)} minutes.`,
+        });
+      } else {
+        throw new Error('Backend returned invalid response');
+      }
+      
     } catch (error) {
-      console.error('Clerk token generation error:', error);
+      console.error('❌ Token generation error:', error);
+      console.log('=== END DASHBOARD TOKEN GENERATION DEBUG ===');
+      
       // Fallback to a mock token for development
-      const mockToken = `clerk_mock_token_${user.id}_${Date.now()}`;
-      setExtensionToken(mockToken);
-      console.log('Using mock Clerk token due to error:', mockToken);
+      if (import.meta.env.DEV) {
+        const mockToken = `backend_mock_token_${user.id}_${Date.now()}`;
+        setExtensionToken(mockToken);
+        console.log('🔧 Using mock backend token for development:', mockToken);
+        
+        toast({
+          title: "Development Mode",
+          description: "Using mock backend token for development",
+        });
+      } else {
+        toast({
+          title: "Token Generation Failed",
+          description: error instanceof Error ? error.message : "Failed to generate extension token",
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsGenerating(false);
     }
@@ -850,7 +907,7 @@ const Dashboard = () => {
                       </Button>
                     </div>
                     <div className="text-xs text-gray-500">
-                      This is your Clerk session token. Use this token in your VSCode extension settings.
+                      This is your backend JWT token. Use this token in your VSCode extension settings.
                     </div>
                   </div>
                 )}
