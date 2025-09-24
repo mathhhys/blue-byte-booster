@@ -99,6 +99,11 @@ const Dashboard = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
   const [autoRenew, setAutoRenew] = useState(true);
+  const [tokenInfo, setTokenInfo] = useState<{
+    expiresAt?: string;
+    createdAt?: string;
+    isExpired?: boolean;
+  } | null>(null);
 
   // Credits state
   const [currentBalance, setCurrentBalance] = useState<number>(0); // Initialize with 0, will be updated from dbUser
@@ -241,8 +246,8 @@ const Dashboard = () => {
 
     setIsGenerating(true);
     try {
-      console.log('=== DASHBOARD TOKEN GENERATION DEBUG ===');
-      console.log('Generating backend JWT token for VSCode extension...');
+      console.log('=== EXTENSION TOKEN GENERATION START ===');
+      console.log('Generating 4-month extension token for VSCode...');
       console.log('Clerk User ID:', user.id);
       
       // Get Clerk session token for backend authentication
@@ -252,10 +257,10 @@ const Dashboard = () => {
         throw new Error('Failed to get Clerk authentication token');
       }
       
-      console.log('Got Clerk auth token, calling backend to generate JWT...');
+      console.log('Got Clerk auth token, calling backend to generate 4-month JWT...');
       
-      // Call backend to generate backend JWT token
-      const response = await fetch('/api/extension/auth', {
+      // Call backend to generate long-lived extension token
+      const response = await fetch('/api/extension/auth/token', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -267,12 +272,12 @@ const Dashboard = () => {
       
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Backend token generation failed:', errorText);
-        throw new Error(`Backend token generation failed: ${response.status} - ${errorText}`);
+        console.error('Extension token generation failed:', errorText);
+        throw new Error(`Extension token generation failed: ${response.status} - ${errorText}`);
       }
       
       const data = await response.json();
-      console.log('Backend token generation successful:', {
+      console.log('Extension token generation successful:', {
         hasToken: !!data.access_token,
         expiresIn: data.expires_in,
         expiresAt: data.expires_at,
@@ -281,29 +286,41 @@ const Dashboard = () => {
       
       if (data.success && data.access_token) {
         setExtensionToken(data.access_token);
-        console.log('✅ Generated backend JWT token for VSCode extension');
+        setTokenInfo({
+          expiresAt: data.expires_at,
+          createdAt: new Date().toISOString(),
+          isExpired: false
+        });
+        
+        const monthsUntilExpiry = Math.floor(data.expires_in / (30 * 24 * 60 * 60));
+        console.log('✅ Generated 4-month extension token for VSCode');
         
         toast({
-          title: "Token Generated",
-          description: `Backend JWT token generated successfully. Expires in ${Math.floor(data.expires_in / 60)} minutes.`,
+          title: "Extension Token Generated",
+          description: `Long-lived extension token generated successfully. Valid for ${monthsUntilExpiry} months.`,
         });
       } else {
         throw new Error('Backend returned invalid response');
       }
       
     } catch (error) {
-      console.error('❌ Token generation error:', error);
-      console.log('=== END DASHBOARD TOKEN GENERATION DEBUG ===');
+      console.error('❌ Extension token generation error:', error);
+      console.log('=== EXTENSION TOKEN GENERATION END (ERROR) ===');
       
       // Fallback to a mock token for development
       if (import.meta.env.DEV) {
-        const mockToken = `backend_mock_token_${user.id}_${Date.now()}`;
+        const mockToken = `extension_mock_token_${user.id}_${Date.now()}`;
         setExtensionToken(mockToken);
-        console.log('🔧 Using mock backend token for development:', mockToken);
+        setTokenInfo({
+          expiresAt: new Date(Date.now() + 4 * 30 * 24 * 60 * 60 * 1000).toISOString(),
+          createdAt: new Date().toISOString(),
+          isExpired: false
+        });
+        console.log('🔧 Using mock extension token for development:', mockToken);
         
         toast({
           title: "Development Mode",
-          description: "Using mock backend token for development",
+          description: "Using mock 4-month extension token for development",
         });
       } else {
         toast({
@@ -331,6 +348,7 @@ const Dashboard = () => {
 
   const refreshToken = () => {
     setExtensionToken('');
+    setTokenInfo(null);
     generateToken();
   };
 
@@ -858,7 +876,7 @@ const Dashboard = () => {
               
               <div className="space-y-4 flex-1">
                 <div className="text-sm text-gray-400 mb-3">
-                  Generate an authentication token to connect your VSCode extension to your account.
+                  Generate a long-lived authentication token (valid for 4 months) to connect your VSCode extension to your account.
                 </div>
                 
                 {!extensionToken ? (
@@ -875,7 +893,7 @@ const Dashboard = () => {
                     ) : (
                       <>
                         <Code className="w-4 h-4 mr-2" />
-                        Generate Extension Token
+                        Generate 4-Month Token
                       </>
                     )}
                   </Button>
@@ -907,8 +925,17 @@ const Dashboard = () => {
                       </Button>
                     </div>
                     <div className="text-xs text-gray-500">
-                      This is your backend JWT token. Use this token in your VSCode extension settings.
+                      This is your long-lived extension token. Use this token in your VSCode extension settings.
                     </div>
+                    {tokenInfo && (
+                      <div className="mt-3 p-3 bg-[#1a1a1a] rounded border border-white/10">
+                        <div className="text-xs text-gray-400 space-y-1">
+                          <div>Created: {new Date(tokenInfo.createdAt!).toLocaleDateString()}</div>
+                          <div>Expires: {new Date(tokenInfo.expiresAt!).toLocaleDateString()}</div>
+                          <div className="text-green-400">✓ Valid for 4 months</div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

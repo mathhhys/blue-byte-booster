@@ -5,7 +5,7 @@ export function generateSessionId(): string {
   return crypto.randomUUID()
 }
 
-export function generateJWT(userData: any, sessionId: string, expirySeconds: number = 24 * 60 * 60): string {
+export function generateJWT(userData: any, sessionId: string): string {
   const payload = {
     sub: userData.clerk_id,
     email: userData.email,
@@ -13,7 +13,7 @@ export function generateJWT(userData: any, sessionId: string, expirySeconds: num
     org_id: userData.organization_id,
     plan: userData.plan_type,
     iat: Math.floor(Date.now() / 1000),
-    exp: Math.floor(Date.now() / 1000) + expirySeconds, // Configurable expiry
+    exp: Math.floor(Date.now() / 1000) + (24 * 60 * 60), // 24 hours
     iss: 'softcodes.ai',
     aud: 'vscode-extension'
   }
@@ -32,6 +32,42 @@ export function generateRefreshToken(userData: any, sessionId: string): string {
   }
   
   return jwt.sign(payload, process.env.JWT_SECRET!)
+}
+
+// New function for extension tokens with 4-month validity
+export function generateExtensionJWT(userData: any): { token: string; expiresAt: Date; hash: string } {
+  const now = Math.floor(Date.now() / 1000);
+  const fourMonthsInSeconds = 4 * 30 * 24 * 60 * 60; // 4 months
+  const expiresAt = new Date((now + fourMonthsInSeconds) * 1000);
+  
+  const payload = {
+    sub: userData.clerk_id,
+    email: userData.email,
+    org_id: userData.organization_id,
+    plan: userData.plan_type,
+    type: 'extension',
+    iat: now,
+    exp: now + fourMonthsInSeconds,
+    iss: 'softcodes.ai',
+    aud: 'vscode-extension'
+  };
+  
+  const token = jwt.sign(payload, process.env.JWT_SECRET!);
+  const hash = crypto.createHash('sha256').update(token).digest('hex');
+  
+  return { token, expiresAt, hash };
+}
+
+export function verifyExtensionJWT(token: string): any {
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!);
+    if (typeof decoded === 'object' && decoded !== null && 'type' in decoded && decoded.type !== 'extension') {
+      throw new Error('Invalid token type');
+    }
+    return decoded;
+  } catch (error) {
+    throw new Error('Invalid extension token');
+  }
 }
 
 export async function generateCodeChallenge(codeVerifier: string): Promise<string> {

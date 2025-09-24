@@ -8,22 +8,22 @@ The 404 error occurred when attempting to generate a backend JWT token for the V
 **Impact**: Users cannot generate tokens for VSCode extension integration, blocking secure backend access (e.g., credits, plans).
 
 ## Solution Overview
-- Created the merged API route at [`api/extension/auth.ts`](api/extension/auth.ts) for POST /token (consolidated to avoid Vercel function limit).
+- Created the missing API route at [`api/dashboard-token/generate/route.ts`](api/dashboard-token/generate/route.ts).
 - Uses Clerk for token verification, Supabase for user data retrieval, and existing JWT utilities for signing.
 - No frontend changes needed; existing error handling (toasts, dev mock) suffices.
-- JWT expiry: 4 months (10,512,000 seconds, configurable via generateJWT param).
+- JWT expiry: 24 hours (configurable via code).
 - Security: Server-side verification; service role key for Supabase (bypasses RLS for admin query).
 
 ## Implementation Details
 
 ### API Route Code
-The full handler in [`api/extension/auth.ts`](api/extension/auth.ts) for POST /token:
+The full handler in [`api/dashboard-token/generate/route.ts`](api/dashboard-token/generate/route.ts):
 
 ```typescript
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@clerk/backend';
 import { createClient } from '@supabase/supabase-js';
-import { generateSessionId, generateJWT } from '../../../src/utils/jwt.js';
+import { generateSessionId, generateJWT } from '../../../api/utils/jwt';
 
 export async function POST(request: NextRequest) {
   try {
@@ -66,9 +66,9 @@ export async function POST(request: NextRequest) {
     }
 
     const sessionId = generateSessionId();
-    const accessToken = generateJWT(userData, sessionId, 4 * 30 * 24 * 60 * 60); // 4 months
+    const accessToken = generateJWT(userData, sessionId);
 
-    const expiresIn = 4 * 30 * 24 * 60 * 60; // 4 months in seconds
+    const expiresIn = 24 * 60 * 60; // 24 hours in seconds
     const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
 
     return NextResponse.json({
@@ -76,8 +76,7 @@ export async function POST(request: NextRequest) {
       access_token: accessToken,
       expires_in: expiresIn,
       expires_at: expiresAt,
-      token_type: 'Bearer',
-      usage: 'vscode_extension'
+      token_type: 'Bearer'
     });
 
   } catch (error) {
@@ -90,18 +89,9 @@ export async function POST(request: NextRequest) {
 ### Key Components
 - **Clerk Verification**: Uses `@clerk/backend`'s `verifyToken` with `CLERK_JWT_KEY` from env.
 - **Supabase Query**: Direct query to 'users' table using service role key (admin access; ensure RLS allows or use service role for this endpoint).
-- **JWT Generation**: Leverages [`src/utils/jwt.ts`](src/utils/jwt.ts:8-22) `generateJWT`, including user claims (clerk_id, email, plan_type, etc.) and configurable expiry (default 24h, 4 months for dashboard tokens).
+- **JWT Generation**: Leverages [`api/utils/jwt.ts`](api/utils/jwt.ts:8-22) `generateJWT`, including user claims (clerk_id, email, plan_type, etc.) and 24h expiry.
 - **Response Format**: Matches frontend expectations for success/error handling.
 - **Error Handling**: 401 for auth issues, 404 for missing user, 500 for server errors; logs for debugging.
-
-### Time Accuracy Fixes
-- **Short-lived Issue**: Tokens now expire after 4 months (10,512,000 seconds) instead of 24 hours, issued immediately on request.
-- **Inaccuracy Causes and Fixes**:
-  - Time zone mismatches: All timestamps use UTC epoch (Math.floor(Date.now() / 1000)) for iat/exp in JWT payload.
-  - Clock skew: Backend verification includes clockTolerance: 5 seconds in jwt.verify.
-  - DB storage: expires_at normalized to UTC via migration [`backend-api-example/migrations/20250923_normalize_expires_at_utc.sql`](backend-api-example/migrations/20250923_normalize_expires_at_utc.sql).
-  - Logging: Enhanced with epoch/ISO comparisons to detect discrepancies.
-- Immediate issuance: POST /generate responds synchronously with fresh token.
 
 ### Environment Variables Required
 Add to `.env.local` and Vercel dashboard:
@@ -153,14 +143,14 @@ Supabase query (service role) → userData (email, plan, credits)
   ↓
 generateJWT (utils/jwt.ts) → access_token (24h expiry)
   ↓
-Response: { success: true, access_token, expires_in: 10512000 } // 4 months
+Response: { success: true, access_token, expires_in: 86400 }
 Extension uses access_token for backend calls
 ```
 
 ## Future Improvements
 - Rate limiting on endpoint (use existing middleware if available).
-- Token revocation mechanism for long-lived tokens (e.g., blacklist on logout).
+- Shorter expiry (e.g., 1h) for security.
 - Include credits in JWT for extension caching.
-- Add tests: e.g., src/_tests_/api/dashboard-token.test.ts for generation/validation; e2e with backend-api-example/test-vscode-auth.js simulating time zones.
+- Add tests: e.g., src/_tests_/api/dashboard-token.test.ts.
 
 This fix resolves the 404 and enables VSCode extension token generation. Contact support if deployment issues arise.
