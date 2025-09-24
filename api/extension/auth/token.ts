@@ -1,10 +1,35 @@
 import { verifyToken } from '@clerk/backend';
 import { createClient } from '@supabase/supabase-js';
-import { generateSessionId, generateJWT } from '../../utils/jwt.js';
+import { generateSessionId, generateJWT, verifyJWT } from '../../utils/jwt.js';
 import type { NextApiRequest, NextApiResponse } from 'next';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'POST') {
+  const { method } = req;
+  
+  // Handle validation endpoint
+  if (method === 'POST' && req.url?.includes('/validate')) {
+    try {
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ valid: false, error: 'Missing token' });
+      }
+
+      const token = authHeader.substring(7);
+      const decoded = verifyJWT(token);
+      
+      if (!decoded || !decoded.sub) {
+        return res.status(401).json({ valid: false, error: 'Invalid token' });
+      }
+
+      return res.status(200).json({ valid: true, userId: decoded.sub });
+    } catch (error) {
+      console.error('Token validation error:', error);
+      return res.status(500).json({ valid: false, error: 'Validation failed' });
+    }
+  }
+  
+  // Original token generation endpoint
+  if (method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
