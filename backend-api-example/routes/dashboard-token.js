@@ -6,7 +6,7 @@ const router = express.Router();
 
 console.log('routes/dashboard-token.js: JWT_SECRET:', process.env.JWT_SECRET ? 'Loaded' : 'Not Loaded');
 const JWT_SECRET = process.env.JWT_SECRET;
-const ACCESS_TOKEN_EXPIRES_SECONDS = 4 * 30 * 24 * 60 * 60; // 4 months in seconds
+const ACCESS_TOKEN_EXPIRES_SECONDS = 60 * 60; // 1 hour in seconds
 
 // Unified time calculation functions (matching auth.js)
 function getCurrentEpochTime() {
