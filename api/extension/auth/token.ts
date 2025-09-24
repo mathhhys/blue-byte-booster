@@ -1,32 +1,10 @@
 import { verifyToken } from '@clerk/backend';
 import { createClient } from '@supabase/supabase-js';
-import { generateSessionId, generateJWT, verifyJWT } from '../../../src/utils/jwt.js';
 import type { NextApiRequest, NextApiResponse } from 'next';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { method } = req;
   
-  // Handle validation endpoint
-  if (method === 'POST' && req.url?.includes('/validate')) {
-    try {
-      const authHeader = req.headers.authorization;
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return res.status(401).json({ valid: false, error: 'Missing token' });
-      }
-
-      const token = authHeader.substring(7);
-      const decoded = verifyJWT(token);
-      
-      if (!decoded || !decoded.sub) {
-        return res.status(401).json({ valid: false, error: 'Invalid token' });
-      }
-
-      return res.status(200).json({ valid: true, userId: decoded.sub });
-    } catch (error) {
-      console.error('Token validation error:', error);
-      return res.status(500).json({ valid: false, error: 'Validation failed' });
-    }
-  }
   
   // Original token generation endpoint
   if (method !== 'POST') {
@@ -54,6 +32,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.log('Verifying Clerk token...');
     console.log('CLERK_SECRET_KEY length:', process.env.CLERK_SECRET_KEY ? process.env.CLERK_SECRET_KEY.length : 'unset');
     
+    const now = Math.floor(Date.now() / 1000);
     let claims: any;
     try {
       // Decode header without verification to inspect
@@ -68,7 +47,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         sub: payload.sub?.substring(0, 10) + '...'
       });
       
-      // Check if token is expired
+      // Check if token is expired (pre-verification check)
       const now = Math.floor(Date.now() / 1000);
       if (payload.exp && payload.exp < now) {
         console.error('❌ Token is expired');
@@ -77,7 +56,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           details: 'The provided token has expired'
         });
       }
-      
+
       // Try verification with different approaches
       console.log('Attempting Clerk token verification...');
       console.log('Using CLERK_SECRET_KEY length:', process.env.CLERK_SECRET_KEY?.length);
@@ -104,6 +83,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           throw method1Error; // Throw the original error
         }
       }
+
       
     } catch (verifyError) {
       const err = verifyError as Error;
@@ -120,6 +100,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         details: `JWT signature is invalid. ${err.message}`
       });
     }
+
+    // Calculate expiration from verified claims
+    const expiresIn = claims.exp - now;
+    const expiresAt = new Date(claims.exp * 1000).toISOString();
+    console.log('Clerk token expires in:', expiresIn, 'seconds');
 
     const clerkId = claims.sub;
     if (!clerkId) {
@@ -163,30 +148,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
     console.log('✅ User data fetched:', { clerk_id: userData.clerk_id, plan_type: userData.plan_type });
 
-    console.log('Generating session ID and JWT...');
-    
-    if (!process.env.JWT_SECRET) {
-      console.error('❌ JWT_SECRET is not set');
-      return res.status(500).json({ error: 'Server configuration error', details: 'JWT_SECRET not configured' });
-    }
-    
-    // Ensure userData has all required fields for JWT
-    const userDataForJWT = {
-      ...userData,
-      organization_id: null
-    };
-    
-    const sessionId = generateSessionId();
-    const accessToken = generateJWT(userDataForJWT, sessionId);
-    console.log('✅ JWT generated, length:', accessToken.length);
-
-    const expiresIn = 24 * 60 * 60; // 24 hours in seconds
-    const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
-
-    console.log('Returning success response');
+    console.log('Returning success response with Clerk token');
     res.status(200).json({
       success: true,
-      access_token: accessToken,
+      access_token: clerkToken,
       expires_in: expiresIn,
       expires_at: expiresAt,
       token_type: 'Bearer'

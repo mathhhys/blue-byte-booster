@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { verifyJWT } from '../../../src/utils/jwt.js';
+import { verifyToken } from '@clerk/backend';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -13,13 +13,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const token = authHeader.substring(7);
-    const decoded = verifyJWT(token);
+    const claims = await verifyToken(token, {
+      secretKey: process.env.CLERK_SECRET_KEY!,
+    });
     
-    if (!decoded || !decoded.sub) {
+    if (!claims || !claims.sub) {
       return res.status(401).json({ valid: false, error: 'Invalid token' });
     }
 
-    res.status(200).json({ valid: true, userId: decoded.sub });
+    res.status(200).json({ valid: true, userId: claims.sub });
   } catch (error) {
     console.error('Token validation error:', error);
     res.status(500).json({ valid: false, error: 'Validation failed' });
