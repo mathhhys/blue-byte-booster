@@ -127,7 +127,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.log('Querying users table for clerkId:', clerkId);
     const { data: userData, error } = await supabase
       .from('users')
-      .select('clerk_id, email, plan_type, credits, organization_id')
+      .select('clerk_id, email, plan_type, credits')
       .eq('clerk_id', clerkId)
       .single();
 
@@ -145,8 +145,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(500).json({ error: 'Server configuration error', details: 'JWT_SECRET not configured' });
     }
     
+    // Ensure userData has all required fields for JWT
+    const userDataForJWT = {
+      ...userData,
+      organization_id: null
+    };
+    
     const sessionId = generateSessionId();
-    const accessToken = generateJWT(userData, sessionId);
+    const accessToken = generateJWT(userDataForJWT, sessionId);
     console.log('✅ JWT generated, length:', accessToken.length);
 
     const expiresIn = 24 * 60 * 60; // 24 hours in seconds
