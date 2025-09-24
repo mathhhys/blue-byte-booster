@@ -1,6 +1,6 @@
 import { verifyToken } from '@clerk/backend';
 import { createClient } from '@supabase/supabase-js';
-import { generateSessionId, generateJWT } from '../../../api/utils/jwt.js';
+import { generateSessionId, generateJWT } from '../../utils/jwt';
 import type { NextApiRequest, NextApiResponse } from 'next';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -26,8 +26,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.log('Clerk token length:', clerkToken.length);
     console.log('Verifying Clerk token...');
     const claims = await verifyToken(clerkToken, {
-      jwtKey: process.env.CLERK_SECRET_KEY!,
-      issuer: 'https://clerk.softcodes.ai'
+      jwtKey: process.env.CLERK_SECRET_KEY!
     });
     console.log('✅ Clerk claims:', { sub: claims.sub, email: claims.email });
 
@@ -39,7 +38,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Fetch user data from Supabase (using service role for server-side)
     console.log('Creating Supabase client...');
     const supabase = createClient(
-      process.env.VITE_SUPABASE_URL!,
+      process.env.SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
       {
         auth: {
