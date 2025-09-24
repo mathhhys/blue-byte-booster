@@ -8,7 +8,7 @@ The 404 error occurred when attempting to generate a backend JWT token for the V
 **Impact**: Users cannot generate tokens for VSCode extension integration, blocking secure backend access (e.g., credits, plans).
 
 ## Solution Overview
-- Created the missing API route at [`api/dashboard-token/generate.ts`](api/dashboard-token/generate.ts).
+- Created the merged API route at [`api/extension/auth.ts`](api/extension/auth.ts) for POST /token (consolidated to avoid Vercel function limit).
 - Uses Clerk for token verification, Supabase for user data retrieval, and existing JWT utilities for signing.
 - No frontend changes needed; existing error handling (toasts, dev mock) suffices.
 - JWT expiry: 4 months (10,512,000 seconds, configurable via generateJWT param).
@@ -17,7 +17,7 @@ The 404 error occurred when attempting to generate a backend JWT token for the V
 ## Implementation Details
 
 ### API Route Code
-The full handler in [`api/dashboard-token/generate.ts`](api/dashboard-token/generate.ts):
+The full handler in [`api/extension/auth.ts`](api/extension/auth.ts) for POST /token:
 
 ```typescript
 import { NextRequest, NextResponse } from 'next/server';
