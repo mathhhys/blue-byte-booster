@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyJWT } from '../../../../src/utils/jwt';
+import { verifyJWT } from '../../../../src/utils/jwt.js';
 
 export async function POST(request: NextRequest) {
   try {

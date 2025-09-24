@@ -1,6 +1,6 @@
 import { verifyToken } from '@clerk/backend';
 import { createClient } from '@supabase/supabase-js';
-import { generateSessionId, generateJWT, verifyJWT } from '../../../src/utils/jwt';
+import { generateSessionId, generateJWT, verifyJWT } from '../../../src/utils/jwt.js';
 import type { NextApiRequest, NextApiResponse } from 'next';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {

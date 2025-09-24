@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { verifyJWT } from '../../../src/utils/jwt.ts';
+import { verifyJWT } from '../../../src/utils/jwt.js';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
