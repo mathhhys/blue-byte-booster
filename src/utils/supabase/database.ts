@@ -37,7 +37,7 @@ if (isServerEnvironment) {
 }
 
 // Helper function to get appropriate client with authentication
-async function getAuthenticatedClient() {
+export async function getAuthenticatedClient() {
   console.log('🔧 getAuthenticatedClient() called');
   console.log('- isServerEnvironment:', isServerEnvironment);
   console.log('- serverSupabase exists:', !!serverSupabase);
