@@ -203,6 +203,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/dashboard-token', dashboardTokenRoutes);
 app.use('/api/organizations', organizationsRoutes);
 app.use('/api/extension/auth', extensionAuthRoutes);
+app.use('/api/user', userRoutes);
 
 // Create Stripe checkout session
 app.post('/api/stripe/create-checkout-session', async (req, res) => {
