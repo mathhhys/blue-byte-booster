@@ -93,54 +93,6 @@ async function verifyClerkToken(token) {
   }
 }
 
-// Helper function to verify extension token
-async function verifyExtensionToken(token) {
-  try {
-    // First verify JWT signature and structure
-    const decoded = jwt.verify(token, JWT_SECRET);
-    
-    if (decoded.type !== 'extension') {
-      throw new Error('Not an extension token');
-    }
-
-    // Check if token exists and is not revoked
-    const tokenHash = require('crypto').createHash('sha256').update(token).digest('hex');
-    
-    const { data: tokenData, error } = await supabase
-      .from('extension_tokens')
-      .select('user_id, expires_at, revoked_at')
-      .eq('token_hash', tokenHash)
-      .single();
-
-    if (error || !tokenData) {
-      throw new Error('Token not found in database');
-    }
-
-    if (tokenData.revoked_at) {
-      throw new Error('Token has been revoked');
-    }
-
-    if (new Date(tokenData.expires_at) < new Date()) {
-      throw new Error('Token has expired');
-    }
-
-    // Update last_used_at
-    await supabase
-      .from('extension_tokens')
-      .update({ last_used_at: new Date().toISOString() })
-      .eq('token_hash', tokenHash);
-
-    return {
-      clerkUserId: decoded.sub,
-      userId: tokenData.user_id,
-      planType: decoded.plan
-    };
-
-  } catch (error) {
-    throw new Error('Invalid extension token: ' + error.message);
-  }
-}
-
 // Middleware to authenticate Clerk token
 const authenticateClerkToken = async (req, res, next) => {
   try {
@@ -165,67 +117,59 @@ const authenticateClerkToken = async (req, res, next) => {
       return next();
     }
 
-    let authResult;
-
+    // Try to verify as custom JWT first (for backward compatibility)
+    let decoded;
+    let clerkUserId;
+    
     try {
-      // Try extension token first
-      console.log('middleware/auth.js: Attempting extension token verification...');
-      authResult = await verifyExtensionToken(token);
-      console.log('middleware/auth.js: Extension token verified successfully');
-    } catch (extensionError) {
-      console.log('middleware/auth.js: Extension token verification failed, trying other methods...');
+      // First try custom JWT with clock tolerance
+      decoded = jwt.verify(token, JWT_SECRET, { clockTolerance: 5 });
+      clerkUserId = decoded.clerkUserId;
+      console.log('middleware/auth.js: Custom JWT token verified. Decoded:', decoded);
+    } catch (jwtError) {
+      console.log('middleware/auth.js: Custom JWT verification failed, trying Clerk token...');
       
-      // Fall back to existing Clerk/JWT verification
+      // If custom JWT fails, try Clerk token
       try {
-        // First try custom JWT with clock tolerance
-        const decoded = jwt.verify(token, JWT_SECRET, { clockTolerance: 5 });
-        authResult = { clerkUserId: decoded.clerkUserId };
-        console.log('middleware/auth.js: Custom JWT token verified');
-      } catch (jwtError) {
-        console.log('middleware/auth.js: Custom JWT verification failed, trying Clerk token...');
-        
-        // Try Clerk token
         const clerkDecoded = await verifyClerkToken(token);
-        authResult = { clerkUserId: clerkDecoded.clerkUserId };
-        console.log('middleware/auth.js: Clerk token verified');
+        clerkUserId = clerkDecoded.clerkUserId;
+        console.log('middleware/auth.js: Clerk token verified. User ID:', clerkUserId);
+      } catch (clerkError) {
+        console.error('middleware/auth.js: Both JWT and Clerk token verification failed:', clerkError);
+        return res.status(401).json({ error: 'Invalid token' });
       }
     }
 
-    if (!authResult || !authResult.clerkUserId) {
-      console.error('middleware/auth.js: No valid authentication result');
-      return res.status(401).json({ error: 'Invalid token' });
+    if (!clerkUserId) {
+      console.error('middleware/auth.js: Invalid token payload: missing clerkUserId');
+      return res.status(401).json({ error: 'Invalid token payload' });
     }
+    console.log('middleware/auth.js: Clerk User ID from token:', clerkUserId);
 
-    // Verify user exists in database (only if not already provided by extension token)
-    if (!authResult.userId) {
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('id, clerk_id, plan_type')
-        .eq('clerk_id', authResult.clerkUserId)
-        .single();
+    // Verify user exists in database
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('id, clerk_id, plan_type')
+      .eq('clerk_id', clerkUserId)
+      .single();
 
-      if (userError || !userData) {
-        console.error('middleware/auth.js: User not found in database');
-        return res.status(401).json({ error: 'User not found' });
-      }
-      
-      authResult.userId = userData.id;
-      authResult.planType = userData.plan_type;
+    if (userError || !userData) {
+      console.error('middleware/auth.js: User not found in database. Error:', userError, 'UserData:', userData);
+      return res.status(401).json({ error: 'User not found' });
     }
-
-    console.log('middleware/auth.js: Authentication successful for user:', authResult.clerkUserId);
+    console.log('middleware/auth.js: User found in database. UserData:', userData);
 
     // Add user info to request
     req.auth = {
-      clerkUserId: authResult.clerkUserId,
-      userId: authResult.userId,
-      planType: authResult.planType,
-      isAdmin: authResult.planType === 'admin'
+      clerkUserId: clerkUserId,
+      userId: userData.id,
+      planType: userData.plan_type,
+      isAdmin: userData.plan_type === 'admin' // Simple admin check
     };
 
     next();
   } catch (error) {
-    console.error('middleware/auth.js: Auth middleware error:', error);
+    console.error('middleware/auth.js: Auth middleware catch block error:', error);
     res.status(500).json({ error: 'Authentication failed' });
   }
 };
