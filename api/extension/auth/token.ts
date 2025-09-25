@@ -1,6 +1,8 @@
 import { verifyToken } from '@clerk/backend';
 import { createClient } from '@supabase/supabase-js';
 import type { NextApiRequest, NextApiResponse } from 'next';
+import crypto from 'crypto';
+import { generateExtensionJWT } from '../../../src/utils/jwt.js';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { method } = req;
@@ -137,7 +139,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.log('Querying users table for clerkId:', clerkId);
     const { data: userData, error } = await supabase
       .from('users')
-      .select('clerk_id, email, plan_type, credits')
+      .select('id, clerk_id, email, plan_type, credits')
       .eq('clerk_id', clerkId)
       .single();
 
@@ -148,12 +150,41 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
     console.log('✅ User data fetched:', { clerk_id: userData.clerk_id, plan_type: userData.plan_type });
 
-    console.log('Returning success response with Clerk token');
+    // Generate custom extension JWT
+    const mergedPayload = {
+      ...claims,
+      ...userData,
+      scope: 'vscode:auth'
+    };
+    const customToken = generateExtensionJWT(mergedPayload);
+
+    // Hash token for storage (security)
+    const tokenHash = crypto.createHash('sha256').update(customToken).digest('hex');
+
+    // Store in Supabase vscode_tokens
+    const extensionExpiresAt = new Date((now + 12096000) * 1000); // 4 months
+    const { error: insertError } = await supabase
+      .from('vscode_tokens')
+      .insert({
+        user_id: userData.id,
+        token_hash: tokenHash,
+        expires_at: extensionExpiresAt,
+        created_at: new Date()
+      });
+
+    if (insertError) {
+      console.error('Failed to store extension token:', insertError);
+      return res.status(500).json({ error: 'Failed to generate token' });
+    }
+
+    console.log('✅ Custom extension JWT generated and stored');
+
+    console.log('Returning success response with custom extension token');
     res.status(200).json({
       success: true,
-      access_token: clerkToken,
-      expires_in: expiresIn,
-      expires_at: expiresAt,
+      access_token: customToken,
+      expires_in: 12096000, // 4 months in seconds
+      expires_at: extensionExpiresAt.toISOString(),
       token_type: 'Bearer'
     });
     console.log('=== TOKEN API DEBUG END ===');
