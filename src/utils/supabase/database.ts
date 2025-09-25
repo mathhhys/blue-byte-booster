@@ -76,7 +76,6 @@ export interface User {
   plan_type: 'starter' | 'pro' | 'teams' | 'enterprise';
   credits: number;
   stripe_customer_id?: string;
-  organization_id?: string;
   vscode_session_id?: string;
   last_vscode_login?: string;
   vscode_client_version?: string;

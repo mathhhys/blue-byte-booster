@@ -5,16 +5,15 @@ export function generateSessionId(): string {
   return crypto.randomUUID()
 }
 
-export function generateJWT(userData: any, sessionId: string, expSeconds: number = 24 * 60 * 60): string {
-  const iat = Math.floor(Date.now() / 1000);
+export function generateJWT(userData: any, sessionId: string): string {
   const payload = {
     sub: userData.clerk_id,
     email: userData.email,
     session_id: sessionId,
     org_id: userData.organization_id,
     plan: userData.plan_type,
-    iat,
-    exp: iat + expSeconds, // Custom expiration
+    iat: Math.floor(Date.now() / 1000),
+    exp: Math.floor(Date.now() / 1000) + (24 * 60 * 60), // 24 hours
     iss: 'softcodes.ai',
     aud: 'vscode-extension'
   }

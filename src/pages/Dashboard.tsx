@@ -259,16 +259,10 @@ const Dashboard = () => {
         throw new Error('Failed to get Clerk authentication token');
       }
       
-      // Decode token payload for inspection (no verification needed) - browser-safe
+      // Decode token payload for inspection (no verification needed)
       try {
         const payloadB64 = clerkToken.split('.')[1];
-        // Browser-safe base64 decode
-        const binaryString = atob(payloadB64);
-        const bytes = new Uint8Array(binaryString.length);
-        for (let i = 0; i < binaryString.length; i++) {
-          bytes[i] = binaryString.charCodeAt(i);
-        }
-        const payloadJson = new TextDecoder().decode(bytes);
+        const payloadJson = Buffer.from(payloadB64, 'base64').toString();
         const payload = JSON.parse(payloadJson);
         const now = Math.floor(Date.now() / 1000);
         console.log('🔍 [DASHBOARD] Decoded Clerk token payload:');

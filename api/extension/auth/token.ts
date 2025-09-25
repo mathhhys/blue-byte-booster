@@ -1,8 +1,6 @@
 import { verifyToken } from '@clerk/backend';
+import { createClient } from '@supabase/supabase-js';
 import type { NextApiRequest, NextApiResponse } from 'next';
-import jwt from 'jsonwebtoken';
-import crypto from 'crypto';
-import { userOperations } from '../../../src/utils/supabase/database.js';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { method } = req;
@@ -105,63 +103,59 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
+    // Calculate expiration from verified claims
+    const expiresIn = claims.exp - now;
+    const expiresAt = new Date(claims.exp * 1000).toISOString();
+    console.log('Clerk token expires in:', expiresIn, 'seconds');
+
     const clerkId = claims.sub;
     if (!clerkId) {
       return res.status(401).json({ error: 'Invalid Clerk token' });
     }
 
-    // Fetch user data using shared operations (ensures consistent server-side client and RLS handling)
-    console.log('🔧 Using userOperations.getUserByClerkId for clerkId:', clerkId);
-    console.log('Env check before query: SUPABASE_SERVICE_ROLE_KEY present:', !!process.env.SUPABASE_SERVICE_ROLE_KEY);
-    const { data: userData, error: userError } = await userOperations.getUserByClerkId(clerkId);
+    // Fetch user data from Supabase (using service role for server-side)
+    console.log('Creating Supabase client...');
+    const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
     
-    console.log('userOperations result:', { data: !!userData, error: userError?.message || userError });
-    if (userError || !userData) {
-      console.error('User fetch error via userOperations:', userError || 'No user data returned');
+    if (!supabaseUrl || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      console.error('❌ Missing Supabase configuration');
+      console.error('SUPABASE_URL:', !!supabaseUrl);
+      console.error('SUPABASE_SERVICE_ROLE_KEY:', !!process.env.SUPABASE_SERVICE_ROLE_KEY);
+      return res.status(500).json({ error: 'Server configuration error', details: 'Missing Supabase configuration' });
+    }
+    
+    const supabase = createClient(
+      supabaseUrl,
+      process.env.SUPABASE_SERVICE_ROLE_KEY,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    );
+    console.log('✅ Supabase client created');
+
+    console.log('Querying users table for clerkId:', clerkId);
+    const { data: userData, error } = await supabase
+      .from('users')
+      .select('clerk_id, email, plan_type, credits')
+      .eq('clerk_id', clerkId)
+      .single();
+
+    console.log('Supabase query result:', { data: !!userData, error: error?.message });
+    if (error || !userData) {
+      console.error('User fetch error:', error);
       return res.status(404).json({ error: 'User not found in database' });
     }
-    console.log('✅ User data fetched via userOperations:', {
-      clerk_id: userData.clerk_id,
-      email: userData.email,
-      plan_type: userData.plan_type,
-      credits: userData.credits,
-      organization_id: userData.organization_id
-    });
+    console.log('✅ User data fetched:', { clerk_id: userData.clerk_id, plan_type: userData.plan_type });
 
-    // Generate long-lived custom JWT for VSCode extension (inline to avoid import issues)
-    const sessionId = crypto.randomUUID();
-    const FOUR_MONTHS_SECONDS = 4 * 30 * 24 * 60 * 60; // 4 months approx
-    const iat = Math.floor(Date.now() / 1000);
-    const payload = {
-      sub: userData.clerk_id,
-      email: userData.email,
-      session_id: sessionId,
-      org_id: userData.organization_id || null,
-      plan: userData.plan_type,
-      iat,
-      exp: iat + FOUR_MONTHS_SECONDS,
-      iss: 'softcodes.ai',
-      aud: 'vscode-extension'
-    };
-    const customToken = jwt.sign(payload, process.env.JWT_SECRET!, { header: { alg: 'HS256', kid: 'softcodes-jwt-v1' } });
-    const customExpiresIn = FOUR_MONTHS_SECONDS;
-    const customExpiresAt = new Date((iat + FOUR_MONTHS_SECONDS) * 1000).toISOString();
-
-    // Log token header for debugging
-    const header = JSON.parse(Buffer.from(customToken.split('.')[0], 'base64').toString());
-    console.log('🔧 Generated JWT header:', { alg: header.alg, kid: header.kid });
-
-    console.log('🔧 Generated custom long-lived JWT for extension:');
-    console.log('  - Expires in:', customExpiresIn, 'seconds (~4 months)');
-    console.log('  - Expires at:', customExpiresAt);
-    console.log('  - Token preview:', customToken.substring(0, 50) + '...');
-
-    console.log('Returning success response with custom extension token');
+    console.log('Returning success response with Clerk token');
     res.status(200).json({
       success: true,
-      access_token: customToken,
-      expires_in: customExpiresIn,
-      expires_at: customExpiresAt,
+      access_token: clerkToken,
+      expires_in: expiresIn,
+      expires_at: expiresAt,
       token_type: 'Bearer'
     });
     console.log('=== TOKEN API DEBUG END ===');
