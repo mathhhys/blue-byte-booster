@@ -246,10 +246,36 @@ const Dashboard = () => {
       console.log('Clerk User ID:', user.id);
       
       // Get Clerk session token for backend authentication
+      const beforeGetToken = Date.now();
+      console.log('🔍 [DASHBOARD] Time before getToken():', new Date(beforeGetToken).toISOString(), 'Unix:', Math.floor(beforeGetToken / 1000));
+      
       const clerkToken = await getToken();
+      
+      const afterGetToken = Date.now();
+      console.log('🔍 [DASHBOARD] Time after getToken():', new Date(afterGetToken).toISOString(), 'Unix:', Math.floor(afterGetToken / 1000));
+      console.log('🔍 [DASHBOARD] getToken() took:', afterGetToken - beforeGetToken, 'ms');
       
       if (!clerkToken) {
         throw new Error('Failed to get Clerk authentication token');
+      }
+      
+      // Decode token payload for inspection (no verification needed)
+      try {
+        const payloadB64 = clerkToken.split('.')[1];
+        const payloadJson = Buffer.from(payloadB64, 'base64').toString();
+        const payload = JSON.parse(payloadJson);
+        const now = Math.floor(Date.now() / 1000);
+        console.log('🔍 [DASHBOARD] Decoded Clerk token payload:');
+        console.log('  - iss:', payload.iss);
+        console.log('  - iat:', payload.iat, '(Date:', new Date(payload.iat * 1000).toISOString(), ')');
+        console.log('  - exp:', payload.exp, '(Date:', new Date(payload.exp * 1000).toISOString(), ')');
+        console.log('  - nbf:', payload.nbf, '(Date:', new Date(payload.nbf * 1000).toISOString(), ')');
+        console.log('  - sub (first 10 chars):', payload.sub?.substring(0, 10) + '...');
+        console.log('  - Current Unix time:', now);
+        console.log('  - iat vs now:', payload.iat - now, 'seconds (positive = future)');
+        console.log('  - Duration (exp - iat):', (payload.exp || 0) - payload.iat, 'seconds');
+      } catch (decodeError) {
+        console.error('🔍 [DASHBOARD] Failed to decode token payload:', decodeError);
       }
       
       console.log('Got Clerk auth token, calling backend to generate JWT...');

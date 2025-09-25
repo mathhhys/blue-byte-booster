@@ -38,17 +38,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // Decode header without verification to inspect
       const header = JSON.parse(Buffer.from(clerkToken.split('.')[0], 'base64').toString());
       const payload = JSON.parse(Buffer.from(clerkToken.split('.')[1], 'base64').toString());
+      const now = Math.floor(Date.now() / 1000);
+      console.log('🔍 [BACKEND] Current server time:', new Date(now * 1000).toISOString(), 'Unix:', now);
       console.log('Token header:', { alg: header.alg, kid: header.kid, iss: header.iss });
-      console.log('Token payload preview:', {
-        iss: payload.iss,
-        aud: payload.aud,
-        exp: payload.exp,
-        iat: payload.iat,
-        sub: payload.sub?.substring(0, 10) + '...'
-      });
+      console.log('🔍 [BACKEND] Decoded Clerk token payload:');
+      console.log('  - iss:', payload.iss);
+      console.log('  - iat:', payload.iat, '(Date:', new Date(payload.iat * 1000).toISOString(), ')');
+      console.log('  - exp:', payload.exp, '(Date:', new Date(payload.exp * 1000).toISOString(), ')');
+      console.log('  - nbf:', payload.nbf, '(Date:', new Date(payload.nbf * 1000).toISOString(), ')');
+      console.log('  - sub (first 10 chars):', payload.sub?.substring(0, 10) + '...');
+      console.log('  - iat vs now:', payload.iat - now, 'seconds (positive = future)');
+      console.log('  - Duration (exp - iat):', (payload.exp || 0) - payload.iat, 'seconds');
       
       // Check if token is expired (pre-verification check)
-      const now = Math.floor(Date.now() / 1000);
       if (payload.exp && payload.exp < now) {
         console.error('❌ Token is expired');
         return res.status(401).json({
