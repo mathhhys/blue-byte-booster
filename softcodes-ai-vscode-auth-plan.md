@@ -104,9 +104,11 @@ The handler will receive the callback URI, from which it must extract the author
 The extension makes a backend request to exchange the `authorization_code` for access and refresh tokens.
 
 -   **Action:**
-    1.  Make a `POST` request to the backend's `/api/auth/token` endpoint.
-    2.  Include `authorization_code`, the original `code_verifier` (retrieved from secure storage), `state`, and `redirect_uri` in the request body.
-    3.  Receive and parse the `access_token` and `refresh_token` from the response.
+  1.  Make a `POST` request to the backend's `/api/auth/token` endpoint.
+  2.  Include `authorization_code`, the original `code_verifier` (retrieved from secure storage), `state`, and `redirect_uri` in the request body.
+  3.  The backend verifies the code with Clerk, fetches user data using standardized `userOperations.getUserByClerkId` from `src/utils/supabase/database.ts` (ensures consistent server-side Supabase client with service role key and robust error handling for user lookup).
+  4.  Backend generates and returns long-lived JWT `access_token` (4 months expiry) and `refresh_token`.
+  5.  Extension parses the response.
 
 ---
 

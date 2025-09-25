@@ -1,8 +1,8 @@
 import { verifyToken } from '@clerk/backend';
-import { createClient } from '@supabase/supabase-js';
 import type { NextApiRequest, NextApiResponse } from 'next';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
+import { userOperations } from '../../../src/utils/supabase/database.js';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { method } = req;
@@ -110,42 +110,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(401).json({ error: 'Invalid Clerk token' });
     }
 
-    // Fetch user data from Supabase (using service role for server-side)
-    console.log('Creating Supabase client...');
-    const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+    // Fetch user data using shared operations (ensures consistent server-side client and RLS handling)
+    console.log('🔧 Using userOperations.getUserByClerkId for clerkId:', clerkId);
+    console.log('Env check before query: SUPABASE_SERVICE_ROLE_KEY present:', !!process.env.SUPABASE_SERVICE_ROLE_KEY);
+    const { data: userData, error: userError } = await userOperations.getUserByClerkId(clerkId);
     
-    if (!supabaseUrl || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      console.error('❌ Missing Supabase configuration');
-      console.error('SUPABASE_URL:', !!supabaseUrl);
-      console.error('SUPABASE_SERVICE_ROLE_KEY:', !!process.env.SUPABASE_SERVICE_ROLE_KEY);
-      return res.status(500).json({ error: 'Server configuration error', details: 'Missing Supabase configuration' });
-    }
-    
-    const supabase = createClient(
-      supabaseUrl,
-      process.env.SUPABASE_SERVICE_ROLE_KEY,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      }
-    );
-    console.log('✅ Supabase client created');
-
-    console.log('Querying users table for clerkId:', clerkId);
-    const { data: userData, error } = await supabase
-      .from('users')
-      .select('clerk_id, email, plan_type, credits, organization_id')
-      .eq('clerk_id', clerkId)
-      .single();
-
-    console.log('Supabase query result:', { data: !!userData, error: error?.message });
-    if (error || !userData) {
-      console.error('User fetch error:', error);
+    console.log('userOperations result:', { data: !!userData, error: userError?.message || userError });
+    if (userError || !userData) {
+      console.error('User fetch error via userOperations:', userError || 'No user data returned');
       return res.status(404).json({ error: 'User not found in database' });
     }
-    console.log('✅ User data fetched:', { clerk_id: userData.clerk_id, plan_type: userData.plan_type });
+    console.log('✅ User data fetched via userOperations:', {
+      clerk_id: userData.clerk_id,
+      email: userData.email,
+      plan_type: userData.plan_type,
+      credits: userData.credits,
+      organization_id: userData.organization_id
+    });
 
     // Generate long-lived custom JWT for VSCode extension (inline to avoid import issues)
     const sessionId = crypto.randomUUID();
