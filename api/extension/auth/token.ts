@@ -1,6 +1,8 @@
 import { verifyToken } from '@clerk/backend';
 import { createClient } from '@supabase/supabase-js';
 import type { NextApiRequest, NextApiResponse } from 'next';
+import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { method } = req;
@@ -103,11 +105,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    // Calculate expiration from verified claims
-    const expiresIn = claims.exp - now;
-    const expiresAt = new Date(claims.exp * 1000).toISOString();
-    console.log('Clerk token expires in:', expiresIn, 'seconds');
-
     const clerkId = claims.sub;
     if (!clerkId) {
       return res.status(401).json({ error: 'Invalid Clerk token' });
@@ -139,7 +136,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.log('Querying users table for clerkId:', clerkId);
     const { data: userData, error } = await supabase
       .from('users')
-      .select('clerk_id, email, plan_type, credits')
+      .select('clerk_id, email, plan_type, credits, organization_id')
       .eq('clerk_id', clerkId)
       .single();
 
@@ -150,12 +147,36 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
     console.log('✅ User data fetched:', { clerk_id: userData.clerk_id, plan_type: userData.plan_type });
 
-    console.log('Returning success response with Clerk token');
+    // Generate long-lived custom JWT for VSCode extension (inline to avoid import issues)
+    const sessionId = crypto.randomUUID();
+    const FOUR_MONTHS_SECONDS = 4 * 30 * 24 * 60 * 60; // 4 months approx
+    const iat = Math.floor(Date.now() / 1000);
+    const payload = {
+      sub: userData.clerk_id,
+      email: userData.email,
+      session_id: sessionId,
+      org_id: userData.organization_id || null,
+      plan: userData.plan_type,
+      iat,
+      exp: iat + FOUR_MONTHS_SECONDS,
+      iss: 'softcodes.ai',
+      aud: 'vscode-extension'
+    };
+    const customToken = jwt.sign(payload, process.env.JWT_SECRET!);
+    const customExpiresIn = FOUR_MONTHS_SECONDS;
+    const customExpiresAt = new Date((iat + FOUR_MONTHS_SECONDS) * 1000).toISOString();
+
+    console.log('🔧 Generated custom long-lived JWT for extension:');
+    console.log('  - Expires in:', customExpiresIn, 'seconds (~4 months)');
+    console.log('  - Expires at:', customExpiresAt);
+    console.log('  - Token preview:', customToken.substring(0, 50) + '...');
+
+    console.log('Returning success response with custom extension token');
     res.status(200).json({
       success: true,
-      access_token: clerkToken,
-      expires_in: expiresIn,
-      expires_at: expiresAt,
+      access_token: customToken,
+      expires_in: customExpiresIn,
+      expires_at: customExpiresAt,
       token_type: 'Bearer'
     });
     console.log('=== TOKEN API DEBUG END ===');
