@@ -11,6 +11,34 @@
       "destination": "/api/extension/auth/callback"
     },
     {
+      "source": "/api/stripe/:action",
+      "destination": "/api/stripe/[action]"
+    },
+    {
+      "source": "/api/extension/auth/:action",
+      "destination": "/api/extension/auth/[action]"
+    },
+    {
+      "source": "/api/user/:action",
+      "destination": "/api/user/[action]"
+    },
+    {
+      "source": "/api/billing/credit-purchase",
+      "destination": "/api/billing/credit-purchase"
+    },
+    {
+      "source": "/api/clerk/webhooks",
+      "destination": "/api/clerk/webhooks"
+    },
+    {
+      "source": "/api/starter/process-signup",
+      "destination": "/api/starter/process-signup"
+    },
+    {
+      "source": "/api/stripe/webhooks",
+      "destination": "/api/stripe/webhooks"
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
@@ -20,27 +48,25 @@
       "maxDuration": 10,
       "memory": 512
     },
-    "api/user/get.ts": {
-      "maxDuration": 10
-    },
-    "api/user/initialize.ts": {
-      "maxDuration": 10
-    },
-    "api/stripe/create-checkout-session.js": {
+    "api/billing/credit-purchase.js": {
       "maxDuration": 30,
       "memory": 512
     },
-    "api/stripe/session-status.js": {
-      "maxDuration": 10
-    },
-    "api/stripe/process-payment-success.js": {
+    "api/stripe/[action].js": {
       "maxDuration": 30,
       "memory": 512
     },
-    "api/stripe/create-customer-portal-session.js": {
+    "api/extension/auth/[action].ts": {
+      "maxDuration": 10
+    },
+    "api/user/[action].ts": {
       "maxDuration": 10
     },
     "api/starter/process-signup.js": {
+      "maxDuration": 30,
+      "memory": 512
+    },
+    "api/stripe/webhooks.js": {
       "maxDuration": 30,
       "memory": 512
     }
@@ -67,6 +93,40 @@
     },
     {
       "source": "/api/extension/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET, POST, OPTIONS"
+        },
+        {
+          "key": "Access-Control-Allow-Headers",
+          "value": "Content-Type, Authorization"
+        }
+      ]
+    },
+    {
+      "source": "/api/stripe/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET, POST, OPTIONS"
+        },
+        {
+          "key": "Access-Control-Allow-Headers",
+          "value": "Content-Type, Authorization"
+        }
+      ]
+    },
+    {
+      "source": "/api/user/(.*)",
       "headers": [
         {
           "key": "Access-Control-Allow-Origin",
