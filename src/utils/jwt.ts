@@ -34,20 +34,6 @@ export function generateRefreshToken(userData: any, sessionId: string): string {
   return jwt.sign(payload, process.env.JWT_SECRET!)
 }
 
-export function generateExtensionJWT(payload: any): string {
-  const now = Math.floor(Date.now() / 1000);
-  const extensionPayload = {
-    ...payload,
-    iat: now,
-    exp: now + 12096000, // 4 months (4 * 30 * 24 * 60 * 60 seconds)
-    iss: 'softcodes.ai',
-    aud: 'vscode-extension',
-    scope: 'vscode:auth'
-  };
-  
-  return jwt.sign(extensionPayload, process.env.JWT_SECRET!);
-}
-
 export async function generateCodeChallenge(codeVerifier: string): Promise<string> {
   // For Node.js environment, use crypto module
   const hash = crypto.createHash('sha256').update(codeVerifier).digest()
