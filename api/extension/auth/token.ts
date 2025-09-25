@@ -143,9 +143,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       iss: 'softcodes.ai',
       aud: 'vscode-extension'
     };
-    const customToken = jwt.sign(payload, process.env.JWT_SECRET!);
+    const customToken = jwt.sign(payload, process.env.JWT_SECRET!, { header: { alg: 'HS256', kid: 'softcodes-jwt-v1' } });
     const customExpiresIn = FOUR_MONTHS_SECONDS;
     const customExpiresAt = new Date((iat + FOUR_MONTHS_SECONDS) * 1000).toISOString();
+
+    // Log token header for debugging
+    const header = JSON.parse(Buffer.from(customToken.split('.')[0], 'base64').toString());
+    console.log('🔧 Generated JWT header:', { alg: header.alg, kid: header.kid });
 
     console.log('🔧 Generated custom long-lived JWT for extension:');
     console.log('  - Expires in:', customExpiresIn, 'seconds (~4 months)');
