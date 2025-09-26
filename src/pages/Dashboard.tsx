@@ -527,12 +527,14 @@ const Dashboard = () => {
         {/* Sidebar */}
         <Sidebar className="border-r border-[#2a2a2a] bg-[#161616]">
           <SidebarHeader className="p-4 border-b border-[#2a2a2a]">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-                <Code className="w-5 h-5 text-white" />
-              </div>
-              <span className="font-semibold text-white">Softcodes</span>
-            </div>
+            <Link to="/" className="relative w-8 h-8 overflow-hidden" style={{ display: "inline-block" }}>
+              <img
+                src="https://xraquejellmoyrpqcirs.supabase.co/storage/v1/object/public/softcodes-logo/softcodes%20logo%20navbar%20desktop%20not%20scrolled.svg"
+                alt="Softcodes Logo"
+                className="w-8 h-8 object-contain"
+                loading="eager"
+              />
+            </Link>
           </SidebarHeader>
 
           <SidebarContent className="p-4">
