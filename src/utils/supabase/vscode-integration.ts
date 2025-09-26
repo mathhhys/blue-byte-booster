@@ -16,6 +16,9 @@ export interface VSCodeSession {
   created_at: string
   last_used_at: string
   is_active: boolean
+  user_email?: string
+  plan_type?: string
+  organization_id?: string
 }
 
 export class VSCodeIntegrationService {
@@ -59,19 +62,27 @@ export class VSCodeIntegrationService {
     userId: string
     sessionId: string
     accessToken: string
+    refreshToken?: string
     expiresAt: Date
     clientInfo?: any
+    userEmail?: string
+    planType?: string
+    orgId?: string
   }): Promise<VSCodeSession> {
     
     const sessionData = {
       user_id: data.userId,
       session_id: data.sessionId,
       access_token: data.accessToken,
+      refresh_token: data.refreshToken,
       expires_at: data.expiresAt.toISOString(),
       client_info: data.clientInfo || {},
       created_at: new Date().toISOString(),
       last_used_at: new Date().toISOString(),
-      is_active: true
+      is_active: true,
+      user_email: data.userEmail,
+      plan_type: data.planType,
+      organization_id: data.orgId
     }
 
     const { data: session, error } = await supabase
@@ -111,15 +122,20 @@ export class VSCodeIntegrationService {
   static async deactivateVSCodeSession(sessionId: string): Promise<void> {
     const { error } = await supabase
       .from('vscode_sessions')
-      .update({ 
+      .update({
         is_active: false,
         updated_at: new Date().toISOString()
       })
       .eq('session_id', sessionId)
-
+  
     if (error) throw error
   }
-
+  
+  static async refreshVSCodeSession(oldSessionId: string, newData: any): Promise<VSCodeSession> {
+    await this.deactivateVSCodeSession(oldSessionId);
+    return this.createVSCodeSession(newData);
+  }
+  
   static async getUserCredits(clerkId: string): Promise<number> {
     const { data, error } = await supabase
       .from('users')

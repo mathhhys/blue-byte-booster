@@ -34,7 +34,8 @@
 
     /* Interop Constraints */
     "forceConsistentCasingInFileNames": true,
-    "allowJs": true
+    "allowJs": true,
+    "allowImportingTsExtensions": true
   },
   "include": [
     "api/**/*"

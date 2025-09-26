@@ -1,6 +1,8 @@
 import { verifyToken } from '@clerk/backend';
 import { createClient } from '@supabase/supabase-js';
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { generateJWT, generateRefreshToken, generateSessionId } from '../../../src/utils/jwt.ts';
+import { VSCodeIntegrationService } from '../../../src/utils/supabase/vscode-integration.ts';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { method } = req;
@@ -139,7 +141,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.log('Querying users table for clerkId:', clerkId);
     const { data: userData, error } = await supabase
       .from('users')
-      .select('clerk_id, email, plan_type, credits')
+      .select('clerk_id, email, plan_type, credits, organization_id')
       .eq('clerk_id', clerkId)
       .single();
 
@@ -150,13 +152,36 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
     console.log('✅ User data fetched:', { clerk_id: userData.clerk_id, plan_type: userData.plan_type });
 
-    console.log('Returning success response with Clerk token');
+    // Generate custom JWT pair
+    const sessionId = generateSessionId();
+    const accessToken = generateJWT(userData, sessionId);
+    const refreshToken = generateRefreshToken(userData, sessionId);
+
+    // Create session in Supabase
+    const customExpiresAt = new Date(Date.now() + 3600 * 1000); // 1 hour
+    await VSCodeIntegrationService.createVSCodeSession({
+      userId: userData.clerk_id,
+      sessionId,
+      accessToken,
+      refreshToken,
+      expiresAt: customExpiresAt,
+      clientInfo: { source: 'dashboard' },
+      userEmail: userData.email,
+      planType: userData.plan_type,
+      orgId: userData.organization_id || null
+    });
+
+    const customExpiresIn = 3600; // 1 hour in seconds
+
+    console.log('Custom tokens generated and session created');
     res.status(200).json({
       success: true,
-      access_token: clerkToken,
-      expires_in: expiresIn,
-      expires_at: expiresAt,
-      token_type: 'Bearer'
+      access_token: accessToken,
+      refresh_token: refreshToken,
+      expires_in: customExpiresIn,
+      expires_at: customExpiresAt.toISOString(),
+      token_type: 'Bearer',
+      session_id: sessionId
     });
     console.log('=== TOKEN API DEBUG END ===');
 
