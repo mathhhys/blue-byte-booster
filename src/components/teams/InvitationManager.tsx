@@ -114,8 +114,8 @@ export const InvitationManager: React.FC<InvitationManagerProps> = ({
     setError(null);
 
     try {
-      const success = await revokeInvitation(invitation.clerk_invitation_id, invitation.id, subscriptionId);
-
+      const success = await revokeInvitation(invitation.clerk_invitation_id, invitation.id);
+      
       if (success) {
         setSuccess(`Invitation to ${invitation.email} has been revoked`);
         await loadInvitations(); // Reload to show updated status
