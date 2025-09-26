@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useOrganization } from '@clerk/nextjs';
-import { createClient } from '@/utils/supabase/client';
+import { createSupabaseClient as createClient } from '@/utils/supabase/client';
 import { useToast } from './use-toast';
 
 export function useOrganizationSeats() {

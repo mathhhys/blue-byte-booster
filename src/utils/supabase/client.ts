@@ -1,40 +1,27 @@
-import { createBrowserClient } from "@supabase/ssr";
+import { createClient } from '@supabase/supabase-js';
 
-// Handle environment variables properly for Vite
-const getEnvVar = (name: string): string | undefined => {
-  // In Vite, environment variables are available via import.meta.env
-  return (import.meta as any).env?.[name] || process.env[name];
-};
-
-const supabaseUrl = getEnvVar('VITE_SUPABASE_URL') ||
-                   getEnvVar('NEXT_PUBLIC_SUPABASE_URL');
-
-const supabaseKey = getEnvVar('VITE_SUPABASE_ANON_KEY') ||
-                   getEnvVar('NEXT_PUBLIC_SUPABASE_ANON_KEY');
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 console.log('🔧 Supabase Client Debug:');
 console.log('- URL:', supabaseUrl ? 'Set' : 'Missing');
-console.log('- Anon Key:', supabaseKey ? 'Set' : 'Missing');
+console.log('- Anon Key:', supabaseAnonKey ? 'Set' : 'Missing');
 
-if (!supabaseUrl || !supabaseKey) {
+if (!supabaseUrl || !supabaseAnonKey) {
   console.error('❌ Supabase environment variables are missing!');
-  console.error('- VITE_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_URL is required');
-  console.error('- VITE_SUPABASE_ANON_KEY or NEXT_PUBLIC_SUPABASE_ANON_KEY is required');
+  console.error('- VITE_SUPABASE_URL is required');
+  console.error('- VITE_SUPABASE_ANON_KEY is required');
 }
-
-export const createClient = () => {
-  if (!supabaseUrl || !supabaseKey) {
+export const createSupabaseClient = () => {
+  if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error('Supabase environment variables are not configured. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.');
   }
 
-  const client = createBrowserClient(
+  const client = createClient(
     supabaseUrl,
-    supabaseKey,
+    supabaseAnonKey,
   );
 
-  console.log('🔧 Created Supabase browser client');
+  console.log('🔧 Created Supabase client');
   return client;
 };
-
-// Export a default instance for convenience
-export const supabase = createClient();
