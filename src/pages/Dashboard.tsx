@@ -527,9 +527,9 @@ const Dashboard = () => {
         {/* Sidebar */}
         <Sidebar className="border-r border-[#2a2a2a] bg-[#161616]">
           <SidebarHeader className="p-4 border-b border-[#2a2a2a]">
-            <Link to="/" className="relative w-8 h-8 overflow-hidden" style={{ display: "inline-block" }}>
+            <Link to="/" className="w-8 h-8">
               <img
-                src="https://xraquejellmoyrpqcirs.supabase.co/storage/v1/object/public/softcodes-logo/softcodes%20logo%20navbar%20desktop%20not%20scrolled.svg"
+                src="https://xraquejellmoyrpqcirs.supabase.co/storage/v1/object/public/softcodes-logo/64f13509d1c4365f30a60404_logo%20softcodes_-p-500.svg"
                 alt="Softcodes Logo"
                 className="w-8 h-8 object-contain"
                 loading="eager"
