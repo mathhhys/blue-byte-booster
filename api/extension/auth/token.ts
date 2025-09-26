@@ -1,8 +1,8 @@
 import { verifyToken } from '@clerk/backend';
 import { createClient } from '@supabase/supabase-js';
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { generateJWT, generateRefreshToken, generateSessionId } from '../../../src/utils/jwt.ts';
-import { VSCodeIntegrationService } from '../../../src/utils/supabase/vscode-integration.ts';
+import { generateJWT, generateRefreshToken, generateSessionId } from '../../../src/utils/jwt.js';
+import { VSCodeIntegrationService } from '../../../src/utils/supabase/vscode-integration.js';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { method } = req;

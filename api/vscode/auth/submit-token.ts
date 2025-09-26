@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { verifyJWT } from '../../../src/utils/jwt';
+import { verifyJWT } from '../../../src/utils/jwt.js';
 import { createClient } from '@supabase/supabase-js';
-import { VSCodeIntegrationService } from '../../../src/utils/supabase/vscode-integration';
+import { VSCodeIntegrationService } from '../../../src/utils/supabase/vscode-integration.js';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
