@@ -526,12 +526,12 @@ const Dashboard = () => {
       <SidebarProvider>
         {/* Sidebar */}
         <Sidebar className="border-r border-[#2a2a2a] bg-[#161616]">
-          <SidebarHeader className="p-4 border-b border-[#2a2a2a]">
-            <Link to="/" className="w-8 h-8">
+          <SidebarHeader className="h-32 flex items-center justify-center p-0 border-b border-[#2a2a2a]">
+            <Link to="/" className="mt-0 mb-0 relative w-32 h-32 overflow-hidden" style={{ display: "inline-block" }}>
               <img
-                src="https://xraquejellmoyrpqcirs.supabase.co/storage/v1/object/public/softcodes-logo/64f13509d1c4365f30a60404_logo%20softcodes_-p-500.svg"
+                src="https://xraquejellmoyrpqcirs.supabase.co/storage/v1/object/public/softcodes-logo/softcodes%20logo%20navbar%20desktop%20not%20scrolled.svg"
                 alt="Softcodes Logo"
-                className="w-8 h-8 object-contain"
+                className="w-32 h-32 object-contain"
                 loading="eager"
               />
             </Link>
