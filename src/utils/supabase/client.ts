@@ -25,3 +25,5 @@ export const createSupabaseClient = () => {
   console.log('🔧 Created Supabase client');
   return client;
 };
+
+export default createSupabaseClient();

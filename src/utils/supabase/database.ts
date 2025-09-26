@@ -1,4 +1,4 @@
-import { supabase } from './client.js';
+import supabase from './client';
 import { createClient } from '@supabase/supabase-js';
 
 // Check if we're in a server environment (Node.js/API routes)
