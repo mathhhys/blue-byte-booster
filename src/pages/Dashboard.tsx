@@ -96,8 +96,6 @@ const Dashboard = () => {
 
   // Extension token state
   const [extensionToken, setExtensionToken] = useState<string>('');
-  const [refreshTokenValue, setRefreshTokenValue] = useState<string>(''); // Hidden for security
-  const [tokenExpiry, setTokenExpiry] = useState<number>(0);
   const [isGenerating, setIsGenerating] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
   const [autoRenew, setAutoRenew] = useState(true);
@@ -309,13 +307,11 @@ const Dashboard = () => {
       
       if (data.success && data.access_token) {
         setExtensionToken(data.access_token);
-        setRefreshTokenValue(data.refresh_token || ''); // Store for potential use
-        setTokenExpiry(data.expires_in);
         console.log('✅ Generated backend JWT token for VSCode extension');
         
         toast({
-          title: "Tokens Generated",
-          description: `Access token expires in ${Math.floor(data.expires_in / 60)} minutes. The refresh token enables auto-renewal in the extension.`,
+          title: "Token Generated",
+          description: `Backend JWT token generated successfully. Expires in ${Math.floor(data.expires_in / 60)} minutes.`,
         });
       } else {
         throw new Error('Backend returned invalid response');
@@ -327,16 +323,13 @@ const Dashboard = () => {
       
       // Fallback to a mock token for development
       if (import.meta.env.DEV) {
-        const mockAccess = `mock_access_${user.id}_${Date.now()}`;
-        const mockRefresh = `mock_refresh_${user.id}_${Date.now()}`;
-        setExtensionToken(mockAccess);
-        setRefreshTokenValue(mockRefresh);
-        setTokenExpiry(3600);
-        console.log('🔧 Using mock tokens for development');
+        const mockToken = `backend_mock_token_${user.id}_${Date.now()}`;
+        setExtensionToken(mockToken);
+        console.log('🔧 Using mock backend token for development:', mockToken);
         
         toast({
           title: "Development Mode",
-          description: "Using mock tokens for development",
+          description: "Using mock backend token for development",
         });
       } else {
         toast({
@@ -914,7 +907,7 @@ const Dashboard = () => {
                   </Button>
                 ) : (
                   <div className="space-y-3">
-                    <div className="text-sm font-medium text-white">Access Token (Copy for VSCode):</div>
+                    <div className="text-sm font-medium text-white">Your Extension Token:</div>
                     <div className="flex gap-2">
                       <Input
                         value={extensionToken}
@@ -939,11 +932,8 @@ const Dashboard = () => {
                         )}
                       </Button>
                     </div>
-                    <div className="text-xs text-gray-400">
-                      Expires in {Math.floor(tokenExpiry / 60)} minutes. The extension will auto-refresh using the refresh token.
-                    </div>
                     <div className="text-xs text-gray-500">
-                      Paste this access token into your VSCode extension settings. It will handle automatic renewal.
+                      This is your backend JWT token. Use this token in your VSCode extension settings.
                     </div>
                   </div>
                 )}
