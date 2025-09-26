@@ -101,17 +101,87 @@ export async function handleMemberLeave(orgId: string, userId: string) {
 }
 
 // Client-side wrapper for UI (e.g., in InvitationManager)
-export const useInvitations = () => {
+export const useTeamInvitations = () => {
   const { toast } = useToast();
 
-  const inviteMember = async (email: string, orgId: string, inviterId: string) => {
+  const sendInvitationHook = async (email: string, subscriptionId: string, inviterId: string) => {
     try {
-      await sendInvitation(email, orgId, inviterId);
+      // Call API endpoint to send invitation
+      const response = await fetch('/api/organization/invitations/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, subscriptionId, inviterId }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to send invitation');
+      }
+
+      const result = await response.json();
       toast({ title: 'Success', description: 'Invitation sent. Seat reserved.' });
+      return { success: true, invitation: result.invitation };
     } catch (error: any) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      return { success: false, error: error.message };
     }
   };
 
-  return { inviteMember };
+  const revokeInvitation = async (invitationId: string, dbInvitationId?: string, organizationId?: string) => {
+    try {
+      // Call API endpoint to revoke invitation
+      const response = await fetch('/api/organization/invitations/revoke', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ invitationId, dbInvitationId, organizationId }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to revoke invitation');
+      }
+
+      toast({ title: 'Success', description: 'Invitation revoked successfully.' });
+      return true;
+    } catch (error: any) {
+      console.error('Error revoking invitation:', error);
+      toast({ title: 'Error', description: 'Failed to revoke invitation', variant: 'destructive' });
+      return false;
+    }
+  };
+
+  return { sendInvitation: sendInvitationHook, revokeInvitation };
+};
+
+// Utility functions for invitation management
+export const invitationUtils = {
+  validateEmail: (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  },
+
+  generateInvitationLink: (orgId: string, invitationId: string): string => {
+    // This would generate the actual invitation link
+    // For now, return a placeholder
+    return `https://app.softcodes.ai/accept-invitation?org=${orgId}&invitation=${invitationId}`;
+  },
+
+  formatInvitationStatus: (status: string): string => {
+    switch (status) {
+      case 'pending':
+        return 'Pending';
+      case 'accepted':
+        return 'Accepted';
+      case 'expired':
+        return 'Expired';
+      case 'revoked':
+        return 'Revoked';
+      default:
+        return status;
+    }
+  }
 };
