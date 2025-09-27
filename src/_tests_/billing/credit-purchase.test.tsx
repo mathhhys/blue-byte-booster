@@ -1,12 +1,11 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ClerkProvider } from '@clerk/clerk-react';
 import Dashboard from '@/pages/Dashboard';
 
 // Mock the API calls
-const mockFetch = vi.fn();
+const mockFetch = jest.fn();
 global.fetch = mockFetch;
 
 // Mock Clerk
@@ -17,21 +16,21 @@ const mockUser = {
   lastName: 'User'
 };
 
-vi.mock('@clerk/clerk-react', () => ({
+jest.mock('@clerk/clerk-react', () => ({
   useUser: () => ({ user: mockUser, isLoaded: true }),
-  useAuth: () => ({ getToken: vi.fn().mockResolvedValue('mock-token') }),
+  useAuth: () => ({ getToken: jest.fn().mockResolvedValue('mock-token') }),
   useOrganization: () => ({ organization: null, isLoaded: true }),
-  UserButton: () => <div data-testid="user-button">User Button</div>,
-  OrganizationSwitcher: () => <div data-testid="org-switcher">Org Switcher</div>,
-  SignedIn: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  UserButton: () => null,
+  OrganizationSwitcher: () => null,
+  SignedIn: ({ children }: { children: React.ReactNode }) => children,
   SignedOut: () => null,
   RedirectToSignIn: () => null,
 }));
 
 // Mock toast
-vi.mock('@/hooks/use-toast', () => ({
+jest.mock('@/hooks/use-toast', () => ({
   useToast: () => ({
-    toast: vi.fn(),
+    toast: jest.fn(),
   }),
 }));
 
@@ -55,7 +54,7 @@ const TestWrapper = ({ children }: { children: React.ReactNode }) => {
 
 describe('Credit Purchase Functionality', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    jest.clearAllMocks();
     
     // Mock successful user fetch
     mockFetch.mockImplementation((url) => {

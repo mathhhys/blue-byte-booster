@@ -138,24 +138,112 @@ export const assignSeatToMember = async (
   userEmail: string,
   userName: string
 ): Promise<{ success: boolean; error?: string }> => {
-  // Mock implementation
-  await new Promise(resolve => setTimeout(resolve, 500));
+  try {
+    const response = await fetch('/api/organizations/seats/assign', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        org_id: orgId,
+        clerk_user_id: userId,
+        email: userEmail,
+        name: userName
+      }),
+    });
 
-  return {
-    success: true,
-  };
+    const data = await response.json();
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: data.error || 'Failed to assign seat'
+      };
+    }
+
+    return {
+      success: true
+    };
+  } catch (error) {
+    console.error('Error assigning seat to member:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to assign seat'
+    };
+  }
 };
 
 export const removeSeatFromMember = async (
   orgId: string,
   userId: string
 ): Promise<{ success: boolean; error?: string }> => {
-  // Mock implementation
-  await new Promise(resolve => setTimeout(resolve, 500));
+  try {
+    const response = await fetch(`/api/organizations/seats/${userId}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        org_id: orgId
+      }),
+    });
 
-  return {
-    success: true,
-  };
+    const data = await response.json();
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: data.error || 'Failed to remove seat'
+      };
+    }
+
+    return {
+      success: true
+    };
+  } catch (error) {
+    console.error('Error removing seat from member:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to remove seat'
+    };
+  }
+};
+
+export const updateSubscriptionQuantity = async (
+  orgId: string,
+  quantity: number
+): Promise<{ success: boolean; error?: string }> => {
+  try {
+    const response = await fetch('/api/organizations/subscription/quantity', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        org_id: orgId,
+        quantity: quantity
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: data.error || 'Failed to update subscription quantity'
+      };
+    }
+
+    return {
+      success: true
+    };
+  } catch (error) {
+    console.error('Error updating subscription quantity:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to update subscription quantity'
+    };
+  }
 };
 
 export const formatSeatUsage = (used: number, total: number): string => {

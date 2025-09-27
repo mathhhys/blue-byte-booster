@@ -154,6 +154,173 @@ export interface Database {
           created_at?: string;
         };
       };
+      organization_members: {
+        Row: {
+          id: string;
+          organization_id: string;
+          clerk_user_id: string;
+          role: 'admin' | 'member';
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          clerk_user_id: string;
+          role: 'admin' | 'member';
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          clerk_user_id?: string;
+          role?: 'admin' | 'member';
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      organization_subscriptions: {
+        Row: {
+          id: string;
+          clerk_org_id: string;
+          organization_id: string;
+          stripe_subscription_id: string | null;
+          plan_type: 'teams' | 'enterprise';
+          billing_frequency: 'monthly' | 'yearly';
+          seats_total: number;
+          seats_used: number;
+          quantity: number | null;
+          overage_seats: number;
+          auto_update_quantity: boolean;
+          currency: string;
+          status: 'active' | 'canceled' | 'past_due' | 'incomplete';
+          overage: boolean;
+          current_period_start: string | null;
+          current_period_end: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          clerk_org_id: string;
+          organization_id: string;
+          stripe_subscription_id?: string | null;
+          plan_type: 'teams' | 'enterprise';
+          billing_frequency: 'monthly' | 'yearly';
+          seats_total?: number;
+          seats_used?: number;
+          quantity?: number | null;
+          overage_seats?: number;
+          auto_update_quantity?: boolean;
+          currency?: string;
+          status?: 'active' | 'canceled' | 'past_due' | 'incomplete';
+          overage?: boolean;
+          current_period_start?: string | null;
+          current_period_end?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          clerk_org_id?: string;
+          organization_id?: string;
+          stripe_subscription_id?: string | null;
+          plan_type?: 'teams' | 'enterprise';
+          billing_frequency?: 'monthly' | 'yearly';
+          seats_total?: number;
+          seats_used?: number;
+          quantity?: number | null;
+          overage_seats?: number;
+          auto_update_quantity?: boolean;
+          currency?: string;
+          status?: 'active' | 'canceled' | 'past_due' | 'incomplete';
+          overage?: boolean;
+          current_period_start?: string | null;
+          current_period_end?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      organization_seats: {
+        Row: {
+          id: string;
+          organization_subscription_id: string;
+          clerk_user_id: string;
+          clerk_org_id: string;
+          user_email: string;
+          user_name: string | null;
+          assigned_by: string | null;
+          role: string | null;
+          assigned_at: string;
+          status: 'active' | 'revoked' | 'pending' | 'expired';
+          expires_at: string | null;
+          revoked_reason: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_subscription_id: string;
+          clerk_user_id: string;
+          clerk_org_id: string;
+          user_email: string;
+          user_name?: string | null;
+          assigned_by?: string | null;
+          role?: string | null;
+          assigned_at?: string;
+          status?: 'active' | 'revoked' | 'pending' | 'expired';
+          expires_at?: string | null;
+          revoked_reason?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          organization_subscription_id?: string;
+          clerk_user_id?: string;
+          clerk_org_id?: string;
+          user_email?: string;
+          user_name?: string | null;
+          assigned_by?: string | null;
+          role?: string | null;
+          assigned_at?: string;
+          status?: 'active' | 'revoked' | 'pending' | 'expired';
+          expires_at?: string | null;
+          revoked_reason?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      seat_adjustments: {
+        Row: {
+          id: string;
+          organization_subscription_id: string;
+          old_quantity: number;
+          new_quantity: number;
+          adjustment_type: string;
+          stripe_invoice_id: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_subscription_id: string;
+          old_quantity: number;
+          new_quantity: number;
+          adjustment_type: string;
+          stripe_invoice_id?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          organization_subscription_id?: string;
+          old_quantity?: number;
+          new_quantity?: number;
+          adjustment_type?: string;
+          stripe_invoice_id?: string | null;
+          created_at?: string;
+        };
+      };
     };
     Functions: {
       grant_credits: {

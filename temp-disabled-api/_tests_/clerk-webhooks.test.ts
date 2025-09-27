@@ -1,4 +1,4 @@
-import handler from '../webhooks/clerk';
+import handler from '../../api/clerk/webhooks';
 import { createClient } from '@supabase/supabase-js';
 import { Webhook } from 'svix';
 

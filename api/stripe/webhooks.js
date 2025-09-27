@@ -58,6 +58,14 @@ export default async function handler(req, res) {
         await handleInvoicePaymentSucceeded(event.data.object, supabase);
         break;
 
+      case 'invoice.paid':
+        await handleInvoicePaid(event.data.object, supabase);
+        break;
+
+      case 'invoice.payment_failed':
+        await handleInvoicePaymentFailed(event.data.object, supabase);
+        break;
+
       case 'checkout.session.completed':
         await handleCheckoutSessionCompleted(event.data.object, supabase);
         break;
@@ -205,7 +213,7 @@ async function handleCheckoutSessionCompleted(session, supabase) {
   }
 }
 
-// Handle subscription updates (plan changes, seat changes)
+// Handle subscription updates (plan changes, seat changes, quantity changes)
 async function handleSubscriptionUpdated(subscription, supabase) {
   console.log('📝 Processing subscription updated:', subscription.id);
   
@@ -217,28 +225,181 @@ async function handleSubscriptionUpdated(subscription, supabase) {
       return;
     }
 
-    // Update subscription record in database
+    // Calculate total quantity from subscription items
+    const totalQuantity = subscription.items.data.reduce((total, item) => {
+      return total + item.quantity;
+    }, 0);
+
+    // Get organization subscription details
+    const { data: orgSubscription, error: fetchError } = await supabase
+      .from('organization_subscriptions')
+      .select('*')
+      .eq('stripe_subscription_id', subscription.id)
+      .single();
+
+    if (fetchError) {
+      console.error('Error fetching organization subscription:', fetchError);
+      // Fall back to regular subscription update
+      await updateRegularSubscription(subscription, supabase);
+      return;
+    }
+
+    // Update organization subscription with new quantity
     const { error: updateError } = await supabase
-      .from('subscriptions')
+      .from('organization_subscriptions')
       .update({
+        quantity: totalQuantity,
         status: subscription.status,
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
+        // Reset overage seats if quantity increased
+        overage_seats: orgSubscription.overage_seats > 0 ?
+          Math.max(0, orgSubscription.overage_seats - (totalQuantity - orgSubscription.quantity)) :
+          orgSubscription.overage_seats
       })
       .eq('stripe_subscription_id', subscription.id);
 
     if (updateError) {
-      console.error('Error updating subscription:', updateError);
+      console.error('Error updating organization subscription:', updateError);
     }
+
+    // Also update regular subscription table for backward compatibility
+    await updateRegularSubscription(subscription, supabase);
 
     await recordWebhookProcessing(subscription.id, 'customer.subscription.updated', {
       clerkUserId,
-      status: subscription.status
+      status: subscription.status,
+      quantity: totalQuantity,
+      organization_id: orgSubscription.organization_id
     }, supabase);
 
-    console.log('✅ Subscription update processed');
+    console.log('✅ Subscription update processed with quantity:', totalQuantity);
 
   } catch (error) {
     console.error('❌ Error processing subscription updated:', error);
+    throw error;
+  }
+}
+
+// Helper function to update regular subscription table
+async function updateRegularSubscription(subscription, supabase) {
+  const { error: updateError } = await supabase
+    .from('subscriptions')
+    .update({
+      status: subscription.status,
+      updated_at: new Date().toISOString()
+    })
+    .eq('stripe_subscription_id', subscription.id);
+
+  if (updateError) {
+    console.error('Error updating regular subscription:', updateError);
+  }
+}
+// Handle successful invoice payment (specifically for overage charges)
+async function handleInvoicePaid(invoice, supabase) {
+  console.log('💰 Processing invoice paid:', invoice.id);
+  
+  try {
+    // Skip if this is not a subscription invoice
+    if (!invoice.subscription) {
+      console.log('Skipping non-subscription invoice');
+      return;
+    }
+
+    // Get organization subscription
+    const { data: orgSubscription, error: fetchError } = await supabase
+      .from('organization_subscriptions')
+      .select('*')
+      .eq('stripe_subscription_id', invoice.subscription)
+      .single();
+
+    if (fetchError) {
+      console.log('Organization subscription not found, skipping overage processing');
+      return;
+    }
+
+    // Check if this invoice contains overage charges
+    const hasOverageCharges = invoice.lines.data.some(line => 
+      line.description?.includes('overage') || line.metadata?.is_overage === 'true'
+    );
+
+    if (hasOverageCharges && orgSubscription.overage_seats > 0) {
+      console.log('Clearing overage seats after successful payment:', orgSubscription.overage_seats);
+      
+      // Clear overage seats
+      const { error: updateError } = await supabase
+        .from('organization_subscriptions')
+        .update({
+          overage_seats: 0,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', orgSubscription.id);
+
+      if (updateError) {
+        console.error('Error clearing overage seats:', updateError);
+      } else {
+        console.log('✅ Overage seats cleared successfully');
+      }
+    }
+
+    await recordWebhookProcessing(invoice.id, 'invoice.paid', {
+      subscription_id: invoice.subscription,
+      organization_id: orgSubscription.organization_id,
+      had_overage_charges: hasOverageCharges,
+      overage_seats_cleared: hasOverageCharges ? orgSubscription.overage_seats : 0
+    }, supabase);
+
+  } catch (error) {
+    console.error('❌ Error processing invoice paid:', error);
+    throw error;
+  }
+}
+
+// Handle failed invoice payment
+async function handleInvoicePaymentFailed(invoice, supabase) {
+  console.log('❌ Processing invoice payment failed:', invoice.id);
+  
+  try {
+    // Skip if this is not a subscription invoice
+    if (!invoice.subscription) {
+      console.log('Skipping non-subscription invoice');
+      return;
+    }
+
+    // Get organization subscription
+    const { data: orgSubscription, error: fetchError } = await supabase
+      .from('organization_subscriptions')
+      .select('*')
+      .eq('stripe_subscription_id', invoice.subscription)
+      .single();
+
+    if (fetchError) {
+      console.log('Organization subscription not found, skipping status update');
+      return;
+    }
+
+    // Update subscription status to past_due
+    const { error: updateError } = await supabase
+      .from('organization_subscriptions')
+      .update({
+        status: 'past_due',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', orgSubscription.id);
+
+    if (updateError) {
+      console.error('Error updating subscription status:', updateError);
+    }
+
+    await recordWebhookProcessing(invoice.id, 'invoice.payment_failed', {
+      subscription_id: invoice.subscription,
+      organization_id: orgSubscription.organization_id,
+      new_status: 'past_due'
+    }, supabase);
+
+    console.log('✅ Subscription status updated to past_due');
+
+  } catch (error) {
+    console.error('❌ Error processing invoice payment failed:', error);
     throw error;
   }
 }

@@ -18,22 +18,26 @@ import {
 } from 'lucide-react';
 import { useUser } from '@clerk/clerk-react';
 import { useTeamInvitations, invitationUtils } from '@/utils/clerk/invitations';
-import { teamInvitationOperations } from '@/utils/supabase/database';
+import { teamInvitationOperations, organizationSeatOperations } from '@/utils/supabase/database';
 import { TeamInvitation } from '@/utils/supabase/database';
+import { useToast } from '@/hooks/use-toast';
 
 interface InvitationManagerProps {
   subscriptionId: string;
   maxSeats: number;
+  organizationId: string;
   onClose?: () => void;
 }
 
 export const InvitationManager: React.FC<InvitationManagerProps> = ({
   subscriptionId,
   maxSeats,
+  organizationId,
   onClose
 }) => {
   const { user } = useUser();
   const { sendInvitation, revokeInvitation } = useTeamInvitations();
+  const { toast } = useToast();
 
   const [emailInput, setEmailInput] = useState('');
   const [invitations, setInvitations] = useState<TeamInvitation[]>([]);

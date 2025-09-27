@@ -35,6 +35,7 @@ import {
   SidebarTrigger,
 } from '@/components/ui/sidebar';
 import { BillingDashboard } from '@/components/organizations/BillingDashboard';
+import { SeatManager } from '@/components/teams/SeatManager';
 
 // Dark theme appearance configuration for Clerk components
 const clerkAppearance = {
@@ -290,7 +291,7 @@ const Organizations = () => {
                   </Card>
                 ) : organization ? (
                   <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                    <TabsList className="grid w-full grid-cols-2 bg-[#2a2a2a] border-white/10">
+                    <TabsList className="grid w-full grid-cols-3 bg-[#2a2a2a] border-white/10">
                       <TabsTrigger
                         value="settings"
                         className="data-[state=active]:bg-blue-600 data-[state=active]:text-white text-gray-400"
@@ -304,7 +305,16 @@ const Organizations = () => {
                         disabled={!isAdmin}
                       >
                         <DollarSign className="w-4 h-4 mr-2" />
-                        Billing & Seats
+                        Billing
+                        {!isAdmin && <span className="ml-1 text-xs">(Admin Only)</span>}
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="seats"
+                        className="data-[state=active]:bg-blue-600 data-[state=active]:text-white text-gray-400"
+                        disabled={!isAdmin}
+                      >
+                        <Users className="w-4 h-4 mr-2" />
+                        Seat Management
                         {!isAdmin && <span className="ml-1 text-xs">(Admin Only)</span>}
                       </TabsTrigger>
                     </TabsList>
@@ -327,6 +337,10 @@ const Organizations = () => {
 
                     <TabsContent value="billing" className="mt-6">
                       <BillingDashboard />
+                    </TabsContent>
+
+                    <TabsContent value="seats" className="mt-6">
+                      <SeatManager />
                     </TabsContent>
                   </Tabs>
                 ) : (

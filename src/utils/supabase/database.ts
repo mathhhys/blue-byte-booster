@@ -527,3 +527,398 @@ export const databaseHelpers = {
     }
   }
 };
+
+// Organization seat operations
+export const organizationSeatOperations = {
+  // Get seat usage and list for an organization
+  async getSeatsForOrganization(clerkOrgId: string): Promise<{
+    data: {
+      seats_used: number;
+      seats_total: number;
+      seats: Array<{
+        user_id: string;
+        email: string;
+        status: string;
+        role: string | null;
+        assigned_at: string;
+      }>;
+    } | null;
+    error: any;
+  }> {
+    try {
+      const client = await getAuthenticatedClient();
+      
+      // Get subscription to get seat counts
+      const { data: subscription, error: subError } = await client
+        .from('organization_subscriptions')
+        .select('seats_used, seats_total, quantity, overage_seats')
+        .eq('clerk_org_id', clerkOrgId)
+        .eq('status', 'active')
+        .single();
+
+      if (subError) {
+        console.error('Error fetching subscription:', subError);
+        return { data: null, error: subError };
+      }
+
+      // Get active seats with user details
+      const { data: seats, error: seatsError } = await client
+        .from('organization_seats')
+        .select('clerk_user_id, user_email, status, role, assigned_at')
+        .eq('clerk_org_id', clerkOrgId)
+        .eq('status', 'active')
+        .order('assigned_at', { ascending: false });
+
+      if (seatsError) {
+        console.error('Error fetching seats:', seatsError);
+        return { data: null, error: seatsError };
+      }
+
+      const result = {
+        seats_used: subscription?.seats_used || 0,
+        seats_total: subscription?.seats_total || 0,
+        seats: seats?.map(seat => ({
+          user_id: seat.clerk_user_id,
+          email: seat.user_email,
+          status: seat.status,
+          role: seat.role,
+          assigned_at: seat.assigned_at
+        })) || []
+      };
+
+      return { data: result, error: null };
+    } catch (error) {
+      console.error('Error in getSeatsForOrganization:', error);
+      return { data: null, error };
+    }
+  },
+
+  // Assign a seat to a user
+  async assignSeat(clerkOrgId: string, userEmail: string, role: string = 'member'): Promise<{
+    data: any | null;
+    error: any;
+  }> {
+    try {
+      const client = await getAuthenticatedClient();
+      
+      // Check if user already has an active seat
+      const { data: existingSeat } = await client
+        .from('organization_seats')
+        .select('id')
+        .eq('clerk_org_id', clerkOrgId)
+        .eq('user_email', userEmail)
+        .eq('status', 'active')
+        .single();
+
+      if (existingSeat) {
+        return { data: null, error: 'User already has an active seat in this organization' };
+      }
+
+      // Get subscription to check seat availability
+      const { data: subscription, error: subError } = await client
+        .from('organization_subscriptions')
+        .select('id, seats_used, seats_total, overage_seats')
+        .eq('clerk_org_id', clerkOrgId)
+        .eq('status', 'active')
+        .single();
+
+      if (subError) {
+        return { data: null, error: 'Organization subscription not found' };
+      }
+
+      // Check seat availability
+      if (subscription.seats_used >= subscription.seats_total + subscription.overage_seats) {
+        return { data: null, error: 'No available seats. Please upgrade your plan.' };
+      }
+
+      // Assign the seat
+      const { data: seat, error: seatError } = await client
+        .from('organization_seats')
+        .insert({
+          organization_subscription_id: subscription.id,
+          clerk_org_id: clerkOrgId,
+          clerk_user_id: '', // Will be filled by Clerk lookup in API
+          user_email: userEmail,
+          role: role,
+          status: 'active',
+          assigned_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+
+      if (seatError) {
+        return { data: null, error: seatError };
+      }
+
+      // Update seats_used count
+      const { error: updateError } = await client
+        .from('organization_subscriptions')
+        .update({
+          seats_used: subscription.seats_used + 1,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', subscription.id);
+
+      if (updateError) {
+        return { data: null, error: updateError };
+      }
+
+      return { data: seat, error: null };
+    } catch (error) {
+      console.error('Error in assignSeat:', error);
+      return { data: null, error };
+    }
+  },
+
+  // Remove/revoke a seat
+  async revokeSeat(clerkOrgId: string, clerkUserId: string, reason: string = 'admin_revoked'): Promise<{
+    data: any | null;
+    error: any;
+  }> {
+    try {
+      const client = await getAuthenticatedClient();
+      
+      // Find the active seat
+      const { data: seat, error: seatError } = await client
+        .from('organization_seats')
+        .select('id, organization_subscription_id')
+        .eq('clerk_org_id', clerkOrgId)
+        .eq('clerk_user_id', clerkUserId)
+        .eq('status', 'active')
+        .single();
+
+      if (seatError || !seat) {
+        return { data: null, error: 'Active seat not found for this user' };
+      }
+
+      // Revoke the seat
+      const { data: revokedSeat, error: revokeError } = await client
+        .from('organization_seats')
+        .update({
+          status: 'revoked',
+          revoked_reason: reason,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', seat.id)
+        .select()
+        .single();
+
+      if (revokeError) {
+        return { data: null, error: revokeError };
+      }
+
+      // Update seats_used count
+      const { data: subscription } = await client
+        .from('organization_subscriptions')
+        .select('seats_used')
+        .eq('id', seat.organization_subscription_id)
+        .single();
+
+      if (subscription) {
+        await client
+          .from('organization_subscriptions')
+          .update({
+            seats_used: Math.max(0, subscription.seats_used - 1),
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', seat.organization_subscription_id);
+      }
+
+      return { data: revokedSeat, error: null };
+    } catch (error) {
+      console.error('Error in revokeSeat:', error);
+      return { data: null, error };
+    }
+  },
+
+  // Revoke expired seats (for cron job/edge function)
+  async revokeExpiredSeats(): Promise<{
+    data: { seats_revoked: number; seats_updated: number } | null;
+    error: any;
+  }> {
+    try {
+      const client = await getAuthenticatedClient();
+      
+      // Find expired seats (expires_at < current time and status is active)
+      const { data: expiredSeats, error: fetchError } = await client
+        .from('organization_seats')
+        .select('id, organization_subscription_id')
+        .lt('expires_at', new Date().toISOString())
+        .eq('status', 'active');
+
+      if (fetchError) {
+        console.error('Error fetching expired seats:', fetchError);
+        return { data: null, error: fetchError };
+      }
+
+      if (!expiredSeats || expiredSeats.length === 0) {
+        return { data: { seats_revoked: 0, seats_updated: 0 }, error: null };
+      }
+
+      let seatsUpdated = 0;
+      const subscriptionIds = new Set<string>();
+
+      // Update each expired seat
+      for (const seat of expiredSeats) {
+        const { error: updateError } = await client
+          .from('organization_seats')
+          .update({
+            status: 'expired',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', seat.id);
+
+        if (updateError) {
+          console.error(`Error updating seat ${seat.id}:`, updateError);
+          continue;
+        }
+
+        seatsUpdated++;
+        subscriptionIds.add(seat.organization_subscription_id);
+      }
+
+      // Update seat counts for affected subscriptions
+      for (const subscriptionId of Array.from(subscriptionIds)) {
+        // Get current seat count
+        const { data: subscription } = await client
+          .from('organization_subscriptions')
+          .select('seats_used')
+          .eq('id', subscriptionId)
+          .single();
+
+        if (subscription) {
+          // Count active seats for this subscription
+          const { count } = await client
+            .from('organization_seats')
+            .select('*', { count: 'exact', head: true })
+            .eq('organization_subscription_id', subscriptionId)
+            .eq('status', 'active');
+
+          const newSeatsUsed = count || 0;
+          
+          await client
+            .from('organization_subscriptions')
+            .update({
+              seats_used: newSeatsUsed,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', subscriptionId);
+        }
+      }
+
+      console.log(`Revoked ${seatsUpdated} expired seats`);
+      return { data: { seats_revoked: expiredSeats.length, seats_updated: seatsUpdated }, error: null };
+    } catch (error) {
+      console.error('Error in revokeExpiredSeats:', error);
+      return { data: null, error };
+    }
+  },
+
+  // Check if a user has an active seat in an organization
+  async getActiveSeatForUser(clerkOrgId: string, clerkUserId: string): Promise<{
+    data: {
+      hasActiveSeat: boolean;
+      seatDetails?: {
+        id: string;
+        role: string | null;
+        assigned_at: string;
+        expires_at: string | null;
+      };
+    } | null;
+    error: any;
+  }> {
+    try {
+      const client = await getAuthenticatedClient();
+      
+      const { data: seat, error } = await client
+        .from('organization_seats')
+        .select('id, role, assigned_at, expires_at')
+        .eq('clerk_org_id', clerkOrgId)
+        .eq('clerk_user_id', clerkUserId)
+        .eq('status', 'active')
+        .single();
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          // No active seat found
+          return { data: { hasActiveSeat: false }, error: null };
+        }
+        return { data: null, error };
+      }
+
+      return {
+        data: {
+          hasActiveSeat: true,
+          seatDetails: {
+            id: seat.id,
+            role: seat.role,
+            assigned_at: seat.assigned_at,
+            expires_at: seat.expires_at
+          }
+        },
+        error: null
+      };
+    } catch (error) {
+      console.error('Error in getActiveSeatForUser:', error);
+      return { data: null, error };
+    }
+  }
+};
+
+// Organization subscription operations
+export const organizationSubscriptionOperations = {
+  // Update subscription quantity
+  async updateSubscriptionQuantity(clerkOrgId: string, newQuantity: number): Promise<{
+    data: any | null;
+    error: any;
+  }> {
+    try {
+      const client = await getAuthenticatedClient();
+      
+      // Get current subscription
+      const { data: subscription, error: subError } = await client
+        .from('organization_subscriptions')
+        .select('id, quantity, seats_total, auto_update_quantity')
+        .eq('clerk_org_id', clerkOrgId)
+        .eq('status', 'active')
+        .single();
+
+      if (subError || !subscription) {
+        return { data: null, error: 'Active subscription not found' };
+      }
+
+      const oldQuantity = subscription.quantity || subscription.seats_total;
+      
+      // Update quantity
+      const { data: updatedSub, error: updateError } = await client
+        .from('organization_subscriptions')
+        .update({
+          quantity: newQuantity,
+          seats_total: newQuantity, // Keep in sync for now
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', subscription.id)
+        .select()
+        .single();
+
+      if (updateError) {
+        return { data: null, error: updateError };
+      }
+
+      // Record adjustment
+      await client
+        .from('seat_adjustments')
+        .insert({
+          organization_subscription_id: subscription.id,
+          old_quantity: oldQuantity,
+          new_quantity: newQuantity,
+          adjustment_type: newQuantity > oldQuantity ? 'upgrade' : 'downgrade'
+        });
+
+      return { data: updatedSub, error: null };
+    } catch (error) {
+      console.error('Error in updateSubscriptionQuantity:', error);
+      return { data: null, error };
+    }
+  }
+};

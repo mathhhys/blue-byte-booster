@@ -27,6 +27,7 @@ import {
   getOrganizationSubscription,
   formatSeatCost,
 } from '@/utils/organization/billing';
+import { organizationSeatOperations } from '@/utils/supabase/database';
 
 interface BillingDashboardProps {
   className?: string;
@@ -43,6 +44,17 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
     billing_frequency: string;
     stripe_subscription_id: string | null;
   } | null>(null);
+  const [seatsData, setSeatsData] = useState<{
+    seats_used: number;
+    seats_total: number;
+    seats: Array<{
+      user_id: string;
+      email: string;
+      status: string;
+      role: string | null;
+      assigned_at: string;
+    }>;
+  } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreatingSubscription, setIsCreatingSubscription] = useState(false);
   const [isOpeningPortal, setIsOpeningPortal] = useState(false);
@@ -52,9 +64,9 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
   const isAdmin = membership?.role === 'org:admin';
   const memberCount = memberships?.count || 0;
   const pendingInvitationsCount = invitations?.count || 0;
-  const totalUsedSeats = memberCount + pendingInvitationsCount;
   
-  // Get seat data from Stripe subscription - no default if no subscription
+  // Use seatsData if available, otherwise fall back to Clerk data
+  const totalUsedSeats = seatsData?.seats_used || (memberCount + pendingInvitationsCount);
   const maxSeats = subscriptionData?.seats_total || 0;
   const availableSeats = Math.max(0, maxSeats - totalUsedSeats);
   const percentUsed = maxSeats > 0 ? Math.round((totalUsedSeats / maxSeats) * 100) : 0;
@@ -86,6 +98,9 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
         // No subscription found
         setSubscriptionData(null);
       }
+
+      // Load seats data from database
+      await loadSeatsData();
     } catch (error) {
       console.error('Error loading billing info:', error);
       toast({
@@ -97,6 +112,21 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
       setSubscriptionData(null);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadSeatsData = async () => {
+    if (!organization?.id) return;
+    
+    try {
+      const { data, error } = await organizationSeatOperations.getSeatsForOrganization(organization.id);
+      if (error) {
+        console.error('Error loading seats data:', error);
+        return;
+      }
+      setSeatsData(data);
+    } catch (error) {
+      console.error('Error in loadSeatsData:', error);
     }
   };
 
@@ -174,25 +204,30 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
     try {
       setIsInviting(true);
       
-      // For demo purposes, simulate invitation creation
-      // In production, you would use Clerk's invitation API or backend endpoint
-      console.log(`Creating invitation for ${newMemberEmail} to organization ${organization.id}`);
+      // Use the organization seat operations to assign a seat
+      const { data, error } = await organizationSeatOperations.assignSeat(organization.id, newMemberEmail, 'member');
       
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      if (error) {
+        toast({
+          title: "Cannot Assign Seat",
+          description: error.message || 'Failed to assign seat to user',
+          variant: "destructive",
+        });
+        return;
+      }
 
       toast({
-        title: "Invitation Sent!",
-        description: `Invitation sent to ${newMemberEmail}`,
+        title: "Seat Assigned!",
+        description: `Seat assigned to ${newMemberEmail}. They can now access the organization.`,
       });
       
       setNewMemberEmail('');
-      // Refresh data to show updated invitation count
+      // Refresh data to show updated seat count
       await loadBillingInfo();
     } catch (error) {
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : 'Failed to send invitation',
+        description: error instanceof Error ? error.message : 'Failed to assign seat',
         variant: "destructive",
       });
     } finally {
