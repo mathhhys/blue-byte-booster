@@ -8,7 +8,7 @@ export default async function handler(req: any, res: any) {
 
   const { orgId, org_id } = req.query;
   
-  console.log('🔍 DEBUG: Received query parameters:', req.query);
+  console.log('🔍 DEBUG: Subscription endpoint - Received query parameters:', req.query);
   console.log('🔍 DEBUG: orgId param:', orgId);
   console.log('🔍 DEBUG: org_id param:', org_id);
   
@@ -19,27 +19,24 @@ export default async function handler(req: any, res: any) {
     return res.status(400).json({ error: 'Organization ID is required (orgId or org_id)' });
   }
   
-  console.log('✅ DEBUG: Using organization ID:', finalOrgId);
+  console.log('✅ DEBUG: Getting subscription for organization ID:', finalOrgId);
 
   try {
     // Verify organization admin access
     const authResult = await orgAdminMiddleware(req, finalOrgId as string);
-    console.log('🔍 API: Getting seats for organization:', finalOrgId, 'by user:', authResult.userId);
+    console.log('🔍 API: Getting subscription for organization:', finalOrgId, 'by user:', authResult.userId);
 
-    const { data, error } = await organizationSeatOperations.getSeatsForOrganization(finalOrgId as string);
+    // For now, return mock subscription data since we don't have Stripe integration fully set up
+    // TODO: Replace with actual Stripe subscription lookup
+    const subscriptionData = {
+      hasSubscription: false,
+      subscription: null
+    };
 
-    if (error) {
-      console.error('❌ API: Database error:', error);
-      return res.status(500).json({ error: 'Database error', details: error });
-    }
-
-    console.log('✅ API: Seats found:', data?.seats_used, '/', data?.seats_total);
-    return res.status(200).json({ 
-      data, 
-      error: null 
-    });
+    console.log('✅ API: Subscription data:', subscriptionData);
+    return res.status(200).json(subscriptionData);
   } catch (error: any) {
-    console.error('❌ API: Exception:', error);
+    console.error('❌ API: Exception in subscription endpoint:', error);
     
     if (error.message === 'Missing or invalid Authorization header') {
       return res.status(401).json({ error: 'Authentication required' });
