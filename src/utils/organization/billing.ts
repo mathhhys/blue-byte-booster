@@ -3,13 +3,19 @@ import { OrganizationBillingInfo, CreateOrganizationSubscriptionRequest } from '
 // Mock API functions for organization billing
 // In production, these would call your actual backend endpoints
 
-export const getOrganizationSubscription = async (orgId: string) => {
+export const getOrganizationSubscription = async (orgId: string, token?: string) => {
   try {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    
     const response = await fetch(`/api/organizations/subscription?orgId=${orgId}`, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
     });
 
     if (!response.ok) {
@@ -30,7 +36,8 @@ export const getOrganizationSubscription = async (orgId: string) => {
 };
 
 export const createOrganizationSubscription = async (
-  request: CreateOrganizationSubscriptionRequest
+  request: CreateOrganizationSubscriptionRequest,
+  token?: string
 ): Promise<{ success: boolean; checkout_url?: string; error?: string }> => {
   try {
     console.log('Creating organization subscription with request:', request);
@@ -42,11 +49,17 @@ export const createOrganizationSubscription = async (
     
     console.log('Sending payload to API:', payload);
     
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    
     const response = await fetch('/api/organizations/create-subscription', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify({
         clerk_org_id: request.clerk_org_id,
         plan_type: request.plan_type,

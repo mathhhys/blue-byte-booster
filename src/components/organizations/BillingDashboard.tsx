@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useOrganization, useOrganizationList } from '@clerk/clerk-react';
+import { useOrganization, useOrganizationList, useAuth } from '@clerk/clerk-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -35,6 +35,7 @@ interface BillingDashboardProps {
 
 export const BillingDashboard = ({ className }: BillingDashboardProps) => {
   const { organization, membership, memberships, invitations } = useOrganization();
+  const { getToken } = useAuth();
   const { toast } = useToast();
   
   const [subscriptionData, setSubscriptionData] = useState<{
@@ -83,8 +84,12 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
     try {
       setIsLoading(true);
       
+      // Get authentication token
+      const token = await getToken();
+      console.log('🔍 DEBUG: Got auth token for subscription call:', token ? 'Present' : 'Missing');
+      
       // Fetch real subscription data from Stripe
-      const result = await getOrganizationSubscription(organization.id);
+      const result = await getOrganizationSubscription(organization.id, token);
       
       if (result.hasSubscription && result.subscription) {
         setSubscriptionData({
@@ -119,7 +124,20 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
     if (!organization?.id) return;
     
     try {
-      const response = await fetch(`/api/organizations/seats?org_id=${organization.id}`);
+      const token = await getToken();
+      console.log('🔍 DEBUG: Got auth token for seats call:', token ? 'Present' : 'Missing');
+      
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      const response = await fetch(`/api/organizations/seats?org_id=${organization.id}`, {
+        headers
+      });
       if (!response.ok) {
         throw new Error(`Failed to fetch seats: ${response.statusText}`);
       }
@@ -135,12 +153,15 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
 
     try {
       setIsCreatingSubscription(true);
+      const token = await getToken();
+      console.log('🔍 DEBUG: Got auth token for create subscription:', token ? 'Present' : 'Missing');
+      
       const result = await createOrganizationSubscription({
         clerk_org_id: organization.id,
         plan_type: 'teams',
         billing_frequency: 'monthly',
         seats_total: 10,
-      });
+      }, token);
 
       if (result.success && result.checkout_url) {
         // Always redirect to Stripe checkout - no mock handling
@@ -203,12 +224,20 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
   
     try {
       setIsInviting(true);
+      const token = await getToken();
+      console.log('🔍 DEBUG: Got auth token for assign seat:', token ? 'Present' : 'Missing');
+      
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
       
       const response = await fetch('/api/organizations/seats/assign', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify({
           org_id: organization.id,
           email: newMemberEmail,

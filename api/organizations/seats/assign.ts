@@ -6,18 +6,26 @@ export default async function handler(req: any, res: any) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { orgId, userEmail, role } = req.body;
+  const { orgId, org_id, userEmail, email, role } = req.body;
+  
+  console.log('🔍 DEBUG: Assign endpoint - Received body:', req.body);
+  
+  const finalOrgId = orgId || org_id;
+  const finalEmail = userEmail || email;
 
-  if (!orgId || !userEmail) {
+  if (!finalOrgId || !finalEmail) {
+    console.log('❌ DEBUG: Missing parameters - orgId/org_id:', finalOrgId, 'userEmail/email:', finalEmail);
     return res.status(400).json({ error: 'Organization ID and user email are required' });
   }
+  
+  console.log('✅ DEBUG: Using orgId:', finalOrgId, 'email:', finalEmail);
 
   try {
     // Verify organization admin access
-    const authResult = await orgAdminMiddleware(req, orgId);
-    console.log('🔍 API: Assigning seat for organization:', orgId, 'by user:', authResult.userId, 'to email:', userEmail);
+    const authResult = await orgAdminMiddleware(req, finalOrgId);
+    console.log('🔍 API: Assigning seat for organization:', finalOrgId, 'by user:', authResult.userId, 'to email:', finalEmail);
 
-    const { data, error } = await organizationSeatOperations.assignSeat(orgId, userEmail, role || 'member');
+    const { data, error } = await organizationSeatOperations.assignSeat(finalOrgId, finalEmail, role || 'member');
 
     if (error) {
       console.error('❌ API: Database error:', error);

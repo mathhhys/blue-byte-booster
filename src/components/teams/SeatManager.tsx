@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useOrganization } from '@clerk/clerk-react';
+import { useOrganization, useAuth } from '@clerk/clerk-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -37,6 +37,7 @@ interface SeatData {
 
 export const SeatManager: React.FC = () => {
   const { organization } = useOrganization();
+  const { getToken } = useAuth();
   const { toast } = useToast();
   const [seatsData, setSeatsData] = useState<SeatData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -57,7 +58,20 @@ export const SeatManager: React.FC = () => {
     
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/organizations/seats?org_id=${organization.id}`);
+      const token = await getToken();
+      console.log('🔍 DEBUG: SeatManager - Got auth token for seats call:', token ? 'Present' : 'Missing');
+      
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      const response = await fetch(`/api/organizations/seats?org_id=${organization.id}`, {
+        headers
+      });
       
       if (!response.ok) {
         throw new Error(`Failed to fetch seats: ${response.statusText}`);
@@ -82,11 +96,20 @@ export const SeatManager: React.FC = () => {
 
     setIsAssigning(true);
     try {
+      const token = await getToken();
+      console.log('🔍 DEBUG: SeatManager - Got auth token for assign:', token ? 'Present' : 'Missing');
+      
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
       const response = await fetch('/api/organizations/seats/assign', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify({
           org_id: organization.id,
           email: assignEmail,
@@ -134,11 +157,20 @@ export const SeatManager: React.FC = () => {
 
     setIsRevoking(true);
     try {
+      const token = await getToken();
+      console.log('🔍 DEBUG: SeatManager - Got auth token for revoke:', token ? 'Present' : 'Missing');
+      
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
       const response = await fetch('/api/organizations/seats/revoke', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify({
           org_id: organization.id,
           user_id: userId,
