@@ -21,23 +21,39 @@ export async function orgAdminMiddleware(req: any, orgId: string): Promise<AuthR
       secretKey: process.env.CLERK_SECRET_KEY!
     });
 
+    console.log('🔍 DEBUG: Token claims:', JSON.stringify(claims, null, 2));
+    
     const userId = claims.sub;
     if (!userId) {
+      console.log('❌ DEBUG: No userId found in claims');
       throw new Error('Authentication required');
     }
+    
+    console.log('✅ DEBUG: User ID from token:', userId);
+    console.log('🔍 DEBUG: Requested org ID:', orgId);
 
     // Check if user belongs to the organization
     const userOrgs = claims.organizations || {};
+    console.log('🔍 DEBUG: User organizations from token:', JSON.stringify(userOrgs, null, 2));
+    
     const userOrg = userOrgs[orgId];
+    console.log('🔍 DEBUG: User org for requested orgId:', userOrg);
 
     if (!userOrg) {
+      console.log('❌ DEBUG: User does not belong to organization:', orgId);
+      console.log('❌ DEBUG: Available organizations:', Object.keys(userOrgs));
       throw new Error('User does not belong to this organization');
     }
 
+    console.log('✅ DEBUG: User belongs to org, role:', userOrg.role);
+
     // Check if user is an admin in the organization
     if (userOrg.role !== 'org:admin') {
+      console.log('❌ DEBUG: User is not admin. Current role:', userOrg.role);
       throw new Error('User is not an organization admin');
     }
+    
+    console.log('✅ DEBUG: User is organization admin');
 
     return {
       userId,
