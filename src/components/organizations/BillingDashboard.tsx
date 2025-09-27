@@ -26,8 +26,8 @@ import {
   createOrganizationSubscription,
   getOrganizationSubscription,
   formatSeatCost,
+  assignSeatToMember,
 } from '@/utils/organization/billing';
-import { organizationSeatOperations } from '@/utils/supabase/database';
 
 interface BillingDashboardProps {
   className?: string;
@@ -119,14 +119,14 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
     if (!organization?.id) return;
     
     try {
-      const { data, error } = await organizationSeatOperations.getSeatsForOrganization(organization.id);
-      if (error) {
-        console.error('Error loading seats data:', error);
-        return;
+      const response = await fetch(`/api/organizations/seats?org_id=${organization.id}`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch seats: ${response.statusText}`);
       }
+      const data = await response.json();
       setSeatsData(data);
     } catch (error) {
-      console.error('Error in loadSeatsData:', error);
+      console.error('Error loading seats data:', error);
     }
   };
 
@@ -200,22 +200,28 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
       });
       return;
     }
-
+  
     try {
       setIsInviting(true);
       
-      // Use the organization seat operations to assign a seat
-      const { data, error } = await organizationSeatOperations.assignSeat(organization.id, newMemberEmail, 'member');
+      const response = await fetch('/api/organizations/seats/assign', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          org_id: organization.id,
+          email: newMemberEmail,
+          role: 'member',
+        }),
+      });
+  
+      const result = await response.json();
       
-      if (error) {
-        toast({
-          title: "Cannot Assign Seat",
-          description: error.message || 'Failed to assign seat to user',
-          variant: "destructive",
-        });
-        return;
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to assign seat');
       }
-
+  
       toast({
         title: "Seat Assigned!",
         description: `Seat assigned to ${newMemberEmail}. They can now access the organization.`,

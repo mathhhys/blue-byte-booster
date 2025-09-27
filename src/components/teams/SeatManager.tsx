@@ -4,7 +4,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
@@ -227,6 +227,7 @@ export const SeatManager: React.FC = () => {
           <DialogContent className="bg-[#2a2a2a] border-white/10 text-white">
             <DialogHeader>
               <DialogTitle>Assign New Seat</DialogTitle>
+              <DialogDescription>Assign a new seat to a team member by entering their email address and role.</DialogDescription>
             </DialogHeader>
             
             <div className="space-y-4">

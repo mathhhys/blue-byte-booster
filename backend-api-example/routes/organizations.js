@@ -1,276 +1,400 @@
-// Organization billing routes
 const express = require('express');
-const router = express.Router();
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const { createClient } = require('@supabase/supabase-js');
+const { authenticateClerkToken } = require('../middleware/auth');
+const { rateLimitMiddleware } = require('../middleware/rateLimit');
 
-const supabase = createClient(
-  process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+const router = express.Router();
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
-// Get organization subscription
-router.get('/subscription', async (req, res) => {
+// Helper to verify user is in organization (admin or member)
+async function verifyUserInOrganization(clerkUserId, orgId) {
+  const { data, error } = await supabase
+    .from('organization_members')
+    .select('id')
+    .eq('clerk_user_id', clerkUserId)
+    .eq('organization_id', orgId)
+    .single();
+
+  return !error && !!data;
+}
+
+// GET /api/organizations/subscription?orgId=...
+router.get('/subscription', authenticateClerkToken, rateLimitMiddleware, async (req, res) => {
   try {
     const { orgId } = req.query;
-
     if (!orgId) {
-      return res.status(400).json({ error: 'Organization ID is required' });
+      return res.status(400).json({ error: 'Organization ID required' });
     }
 
-    console.log('Getting subscription for org:', orgId);
+    const isMember = await verifyUserInOrganization(req.auth.clerkUserId, orgId);
+    if (!isMember) {
+      return res.status(403).json({ error: 'Not authorized for this organization' });
+    }
 
-    // Get organization subscription from database
     const { data: subscription, error } = await supabase
       .from('organization_subscriptions')
-      .select(`
-        *,
-        organizations (
-          name,
-          stripe_customer_id
-        )
-      `)
+      .select('id, clerk_org_id, plan_type, billing_frequency, seats_total, seats_used, status, stripe_subscription_id as id, current_period_start, current_period_end')
       .eq('clerk_org_id', orgId)
       .eq('status', 'active')
-      .order('created_at', { ascending: false })
-      .limit(1)
       .single();
 
-    if (error && error.code !== 'PGRST116') {
-      console.error('Database error:', error);
-      return res.status(500).json({ error: 'Database error' });
-    }
-
-    if (!subscription) {
+    if (error || !subscription) {
       return res.json({
         hasSubscription: false,
-        subscription: null
+        subscription: null,
       });
     }
 
-    // Get seat count
-    const { count: seatsUsed } = await supabase
-      .from('organization_seats')
-      .select('*', { count: 'exact', head: true })
-      .eq('organization_subscription_id', subscription.id);
-
     res.json({
       hasSubscription: true,
-      subscription: {
-        ...subscription,
-        seats_used: seatsUsed || 0
-      }
+      subscription,
     });
-
   } catch (error) {
-    console.error('Error getting organization subscription:', error);
-    res.status(500).json({ error: 'Failed to get subscription' });
+    console.error('Error fetching organization subscription:', error);
+    res.status(500).json({ error: 'Failed to fetch subscription data' });
   }
 });
 
-// Create organization subscription
-router.post('/create-subscription', async (req, res) => {
+// GET /api/organizations/seats?org_id=...
+router.get('/seats', authenticateClerkToken, rateLimitMiddleware, async (req, res) => {
   try {
-    const { clerk_org_id, plan_type, billing_frequency, seats_total, org_name } = req.body;
-
-    if (!clerk_org_id || !plan_type || !billing_frequency || !seats_total) {
-      return res.status(400).json({ error: 'Missing required parameters' });
+    const { org_id: orgId } = req.query;
+    if (!orgId) {
+      return res.status(400).json({ error: 'Organization ID required' });
     }
 
-    console.log('Creating subscription for org:', clerk_org_id);
-
-    // First, ensure organization exists in our database
-    const { data: org, error: orgError } = await supabase.rpc('upsert_organization', {
-      p_clerk_org_id: clerk_org_id,
-      p_name: org_name
-    });
-
-    if (orgError) {
-      console.error('Error upserting organization:', orgError);
-      return res.status(500).json({ error: 'Failed to create organization record' });
+    const isMember = await verifyUserInOrganization(req.auth.clerkUserId, orgId);
+    if (!isMember) {
+      return res.status(403).json({ error: 'Not authorized for this organization' });
     }
 
-    // Get price ID based on plan and billing frequency
-    const priceIds = {
-      teams: {
-        monthly: 'price_1RwNazH6gWxKcaTXi3OmXp4u', // Use your actual Stripe price IDs
-        yearly: 'price_1RwNazH6gWxKcaTXi3OmXp4u'   // Update with yearly price ID
-      }
-    };
-
-    const priceId = priceIds[plan_type]?.[billing_frequency];
-    if (!priceId) {
-      return res.status(400).json({ error: 'Invalid plan or billing frequency' });
-    }
-
-    // Create Stripe customer for the organization
-    const customer = await stripe.customers.create({
-      name: org_name || `Organization ${clerk_org_id}`,
-      metadata: {
-        clerk_org_id: clerk_org_id,
-        type: 'organization'
-      }
-    });
-
-    // Update organization with Stripe customer ID
-    await supabase
-      .from('organizations')
-      .update({ stripe_customer_id: customer.id })
-      .eq('clerk_org_id', clerk_org_id);
-
-    // Create checkout session
-    const session = await stripe.checkout.sessions.create({
-      customer: customer.id,
-      payment_method_types: ['card'],
-      line_items: [
-        {
-          price: priceId,
-          quantity: seats_total,
-        },
-      ],
-      mode: 'subscription',
-      success_url: `${req.headers.origin || 'https://www.softcodes.ai'}/organizations/${clerk_org_id}/billing?success=true`,
-      cancel_url: `${req.headers.origin || 'https://www.softcodes.ai'}/organizations/${clerk_org_id}/billing?canceled=true`,
-      metadata: {
-        clerk_org_id: clerk_org_id,
-        plan_type: plan_type,
-        billing_frequency: billing_frequency,
-        seats_total: seats_total.toString(),
-        type: 'organization'
-      },
-      subscription_data: {
-        metadata: {
-          clerk_org_id: clerk_org_id,
-          plan_type: plan_type,
-          billing_frequency: billing_frequency,
-          seats_total: seats_total.toString(),
-          type: 'organization'
-        }
-      }
-    });
-
-    res.json({
-      success: true,
-      checkout_url: session.url,
-      session_id: session.id
-    });
-
-  } catch (error) {
-    console.error('Error creating organization subscription:', error);
-    res.status(500).json({ error: 'Failed to create subscription' });
-  }
-});
-
-// Create organization billing portal session
-router.post('/create-billing-portal', async (req, res) => {
-  try {
-    const { clerk_org_id } = req.body;
-
-    if (!clerk_org_id) {
-      return res.status(400).json({ error: 'Organization ID is required' });
-    }
-
-    console.log('Creating billing portal for org:', clerk_org_id);
-
-    // Get organization and its Stripe customer ID
-    const { data: org, error: orgError } = await supabase
-      .from('organizations')
-      .select('stripe_customer_id, name')
-      .eq('clerk_org_id', clerk_org_id)
+    const { data: subscription, error: subError } = await supabase
+      .from('organization_subscriptions')
+      .select('seats_used, seats_total')
+      .eq('clerk_org_id', orgId)
+      .eq('status', 'active')
       .single();
 
-    if (orgError || !org) {
-      console.error('Organization not found:', orgError);
-      return res.status(404).json({ error: 'Organization not found' });
+    if (subError || !subscription) {
+      return res.status(400).json({ error: 'No active subscription found' });
     }
 
-    if (!org.stripe_customer_id) {
-      return res.status(400).json({ error: 'Organization has no Stripe customer' });
-    }
+    const { data: seats, error: seatsError } = await supabase
+      .from('organization_seats')
+      .select('clerk_user_id as user_id, user_email as email, status, role, assigned_at')
+      .eq('clerk_org_id', orgId)
+      .eq('status', 'active')
+      .order('assigned_at', { ascending: false });
 
-    // Create billing portal session
-    const portalSession = await stripe.billingPortal.sessions.create({
-      customer: org.stripe_customer_id,
-      return_url: `${req.headers.origin || 'https://www.softcodes.ai'}/organizations/${clerk_org_id}/billing`,
-    });
+    if (seatsError) {
+      console.error('Error fetching seats:', seatsError);
+      return res.status(500).json({ error: 'Failed to fetch seats' });
+    }
 
     res.json({
-      success: true,
-      url: portalSession.url
+      seats_used: subscription.seats_used,
+      seats_total: subscription.seats_total,
+      seats: seats || [],
     });
-
   } catch (error) {
-    console.error('Error creating billing portal session:', error);
-    res.status(500).json({ error: 'Failed to create billing portal session' });
+    console.error('Error loading seats:', error);
+    res.status(500).json({ error: 'Failed to fetch seats' });
   }
 });
 
-// Assign seat to user
-router.post('/assign-seat', async (req, res) => {
+// POST /api/organizations/seats/assign
+router.post('/seats/assign', authenticateClerkToken, rateLimitMiddleware, async (req, res) => {
   try {
-    const { clerk_org_id, clerk_user_id, user_email, user_name, assigned_by } = req.body;
-
-    if (!clerk_org_id || !clerk_user_id || !user_email) {
-      return res.status(400).json({ error: 'Missing required parameters' });
+    const { org_id: orgId, email, role = 'member' } = req.body;
+    if (!orgId || !email) {
+      return res.status(400).json({ error: 'Organization ID and user email are required' });
     }
 
-    console.log('Assigning seat for user:', clerk_user_id, 'in org:', clerk_org_id);
-
-    const { data: result, error } = await supabase.rpc('assign_organization_seat', {
-      p_clerk_org_id: clerk_org_id,
-      p_clerk_user_id: clerk_user_id,
-      p_user_email: user_email,
-      p_user_name: user_name,
-      p_assigned_by: assigned_by
-    });
-
-    if (error) {
-      console.error('Error assigning seat:', error);
-      return res.status(500).json({ error: 'Failed to assign seat' });
+    const isMember = await verifyUserInOrganization(req.auth.clerkUserId, orgId);
+    if (!isMember) {
+      return res.status(403).json({ error: 'Not authorized for this organization' });
     }
 
-    if (!result) {
-      return res.status(400).json({ error: 'No seats available or invalid organization' });
+    // Check subscription
+    const { data: subscription, error: subError } = await supabase
+      .from('organization_subscriptions')
+      .select('id, seats_used, seats_total, overage_seats')
+      .eq('clerk_org_id', orgId)
+      .eq('status', 'active')
+      .single();
+
+    if (subError || !subscription) {
+      return res.status(400).json({ error: 'No active subscription found' });
     }
 
-    res.json({ success: true });
+    if (subscription.seats_used >= subscription.seats_total + (subscription.overage_seats || 0)) {
+      return res.status(402).json({ error: 'No available seats. Upgrade your subscription.' });
+    }
 
+    // Check if user already has seat
+    const { data: existingSeat } = await supabase
+      .from('organization_seats')
+      .select('id')
+      .eq('clerk_org_id', orgId)
+      .eq('user_email', email)
+      .eq('status', 'active')
+      .single();
+
+    if (existingSeat) {
+      return res.status(400).json({ error: 'User already has an active seat' });
+    }
+
+    // Create seat
+    const { data: seat, error: seatError } = await supabase
+      .from('organization_seats')
+      .insert({
+        organization_subscription_id: subscription.id,
+        clerk_org_id: orgId,
+        user_email: email,
+        role,
+        status: 'active',
+        assigned_at: new Date().toISOString(),
+        assigned_by: req.auth.clerkUserId,
+      })
+      .select()
+      .single();
+
+    if (seatError) {
+      return res.status(500).json({ error: seatError.message });
+    }
+
+    // Update seats_used
+    await supabase
+      .from('organization_subscriptions')
+      .update({ seats_used: subscription.seats_used + 1, updated_at: new Date().toISOString() })
+      .eq('id', subscription.id);
+
+    res.json({ success: true, seat });
   } catch (error) {
     console.error('Error assigning seat:', error);
     res.status(500).json({ error: 'Failed to assign seat' });
   }
 });
 
-// Remove seat from user
-router.post('/remove-seat', async (req, res) => {
+// POST /api/organizations/seats/revoke
+router.post('/seats/revoke', authenticateClerkToken, rateLimitMiddleware, async (req, res) => {
   try {
-    const { clerk_org_id, clerk_user_id } = req.body;
-
-    if (!clerk_org_id || !clerk_user_id) {
-      return res.status(400).json({ error: 'Missing required parameters' });
+    const { org_id: orgId, user_id: clerkUserId } = req.body;
+    if (!orgId || !clerkUserId) {
+      return res.status(400).json({ error: 'Organization ID and user ID required' });
     }
 
-    console.log('Removing seat for user:', clerk_user_id, 'from org:', clerk_org_id);
-
-    const { data: result, error } = await supabase.rpc('remove_organization_seat', {
-      p_clerk_org_id: clerk_org_id,
-      p_clerk_user_id: clerk_user_id
-    });
-
-    if (error) {
-      console.error('Error removing seat:', error);
-      return res.status(500).json({ error: 'Failed to remove seat' });
+    const isMember = await verifyUserInOrganization(req.auth.clerkUserId, orgId);
+    if (!isMember) {
+      return res.status(403).json({ error: 'Not authorized for this organization' });
     }
 
-    if (!result) {
-      return res.status(400).json({ error: 'Seat not found or invalid organization' });
+    // Find active seat
+    const { data: seat, error: seatError } = await supabase
+      .from('organization_seats')
+      .select('id, organization_subscription_id')
+      .eq('clerk_org_id', orgId)
+      .eq('clerk_user_id', clerkUserId)
+      .eq('status', 'active')
+      .single();
+
+    if (seatError || !seat) {
+      return res.status(404).json({ error: 'Active seat not found' });
+    }
+
+    // Revoke seat
+    const { error: revokeError } = await supabase
+      .from('organization_seats')
+      .update({
+        status: 'revoked',
+        revoked_reason: 'admin_revoked',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', seat.id);
+
+    if (revokeError) {
+      return res.status(500).json({ error: revokeError.message });
+    }
+
+    // Update seats_used
+    const { data: subscription } = await supabase
+      .from('organization_subscriptions')
+      .select('seats_used')
+      .eq('id', seat.organization_subscription_id)
+      .single();
+
+    if (subscription) {
+      await supabase
+        .from('organization_subscriptions')
+        .update({
+          seats_used: Math.max(0, subscription.seats_used - 1),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', seat.organization_subscription_id);
     }
 
     res.json({ success: true });
-
   } catch (error) {
-    console.error('Error removing seat:', error);
-    res.status(500).json({ error: 'Failed to remove seat' });
+    console.error('Error revoking seat:', error);
+    res.status(500).json({ error: 'Failed to revoke seat' });
+  }
+});
+
+// POST /api/organizations/create-subscription
+router.post('/create-subscription', authenticateClerkToken, rateLimitMiddleware, async (req, res) => {
+  try {
+    const { clerk_org_id: orgId, plan_type, billing_frequency, seats_total } = req.body;
+    if (!orgId || !plan_type || !billing_frequency || !seats_total) {
+      return res.status(400).json({ error: 'Missing required parameters' });
+    }
+
+    // Verify user in org
+    const isMember = await verifyUserInOrganization(req.auth.clerkUserId, orgId);
+    if (!isMember) {
+      return res.status(403).json({ error: 'Not authorized for this organization' });
+    }
+
+    // Price IDs for teams plan (update with actual Stripe prices)
+    const priceIds = {
+      monthly: 'price_1RwNazH6gWxKcaTXi3OmXp4u', // Example teams monthly
+      yearly: 'price_1RwNazH6gWxKcaTXi3OmXp4v', // Example teams yearly
+    };
+
+    const priceId = priceIds[billing_frequency];
+    if (!priceId) {
+      return res.status(400).json({ error: 'Invalid billing frequency' });
+    }
+
+    // Create or get customer
+    let customer;
+    const { data: existingCustomer } = await supabase
+      .from('organization_subscriptions')
+      .select('stripe_customer_id')
+      .eq('clerk_org_id', orgId)
+      .single();
+
+    if (existingCustomer?.stripe_customer_id) {
+      customer = { id: existingCustomer.stripe_customer_id };
+    } else {
+      customer = await stripe.customers.create({
+        metadata: { clerk_org_id: orgId },
+      });
+    }
+
+    // Create checkout session
+    const session = await stripe.checkout.sessions.create({
+      customer: customer.id,
+      payment_method_types: ['card'],
+      line_items: [{ price: priceId, quantity: seats_total }],
+      mode: 'subscription',
+      success_url: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/organizations`,
+      cancel_url: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/organizations`,
+      metadata: {
+        clerk_org_id: orgId,
+        plan_type,
+        billing_frequency,
+        seats_total: seats_total.toString(),
+        type: 'organization',
+      },
+      subscription_data: {
+        metadata: {
+          clerk_org_id: orgId,
+          plan_type,
+          billing_frequency,
+          seats_total: seats_total.toString(),
+          type: 'organization',
+        },
+      },
+    });
+
+    res.json({ success: true, checkout_url: session.url });
+  } catch (error) {
+    console.error('Error creating organization subscription:', error);
+    res.status(500).json({ error: 'Failed to create subscription' });
+  }
+});
+
+// POST /api/organizations/create-billing-portal
+router.post('/create-billing-portal', authenticateClerkToken, rateLimitMiddleware, async (req, res) => {
+  try {
+    const { clerk_org_id: orgId } = req.body;
+    if (!orgId) {
+      return res.status(400).json({ error: 'Organization ID required' });
+    }
+
+    const isMember = await verifyUserInOrganization(req.auth.clerkUserId, orgId);
+    if (!isMember) {
+      return res.status(403).json({ error: 'Not authorized for this organization' });
+    }
+
+    const { data: subscription, error: subError } = await supabase
+      .from('organization_subscriptions')
+      .select('stripe_customer_id')
+      .eq('clerk_org_id', orgId)
+      .eq('status', 'active')
+      .single();
+
+    if (subError || !subscription?.stripe_customer_id) {
+      return res.status(400).json({ error: 'No active subscription found' });
+    }
+
+    const session = await stripe.billingPortal.sessions.create({
+      customer: subscription.stripe_customer_id,
+      return_url: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/organizations`,
+    });
+
+    res.json({ success: true, url: session.url });
+  } catch (error) {
+    console.error('Error creating billing portal:', error);
+    res.status(500).json({ error: 'Failed to create billing portal' });
+  }
+});
+
+// PUT /api/organizations/subscription/quantity
+router.put('/subscription/quantity', authenticateClerkToken, rateLimitMiddleware, async (req, res) => {
+  try {
+    const { org_id: orgId, quantity } = req.body;
+    if (!orgId || typeof quantity !== 'number') {
+      return res.status(400).json({ error: 'Organization ID and quantity required' });
+    }
+
+    const isMember = await verifyUserInOrganization(req.auth.clerkUserId, orgId);
+    if (!isMember) {
+      return res.status(403).json({ error: 'Not authorized for this organization' });
+    }
+
+    const { data: subscription, error: subError } = await supabase
+      .from('organization_subscriptions')
+      .select('id, quantity, seats_total')
+      .eq('clerk_org_id', orgId)
+      .eq('status', 'active')
+      .single();
+
+    if (subError || !subscription) {
+      return res.status(400).json({ error: 'No active subscription found' });
+    }
+
+    // Update quantity (this would typically trigger Stripe update; here just DB)
+    const { error: updateError } = await supabase
+      .from('organization_subscriptions')
+      .update({
+        quantity,
+        seats_total: quantity,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', subscription.id);
+
+    if (updateError) {
+      return res.status(500).json({ error: updateError.message });
+    }
+
+    // In production, update Stripe subscription quantity via API
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error updating subscription quantity:', error);
+    res.status(500).json({ error: 'Failed to update quantity' });
   }
 });
 
