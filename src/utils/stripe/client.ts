@@ -5,8 +5,10 @@ import { getCurrencyConfig } from '@/config/currencies';
 
 const stripePublishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
 
+console.log('Stripe publishable key loaded:', stripePublishableKey ? `pk_${stripePublishableKey.slice(3,10)}...` : 'UNDEFINED - Check .env.local for VITE_STRIPE_PUBLISHABLE_KEY');
+
 if (!stripePublishableKey) {
-  console.warn('Stripe publishable key not found. Please add VITE_STRIPE_PUBLISHABLE_KEY to your environment variables.');
+  throw new Error('Stripe publishable key not set. Add VITE_STRIPE_PUBLISHABLE_KEY=pk_test_... to .env.local');
 }
 
 // Singleton pattern for Stripe instance

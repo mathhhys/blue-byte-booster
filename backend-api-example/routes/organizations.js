@@ -77,18 +77,32 @@ router.get('/seats', authenticateClerkToken, rateLimitMiddleware, async (req, re
       .single();
 
     if (subError || !subscription) {
+      console.log('No active subscription for orgId:', orgId, 'Error:', subError);
       return res.status(400).json({ error: 'No active subscription found' });
     }
 
-    const { data: seats, error: seatsError } = await supabase
-      .from('organization_seats')
-      .select('clerk_user_id as user_id, user_email as email, status, role, assigned_at')
-      .eq('clerk_org_id', orgId)
-      .eq('status', 'active')
-      .order('assigned_at', { ascending: false });
+    console.log('Fetched subscription for orgId:', orgId, 'Seats used/total:', subscription.seats_used, '/', subscription.seats_total);
 
-    if (seatsError) {
-      console.error('Error fetching seats:', seatsError);
+    try {
+      const { data: seats, error: seatsError } = await supabase
+        .from('organization_seats')
+        .select('clerk_user_id as user_id, user_email as email, status, role, assigned_at')
+        .eq('clerk_org_id', orgId)
+        .eq('status', 'active')
+        .order('assigned_at', { ascending: false });
+
+      if (seatsError) {
+        console.error('Seats query failed for orgId:', orgId);
+        console.error('Error code:', seatsError.code);
+        console.error('Error message:', seatsError.message);
+        console.error('Error details:', seatsError.details);
+        console.error('Full error:', seatsError);
+        return res.status(500).json({ error: 'Failed to fetch seats' });
+      }
+
+      console.log('Fetched seats for orgId:', orgId, 'Count:', seats ? seats.length : 0);
+    } catch (queryErr) {
+      console.error('Exception in seats query for orgId:', orgId, queryErr);
       return res.status(500).json({ error: 'Failed to fetch seats' });
     }
 
