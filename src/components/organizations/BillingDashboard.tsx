@@ -61,6 +61,7 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
   const [isOpeningPortal, setIsOpeningPortal] = useState(false);
   const [newMemberEmail, setNewMemberEmail] = useState('');
   const [isInviting, setIsInviting] = useState(false);
+  const [selectedSeats, setSelectedSeats] = useState(5);
 
   const isAdmin = membership?.role === 'org:admin';
   const memberCount = memberships?.count || 0;
@@ -161,7 +162,7 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
         clerk_org_id: organization.id,
         plan_type: 'teams',
         billing_frequency: 'monthly',
-        seats_total: 10,
+        seats_total: selectedSeats,
       }, token);
 
       if (result.success && result.checkout_url) {
@@ -342,7 +343,7 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
             <ul className="text-gray-400 space-y-2 text-sm">
               <li className="flex items-start gap-2">
                 <CheckCircle className="w-4 h-4 text-green-400 mt-0.5 shrink-0" />
-                <span>Seat-based licensing (up to 100 seats)</span>
+                <span>Seat-based licensing (up to 100 seats, $30/month per seat)</span>
               </li>
               <li className="flex items-start gap-2">
                 <CheckCircle className="w-4 h-4 text-green-400 mt-0.5 shrink-0" />
@@ -357,10 +358,27 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
                 <span>Priority support</span>
               </li>
             </ul>
+
+            {/* Seat Selection */}
+            <div className="mt-6 space-y-3">
+              <label className="text-white font-medium block mb-2">Number of Seats</label>
+              <Input
+                type="number"
+                min="1"
+                max="100"
+                value={selectedSeats}
+                onChange={(e) => setSelectedSeats(parseInt(e.target.value) || 1)}
+                className="bg-[#2a2a2a] border-white/10 text-white placeholder-gray-500 w-full"
+                placeholder="Enter number of seats (1-100)"
+              />
+              <div className="text-sm text-gray-400">
+                Total: {formatSeatCost('teams', 'monthly', selectedSeats)} ({selectedSeats} seats)
+              </div>
+            </div>
           </div>
           <Button
             onClick={handleCreateSubscription}
-            disabled={isCreatingSubscription}
+            disabled={isCreatingSubscription || !selectedSeats || selectedSeats < 1 || selectedSeats > 100}
             className="bg-blue-600 hover:bg-blue-700 text-white"
           >
             {isCreatingSubscription ? (
