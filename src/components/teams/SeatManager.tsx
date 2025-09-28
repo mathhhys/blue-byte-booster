@@ -47,8 +47,6 @@ export const SeatManager: React.FC = () => {
   const [assignRole, setAssignRole] = useState('member');
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showBuySeatsModal, setShowBuySeatsModal] = useState(false);
-  const [buyQuantity, setBuyQuantity] = useState(1);
-  const [buyBillingFrequency, setBuyBillingFrequency] = useState('monthly');
 
   useEffect(() => {
     if (organization?.id) {
@@ -222,24 +220,22 @@ export const SeatManager: React.FC = () => {
         method: 'POST',
         headers,
         body: JSON.stringify({
-          quantity: buyQuantity,
-          billingFrequency: buyBillingFrequency,
           orgId: organization.id,
           clerkUserId: userId,
         }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to create checkout');
+        throw new Error('Failed to create billing portal session');
       }
 
       const data = await response.json();
       window.location.href = data.url;
     } catch (error) {
-      console.error('Error buying seats:', error);
+      console.error('Error opening billing portal:', error);
       toast({
         title: "Error",
-        description: "Failed to initiate checkout",
+        description: "Failed to open billing portal",
         variant: "destructive",
       });
     } finally {
@@ -363,8 +359,8 @@ export const SeatManager: React.FC = () => {
         <Dialog open={showBuySeatsModal} onOpenChange={setShowBuySeatsModal}>
           <DialogContent className="bg-[#2a2a2a] border-white/10 text-white">
             <DialogHeader>
-              <DialogTitle>Buy Additional Seats</DialogTitle>
-              <DialogDescription>Purchase additional seats for your team.</DialogDescription>
+              <DialogTitle>Manage Team Seats</DialogTitle>
+              <DialogDescription>Update your team's seat allocation through our billing portal.</DialogDescription>
             </DialogHeader>
 
             <div className="space-y-4">
@@ -374,35 +370,13 @@ export const SeatManager: React.FC = () => {
                 </div>
               )}
 
-              <div>
-                <Label htmlFor="quantity" className="text-white">Number of Additional Seats</Label>
-                <Input
-                  id="quantity"
-                  type="number"
-                  min="1"
-                  max="100"
-                  value={buyQuantity}
-                  onChange={(e) => setBuyQuantity(parseInt(e.target.value) || 1)}
-                  className="bg-[#1a1a1a] border-white/10 text-white mt-1"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="billing" className="text-white">Billing Frequency</Label>
-                <Select value={buyBillingFrequency} onValueChange={setBuyBillingFrequency}>
-                  <SelectTrigger className="bg-[#1a1a1a] border-white/10 text-white mt-1">
-                    <SelectValue placeholder="Select billing frequency" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-[#2a2a2a] border-white/10 text-white">
-                    <SelectItem value="monthly">Monthly</SelectItem>
-                    <SelectItem value="yearly">Yearly</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
               <div className="text-sm text-gray-300">
-                <p>Pricing: ${buyBillingFrequency === 'monthly' ? '10' : '96'} per seat / {buyBillingFrequency}</p>
-                <p>Total: ${(buyQuantity * (buyBillingFrequency === 'monthly' ? 10 : 96)).toFixed(2)} for {buyQuantity} seat{buyQuantity > 1 ? 's' : ''} / {buyBillingFrequency}</p>
+                <p>You'll be redirected to Stripe's secure billing portal where you can:</p>
+                <ul className="list-disc list-inside mt-2 space-y-1">
+                  <li>View your current subscription details</li>
+                  <li>Update the number of seats for your team</li>
+                  <li>Manage billing information and payment methods</li>
+                </ul>
               </div>
             </div>
 
@@ -422,7 +396,7 @@ export const SeatManager: React.FC = () => {
                 {isAssigning ? (
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 ) : null}
-                Proceed to Checkout
+                Manage Billing
               </Button>
             </DialogFooter>
           </DialogContent>

@@ -25,19 +25,11 @@ export default async function handler(req, res) {
       return res.status(405).json({ error: 'Method not allowed' });
     }
 
-    const { quantity, billingFrequency, orgId, clerkUserId, successUrl, cancelUrl } = req.body;
+    const { orgId, clerkUserId, successUrl, cancelUrl } = req.body;
 
     // Validate input
-    if (!quantity || !billingFrequency || !orgId || !clerkUserId) {
+    if (!orgId || !clerkUserId) {
       return res.status(400).json({ error: 'Missing required parameters' });
-    }
-
-    if (quantity < 1 || quantity > 100) {
-      return res.status(400).json({ error: 'Quantity must be between 1 and 100' });
-    }
-
-    if (!['monthly', 'yearly'].includes(billingFrequency)) {
-      return res.status(400).json({ error: 'Invalid billing frequency' });
     }
 
     // Initialize Supabase
@@ -50,59 +42,41 @@ export default async function handler(req, res) {
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Get or create Stripe customer
-    let customer;
-    const customers = await stripe.customers.list({ limit: 100 });
-    customer = customers.data.find((c) => c.metadata?.clerk_user_id === clerkUserId);
+    // Get the organization's active subscription
+    const { data: orgSubscription, error: subError } = await supabase
+      .from('organization_subscriptions')
+      .select('stripe_customer_id, stripe_subscription_id, plan_type, billing_frequency')
+      .eq('clerk_org_id', orgId)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
 
-    if (!customer) {
-      // Fetch user email
-      const { data: userData } = await supabase
-        .from('users')
-        .select('email')
-        .eq('clerk_id', clerkUserId)
-        .single();
-
-      customer = await stripe.customers.create({
-        email: userData?.email,
-        metadata: { clerk_user_id: clerkUserId },
-      });
+    if (subError || !orgSubscription) {
+      return res.status(404).json({ error: 'No active organization subscription found' });
     }
 
-    // Create checkout session
-    const priceId = SEAT_PRICING[billingFrequency].priceId;
+    if (!orgSubscription.stripe_customer_id) {
+      return res.status(400).json({ error: 'Organization subscription missing Stripe customer ID' });
+    }
 
-    const session = await stripe.checkout.sessions.create({
-      customer: customer.id,
-      payment_method_types: ['card'],
-      line_items: [
-        {
-          price: priceId,
-          quantity: quantity,
-        },
-      ],
-      mode: 'subscription',
-      success_url: successUrl || `${req.headers.origin || 'https://www.softcodes.ai'}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: cancelUrl || `${req.headers.origin || 'https://www.softcodes.ai'}/payment-cancelled`,
-      metadata: {
-        clerk_user_id: clerkUserId,
-        org_id: orgId,
-        additional_seats: quantity.toString(),
-        billing_frequency: billingFrequency,
-      },
-      subscription_data: {
-        metadata: {
-          clerk_user_id: clerkUserId,
-          org_id: orgId,
-          additional_seats: quantity.toString(),
-          billing_frequency: billingFrequency,
-        },
-      },
+    // Create customer portal session
+    const portalSession = await stripe.billingPortal.sessions.create({
+      customer: orgSubscription.stripe_customer_id,
+      return_url: successUrl || `${req.headers.origin || 'https://www.softcodes.ai'}/teams`,
+      configuration: {
+        features: {
+          subscription_update: {
+            enabled: true,
+            proration_behavior: 'create_prorations',
+            default_allowed_updates: ['quantity']
+          }
+        }
+      }
     });
 
     return res.status(200).json({
-      sessionId: session.id,
-      url: session.url,
+      url: portalSession.url,
     });
 
   } catch (error) {
