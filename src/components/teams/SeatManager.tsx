@@ -347,7 +347,7 @@ export const SeatManager: React.FC = () => {
           {/* Seats List */}
           <div>
             <h4 className="text-white font-medium mb-3">Assigned Seats</h4>
-            {seatsData.seats.length === 0 ? (
+            {(!seatsData.seats || seatsData.seats.length === 0) ? (
               <div className="text-center py-8 text-gray-400">
                 <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
                 <p>No seats assigned yet</p>
