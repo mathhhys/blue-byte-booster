@@ -1,0 +1,33 @@
+{
+  "response": {
+    "user": {
+      "id": "test-user-123",
+      "email_addresses": [
+        {
+          "id": "email_1",
+          "email_address": "test@example.com",
+          "verification": {
+            "status": "verified"
+          }
+        }
+      ],
+      "first_name": "Test",
+      "last_name": "User",
+      "public_metadata": {},
+      "private_metadata": {},
+      "unsafe_metadata": {}
+    },
+    "session": {
+      "id": "session_123",
+      "user_id": "test-user-123",
+      "last_active_session": true,
+      "expire_at": 1234567890
+    },
+    "client": {
+      "id": "client_123",
+      "user_id": "test-user-123"
+    },
+    "factor_proofs": {},
+    "organization": null
+  }
+}

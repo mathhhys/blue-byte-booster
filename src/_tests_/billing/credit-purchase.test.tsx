@@ -219,4 +219,110 @@ describe('Credit Purchase Functionality', () => {
 
     expect(screen.getByText('Available Credits')).toBeInTheDocument();
   });
+  it('should validate maximum credit amount', async () => {
+    render(
+      <TestWrapper>
+        <Dashboard />
+      </TestWrapper>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText('500')).toBeInTheDocument();
+    });
+
+    const input = screen.getByPlaceholderText('500');
+    
+    // Test max input
+    fireEvent.change(input, { target: { value: '10000' } });
+    await waitFor(() => {
+      expect(screen.getByText('Cost: $140.00')).toBeInTheDocument(); // Assuming conversion ~0.014/credit
+    });
+
+    // Test over max
+    fireEvent.change(input, { target: { value: '10001' } });
+    await waitFor(() => {
+      expect(screen.getByText(/Maximum purchase is 10,000/)).toBeInTheDocument();
+    });
+  });
+
+  it('should handle non-numeric input', async () => {
+    render(
+      <TestWrapper>
+        <Dashboard />
+      </TestWrapper>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText('500')).toBeInTheDocument();
+    });
+
+    const input = screen.getByPlaceholderText('500');
+    const submitButton = screen.getByRole('button', { name: /Add Credits/ });
+    
+    fireEvent.change(input, { target: { value: 'abc' } });
+    fireEvent.click(submitButton);
+
+    // Should not call API
+    await waitFor(() => {
+      expect(mockFetch).not.toHaveBeenCalledWith('/api/billing/credit-purchase');
+    });
+
+    // Expect validation error
+    expect(screen.getByText(/Please enter a valid number/)).toBeInTheDocument();
+  });
+
+  it('should handle API failure during purchase', async () => {
+    mockFetch.mockImplementation((url) => {
+      if (url.includes('/api/user/get')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            data: {
+              id: 'test-user-123',
+              clerk_id: 'test-user-123',
+              email: 'test@example.com',
+              credits: 1250,
+              plan_type: 'starter'
+            },
+            error: null
+          })
+        });
+      }
+      if (url.includes('/api/billing/credit-purchase')) {
+        return Promise.resolve({
+          ok: false,
+          status: 500,
+          json: () => Promise.resolve({ error: 'Payment failed' })
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    });
+
+    const mockToast = require('@/hooks/use-toast').useToast().toast;
+    
+    render(
+      <TestWrapper>
+        <Dashboard />
+      </TestWrapper>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText('500')).toBeInTheDocument();
+    });
+
+    const input = screen.getByPlaceholderText('500');
+    const submitButton = screen.getByRole('button', { name: /Add Credits/ });
+
+    fireEvent.change(input, { target: { value: '500' } });
+    fireEvent.click(submitButton);
+
+    await waitFor(() => {
+      expect(mockToast).toHaveBeenCalledWith({
+        title: 'Error',
+        description: 'Payment failed',
+        variant: 'destructive'
+      });
+    });
+  });
+
 });

@@ -24,6 +24,7 @@ import {
   Minus,
   History,
   BarChart3,
+  Loader2,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
@@ -105,6 +106,7 @@ const mockCreditTransactions = [
 const Billing = () => {
   const { user } = useUser();
   const { organization, isLoaded: orgLoaded, membership } = useOrganization();
+  const { getToken } = useAuth();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('overview');
   const [currentBalance, setCurrentBalance] = useState(1250);
@@ -138,6 +140,57 @@ const Billing = () => {
       month: 'short',
       day: 'numeric'
     });
+  };
+
+  const handleCreditTopup = async (creditsAmount: number) => {
+    if (!user?.id) {
+      toast({
+        title: "Error",
+        description: "User not authenticated",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const token = await getToken({ template: "supabase" });
+      const baseUrl = window.location.origin;
+      const response = await fetch('/api/stripe/create-credit-topup-session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
+        body: JSON.stringify({
+          creditsAmount,
+          clerkUserId: user.id,
+          successUrl: `${baseUrl}/payment/success`,
+          cancelUrl: `${baseUrl}/billing`,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create top-up session');
+      }
+
+      const data = await response.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error('No checkout URL received');
+      }
+    } catch (error) {
+      console.error('Error creating credit top-up:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : 'Failed to create top-up session',
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -459,6 +512,8 @@ const Billing = () => {
                           <Button
                             variant="outline"
                             className="border-white/20 text-white hover:bg-blue-600/20 hover:border-blue-500 p-4 h-auto flex flex-col items-center gap-1"
+                            onClick={() => handleCreditTopup(500)}
+                            disabled={isLoading}
                           >
                             <div className="text-sm font-medium">500 credits</div>
                             <div className="text-lg font-bold text-green-400">$7.00</div>
@@ -466,6 +521,8 @@ const Billing = () => {
                           <Button
                             variant="outline"
                             className="border-white/20 text-white hover:bg-blue-600/20 hover:border-blue-500 p-4 h-auto flex flex-col items-center gap-1"
+                            onClick={() => handleCreditTopup(1000)}
+                            disabled={isLoading}
                           >
                             <div className="text-sm font-medium">1,000 credits</div>
                             <div className="text-lg font-bold text-green-400">$14.00</div>
@@ -473,17 +530,36 @@ const Billing = () => {
                           <Button
                             variant="outline"
                             className="border-white/20 text-white hover:bg-blue-600/20 hover:border-blue-500 p-4 h-auto flex flex-col items-center gap-1"
+                            onClick={() => handleCreditTopup(2500)}
+                            disabled={isLoading}
                           >
                             <div className="text-sm font-medium">2,500 credits</div>
                             <div className="text-lg font-bold text-green-400">$35.00</div>
                           </Button>
                         </div>
 
-                        <div className="pt-4 border-t border-white/10">
-                          <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white">
-                            <Plus className="w-4 h-4 mr-2" />
-                            Continue to Payment
-                          </Button>
+                        <div className="pt-4 border-t border-white/10 space-y-2">
+                          <div className="flex gap-2">
+                            <Input
+                              type="number"
+                              placeholder="Custom amount (credits)"
+                              className="bg-[#2a2a2a] border-white/10 text-white placeholder-gray-500 flex-1"
+                              disabled={isLoading}
+                            />
+                            <Button
+                              onClick={() => {
+                                const customAmount = prompt('Enter number of credits to purchase:');
+                                if (customAmount && !isNaN(Number(customAmount)) && Number(customAmount) > 0) {
+                                  handleCreditTopup(Number(customAmount));
+                                }
+                              }}
+                              disabled={isLoading}
+                              className="bg-blue-600 hover:bg-blue-700 text-white flex-0"
+                            >
+                              {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Plus className="w-4 h-4 mr-2" />}
+                              Buy Custom
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     </Card>

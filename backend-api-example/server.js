@@ -305,6 +305,102 @@ app.post('/api/stripe/create-checkout-session', async (req, res) => {
   }
 });
 
+// Create one-time credit top-up checkout session
+app.post('/api/stripe/create-credit-topup-session', async (req, res) => {
+  try {
+    const { creditsAmount, clerkUserId, successUrl, cancelUrl } = req.body;
+
+    // Validate input
+    if (!creditsAmount || creditsAmount <= 0 || !clerkUserId) {
+      return res.status(400).json({ error: 'Missing or invalid creditsAmount and clerkUserId required' });
+    }
+
+    const amountInCents = Math.round(creditsAmount * 100); // $0.01 per credit
+
+    // Get or create Stripe customer (similar to subscription flow)
+    let customer;
+    try {
+      // Try to find existing customer by Clerk user ID in metadata
+      const customers = await stripe.customers.list({
+        limit: 100,
+      });
+
+      customer = customers.data.find(c => c.metadata?.clerk_user_id === clerkUserId);
+
+      if (!customer) {
+        // Fetch email from Supabase if needed
+        let customerEmail = req.body.email;
+        if (!customerEmail) {
+          const { data: userData, error: fetchError } = await supabase
+            .from('users')
+            .select('email')
+            .eq('clerk_id', clerkUserId)
+            .single();
+          if (!fetchError && userData?.email) {
+            customerEmail = userData.email;
+          }
+        }
+
+        // Create new customer
+        customer = await stripe.customers.create({
+          email: customerEmail || undefined,
+          description: `Credit top-up for Clerk user ${clerkUserId}`,
+          metadata: {
+            clerk_user_id: clerkUserId,
+          },
+        });
+
+        // Update user with customer ID if new
+        const { error: updateError } = await supabase
+          .from('users')
+          .update({ stripe_customer_id: customer.id })
+          .eq('clerk_id', clerkUserId);
+        if (updateError) {
+          console.error('Error updating user with customer ID:', updateError);
+        }
+      }
+    } catch (error) {
+      console.error('Error creating/finding customer:', error);
+      return res.status(500).json({ error: 'Failed to create customer' });
+    }
+
+    // Create one-time payment checkout session
+    const session = await stripe.checkout.sessions.create({
+      customer: customer.id,
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: `Credit Top-up: ${creditsAmount} credits`,
+              description: `Add ${creditsAmount} credits to your account`,
+            },
+            unit_amount: amountInCents,
+          },
+          quantity: 1,
+        },
+      ],
+      mode: 'payment', // One-time payment, not subscription
+      success_url: successUrl || `${process.env.FRONTEND_URL || 'http://localhost:5173'}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: cancelUrl || `${process.env.FRONTEND_URL || 'http://localhost:5173'}/payment/cancelled`,
+      metadata: {
+        clerk_user_id: clerkUserId,
+        credits_amount: creditsAmount.toString(),
+        type: 'credit_topup',
+      },
+    });
+
+    res.json({
+      sessionId: session.id,
+      url: session.url,
+    });
+  } catch (error) {
+    console.error('Error creating credit top-up session:', error);
+    res.status(500).json({ error: 'Failed to create credit top-up session' });
+  }
+});
+
 // Get checkout session status
 app.get('/api/stripe/session-status', async (req, res) => {
   try {
@@ -1034,6 +1130,43 @@ async function handleCheckoutSessionCompleted(session) {
 
       console.log(`Successfully processed organization checkout for ${clerk_org_id}`);
 
+    } else if (session.metadata?.type === 'credit_topup') {
+      // Handle one-time credit top-up
+      const { clerk_user_id: clerkUserId, credits_amount: creditsAmountStr } = session.metadata;
+      
+      if (!clerkUserId || !creditsAmountStr) {
+        console.error('Missing metadata for credit top-up:', session.metadata);
+        return;
+      }
+
+      const creditsAmount = parseInt(creditsAmountStr);
+      if (isNaN(creditsAmount) || creditsAmount <= 0) {
+        console.error('Invalid credits amount for top-up:', creditsAmountStr);
+        return;
+      }
+
+      console.log(`Processing credit top-up for user ${clerkUserId}: +${creditsAmount} credits`);
+
+      // Grant credits using RPC
+      const { error: creditError } = await supabase.rpc('grant_credits', {
+        p_clerk_id: clerkUserId,
+        p_amount: creditsAmount,
+        p_description: `Credit top-up purchase via Stripe (${session.id})`,
+        p_reference_id: session.id,
+      });
+
+      if (creditError) {
+        console.error('Error granting credits for top-up:', creditError);
+        return;
+      }
+
+      // Optionally update last_credit_update in users table
+      await supabase
+        .from('users')
+        .update({ last_credit_update: new Date().toISOString() })
+        .eq('clerk_id', clerkUserId);
+
+      console.log(`Successfully granted ${creditsAmount} credits to user ${clerkUserId}`);
     } else {
       // Handle individual user subscription
       if (!clerk_user_id || !plan_type || !billing_frequency) {

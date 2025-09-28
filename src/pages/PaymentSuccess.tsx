@@ -4,11 +4,11 @@ import { useUser } from '@clerk/clerk-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { 
-  CheckCircle, 
-  CreditCard, 
-  Users, 
-  ArrowRight, 
+import {
+  CheckCircle,
+  CreditCard,
+  Users,
+  ArrowRight,
   Loader2,
   Gift,
   Mail
@@ -155,6 +155,7 @@ export default function PaymentSuccess() {
         <InvitationManager
           subscriptionId={subscriptionId}
           maxSeats={sessionData?.metadata?.seats || 2}
+          organizationId={sessionData?.metadata?.organizationId || ''}
           onClose={() => setShowInvitations(false)}
         />
       </div>
