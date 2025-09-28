@@ -401,7 +401,7 @@ router.put('/subscription/quantity', authenticateClerkToken, rateLimitMiddleware
 
     const { data: subscription, error: subError } = await supabase
       .from('organization_subscriptions')
-      .select('id, quantity, seats_total')
+      .select('id, seats_total')
       .eq('clerk_org_id', orgId)
       .eq('status', 'active')
       .single();
@@ -410,11 +410,10 @@ router.put('/subscription/quantity', authenticateClerkToken, rateLimitMiddleware
       return res.status(400).json({ error: 'No active subscription found' });
     }
 
-    // Update quantity (this would typically trigger Stripe update; here just DB)
+    // Update seats_total (this would typically trigger Stripe update; here just DB)
     const { error: updateError } = await supabase
       .from('organization_subscriptions')
       .update({
-        quantity,
         seats_total: quantity,
         updated_at: new Date().toISOString(),
       })

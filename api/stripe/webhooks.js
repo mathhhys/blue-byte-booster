@@ -244,16 +244,16 @@ async function handleSubscriptionUpdated(subscription, supabase) {
       return;
     }
 
-    // Update organization subscription with new quantity
+    // Update organization subscription with new seats_total
     const { error: updateError } = await supabase
       .from('organization_subscriptions')
       .update({
-        quantity: totalQuantity,
+        seats_total: totalQuantity,
         status: subscription.status,
         updated_at: new Date().toISOString(),
-        // Reset overage seats if quantity increased
+        // Reset overage seats if seats_total increased
         overage_seats: orgSubscription.overage_seats > 0 ?
-          Math.max(0, orgSubscription.overage_seats - (totalQuantity - orgSubscription.quantity)) :
+          Math.max(0, orgSubscription.overage_seats - (totalQuantity - orgSubscription.seats_total)) :
           orgSubscription.overage_seats
       })
       .eq('stripe_subscription_id', subscription.id);
@@ -268,7 +268,7 @@ async function handleSubscriptionUpdated(subscription, supabase) {
     await recordWebhookProcessing(subscription.id, 'customer.subscription.updated', {
       clerkUserId,
       status: subscription.status,
-      quantity: totalQuantity,
+      seats_total: totalQuantity,
       organization_id: orgSubscription.organization_id
     }, supabase);
 
