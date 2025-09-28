@@ -173,16 +173,46 @@ async function handleInvoicePaymentSucceeded(invoice, supabase) {
       invoiceId: invoice.id
     });
 
-    // Grant credits
-    const { error: creditError } = await supabase.rpc('grant_credits', {
-      p_clerk_id: clerkUserId,
-      p_amount: creditsToGrant,
-      p_description: `${planType} plan ${billingFrequency} recurring credits (${seats} seat${seats > 1 ? 's' : ''})`,
-      p_reference_id: invoice.id,
-    });
+    // Get user ID first
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('clerk_id', clerkUserId)
+      .single();
+
+    if (userError || !userData) {
+      throw new Error(`User not found for clerk_id: ${clerkUserId}`);
+    }
+
+    const userId = userData.id;
+
+    // Grant credits by directly updating the users table
+    const { error: creditError } = await supabase
+      .from('users')
+      .update({
+        credits: supabase.sql`credits + ${creditsToGrant}`,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', userId);
 
     if (creditError) {
       throw new Error(`Failed to grant credits: ${creditError.message}`);
+    }
+
+    // Record credit transaction
+    const { error: transactionError } = await supabase
+      .from('credit_transactions')
+      .insert({
+        user_id: userId,
+        amount: creditsToGrant,
+        description: `${planType} plan ${billingFrequency} recurring credits (${seats} seat${seats > 1 ? 's' : ''})`,
+        transaction_type: 'recurring',
+        reference_id: invoice.id
+      });
+
+    if (transactionError) {
+      console.error('Failed to record credit transaction:', transactionError);
+      // Don't fail the webhook if transaction recording fails
     }
 
     // Record webhook processing to prevent duplicates
@@ -515,16 +545,46 @@ async function handlePaymentIntentSucceeded(paymentIntent, supabase) {
       paymentIntentId: paymentIntent.id
     });
 
-    // Grant credits to user
-    const { error: creditError } = await supabase.rpc('grant_credits', {
-      p_clerk_id: clerkUserId,
-      p_amount: credits,
-      p_description: `Credit purchase: ${credits} credits`,
-      p_reference_id: paymentIntent.id,
-    });
+    // Get user ID first
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('clerk_id', clerkUserId)
+      .single();
+
+    if (userError || !userData) {
+      throw new Error(`User not found for clerk_id: ${clerkUserId}`);
+    }
+
+    const userId = userData.id;
+
+    // Grant credits to user by directly updating the users table
+    const { error: creditError } = await supabase
+      .from('users')
+      .update({
+        credits: supabase.sql`credits + ${credits}`,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', userId);
 
     if (creditError) {
       throw new Error(`Failed to grant credits: ${creditError.message}`);
+    }
+
+    // Record credit transaction
+    const { error: transactionError } = await supabase
+      .from('credit_transactions')
+      .insert({
+        user_id: userId,
+        amount: credits,
+        description: `Credit purchase: ${credits} credits`,
+        transaction_type: 'purchase',
+        reference_id: paymentIntent.id
+      });
+
+    if (transactionError) {
+      console.error('Failed to record credit transaction:', transactionError);
+      // Don't fail the webhook if transaction recording fails
     }
 
     // Record webhook processing to prevent duplicates
@@ -671,6 +731,10 @@ async function handleChargeUpdated(charge, supabase) {
 // Helper function to record webhook processing
 async function recordWebhookProcessing(eventId, eventType, payload, supabase) {
   try {
+    // Extract user_clerk_id from payload if available
+    const userClerkId = payload.clerkUserId || payload.user_clerk_id || null;
+    
+    // Use upsert with onConflict to handle duplicate event_id
     const { error } = await supabase
       .from('webhook_events')
       .upsert({
@@ -678,7 +742,10 @@ async function recordWebhookProcessing(eventId, eventType, payload, supabase) {
         event_type: eventType,
         status: 'success',
         payload: payload,
+        user_clerk_id: userClerkId,
         processed_at: new Date().toISOString()
+      }, {
+        onConflict: 'event_id'
       });
 
     if (error) {
