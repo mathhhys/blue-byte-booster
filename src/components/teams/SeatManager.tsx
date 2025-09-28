@@ -79,7 +79,8 @@ export const SeatManager: React.FC = () => {
       }
       
       const data = await response.json();
-      setSeatsData(data);
+      console.log('🔍 DEBUG: SeatManager - API response data:', data);
+      setSeatsData(data.data);
     } catch (error) {
       console.error('Error loading seats:', error);
       toast({
