@@ -166,7 +166,8 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
 
       if (result.success && result.checkout_url) {
         // Always redirect to Stripe checkout - no mock handling
-        console.log('Redirecting to Stripe checkout:', result.checkout_url);
+        console.log('🔍 DEBUG: Redirecting to Stripe checkout:', result.checkout_url);
+        console.log('🔍 DEBUG: Checkout URL contains mock:', result.checkout_url.includes('mock'));
         window.location.href = result.checkout_url;
       } else {
         console.error('Subscription creation failed:', result);
