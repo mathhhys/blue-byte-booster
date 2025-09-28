@@ -3,8 +3,13 @@ const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
 
-async function runMigration() {
-  console.log('🚀 Running Clerk user synchronization migration...');
+async function runMigration(filename) {
+  if (!filename) {
+    console.log('❌ No migration filename provided. Usage: node run-migration.js <filename.sql>');
+    process.exit(1);
+  }
+
+  console.log(`🚀 Running migration: ${filename}...`);
   
   // Initialize Supabase client
   const supabase = createClient(
@@ -14,7 +19,11 @@ async function runMigration() {
 
   try {
     // Read the migration file
-    const migrationPath = path.join(__dirname, 'migrations', '20250911_add_clerk_id_unique_and_avatar_url.sql');
+    const migrationPath = path.join(__dirname, 'migrations', filename);
+    if (!fs.existsSync(migrationPath)) {
+      console.log(`❌ Migration file not found: ${migrationPath}`);
+      process.exit(1);
+    }
     const migrationSQL = fs.readFileSync(migrationPath, 'utf8');
     
     console.log('📄 Migration SQL loaded');
@@ -72,7 +81,7 @@ async function runMigration() {
 }
 
 // Run the migration
-runMigration().then((success) => {
+runMigration(process.argv[2]).then((success) => {
   if (success) {
     console.log('🎉 Migration completed successfully!');
     process.exit(0);

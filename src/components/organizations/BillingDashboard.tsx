@@ -20,6 +20,7 @@ import {
   UserPlus,
   Clock,
   X,
+  RefreshCw,
 } from 'lucide-react';
 import {
   createOrganizationBillingPortal,
@@ -27,6 +28,9 @@ import {
   getOrganizationSubscription,
   formatSeatCost,
   assignSeatToMember,
+  getOrgCredits,
+  createOrgCreditTopup,
+  formatOrgCreditUsage,
 } from '@/utils/organization/billing';
 
 interface BillingDashboardProps {
@@ -62,6 +66,9 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
   const [newMemberEmail, setNewMemberEmail] = useState('');
   const [isInviting, setIsInviting] = useState(false);
   const [selectedSeats, setSelectedSeats] = useState(5);
+  const [orgCredits, setOrgCredits] = useState(null);
+  const [isLoadingCredits, setIsLoadingCredits] = useState(false);
+  const [isToppingUp, setIsToppingUp] = useState(false);
 
   const isAdmin = membership?.role === 'org:admin';
   const memberCount = memberships?.count || 0;
@@ -150,6 +157,25 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
     }
   };
 
+  const loadOrgCredits = async () => {
+    if (!organization?.id || !subscriptionData) return;
+    
+    try {
+      setIsLoadingCredits(true);
+      const credits = await getOrgCredits(organization.id);
+      setOrgCredits(credits);
+    } catch (error) {
+      console.error('Error loading organization credits:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load organization credits",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingCredits(false);
+    }
+  };
+
   const handleCreateSubscription = async () => {
     if (!organization?.id) return;
 
@@ -182,6 +208,40 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
       });
     } finally {
       setIsCreatingSubscription(false);
+    }
+  };
+
+  const handleTopupCredits = async () => {
+    if (!organization?.id) return;
+
+    const creditsToAdd = prompt('How many credits would you like to add?');
+    if (!creditsToAdd || isNaN(Number(creditsToAdd)) || Number(creditsToAdd) <= 0) {
+      toast({
+        title: "Invalid Amount",
+        description: "Please enter a valid number of credits",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsToppingUp(true);
+      const token = await getToken();
+      const result = await createOrgCreditTopup(organization.id, Number(creditsToAdd), token);
+
+      if (result.success && result.checkout_url) {
+        window.location.href = result.checkout_url;
+      } else {
+        throw new Error(result.error || 'Failed to create top-up session');
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : 'Failed to create top-up session',
+        variant: "destructive",
+      });
+    } finally {
+      setIsToppingUp(false);
     }
   };
 
@@ -442,6 +502,67 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
             <div className="text-sm text-gray-400">monthly billing</div>
           </div>
         </div>
+
+        {/* Organization Credit Pool */}
+        {orgCredits && (
+          <div className="mt-6 p-4 bg-[#1a1a1a] rounded-lg">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="text-white font-medium">Organization Credit Pool</h4>
+              <Badge variant="secondary" className="text-xs">
+                {orgCredits.remaining_credits} remaining
+              </Badge>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+              <div>
+                <div className="text-gray-400">Total Credits</div>
+                <div className="text-white font-medium">{orgCredits.total_credits}</div>
+              </div>
+              <div>
+                <div className="text-gray-400">Used</div>
+                <div className="text-white font-medium">{orgCredits.used_credits}</div>
+              </div>
+              <div>
+                <div className="text-gray-400">Remaining</div>
+                <div className="text-white font-medium">{orgCredits.remaining_credits}</div>
+              </div>
+            </div>
+            <div className="w-full bg-gray-700 rounded-full h-2 mt-3">
+              <div
+                className="h-2 rounded-full bg-blue-600"
+                style={{ width: `${(orgCredits.used_credits / orgCredits.total_credits * 100) || 0}%` }}
+              />
+            </div>
+            <div className="flex gap-2 mt-4">
+              <Button
+                onClick={handleTopupCredits}
+                disabled={isToppingUp}
+                size="sm"
+                className="bg-green-600 hover:bg-green-700 text-white"
+              >
+                {isToppingUp ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Plus className="w-4 h-4 mr-2" />
+                )}
+                Top-up Credits
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-white/20 text-white hover:bg-white/10"
+                onClick={() => loadOrgCredits()}
+                disabled={isLoadingCredits}
+              >
+                {isLoadingCredits ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                )}
+                Refresh
+              </Button>
+            </div>
+          </div>
+        )}
 
         <div className="flex gap-3 mt-6">
           <Button

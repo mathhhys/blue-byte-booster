@@ -430,3 +430,160 @@ router.put('/subscription/quantity', authenticateClerkToken, rateLimitMiddleware
 });
 
 module.exports = router;
+
+// GET /api/organizations/credits?org_id=...
+router.get('/credits', authenticateClerkToken, rateLimitMiddleware, async (req, res) => {
+  try {
+    const { org_id: orgId } = req.query;
+    if (!orgId) {
+      return res.status(400).json({ error: 'Organization ID required' });
+    }
+
+    const isMember = await verifyUserInOrganization(req.auth.clerkUserId, orgId);
+    if (!isMember) {
+      return res.status(403).json({ error: 'Not authorized for this organization' });
+    }
+
+    const { data, error } = await supabase
+      .from('organization_subscriptions')
+      .select('total_credits, used_credits, seats_total, seats_used, plan_type, billing_frequency')
+      .eq('clerk_org_id', orgId)
+      .eq('status', 'active')
+      .single();
+
+    if (error || !data) {
+      return res.status(404).json({ error: 'No active subscription found' });
+    }
+
+    res.json({
+      total_credits: data.total_credits,
+      used_credits: data.used_credits,
+      remaining_credits: data.total_credits - data.used_credits,
+      seats_total: data.seats_total,
+      seats_used: data.seats_used,
+      plan_type: data.plan_type,
+      billing_frequency: data.billing_frequency,
+    });
+  } catch (error) {
+    console.error('Error fetching organization credits:', error);
+    res.status(500).json({ error: 'Failed to fetch organization credits' });
+  }
+});
+
+// POST /api/organizations/credits/deduct
+router.post('/credits/deduct', authenticateClerkToken, rateLimitMiddleware, async (req, res) => {
+  try {
+    const { org_id: orgId, credits_amount } = req.body;
+    if (!orgId || !credits_amount || credits_amount <= 0) {
+      return res.status(400).json({ error: 'Organization ID and positive credits amount required' });
+    }
+
+    const isMember = await verifyUserInOrganization(req.auth.clerkUserId, orgId);
+    if (!isMember) {
+      return res.status(403).json({ error: 'Not authorized for this organization' });
+    }
+
+    const { data, error } = await supabase.rpc('deduct_org_credits', {
+      p_clerk_org_id: orgId,
+      p_credits_amount: credits_amount
+    });
+
+    if (error || !data) {
+      return res.status(400).json({ error: 'Insufficient credits or no active subscription' });
+    }
+
+    res.json({ success: true, remaining_credits: data.total_credits - data.used_credits });
+  } catch (error) {
+    console.error('Error deducting organization credits:', error);
+    res.status(500).json({ error: 'Failed to deduct credits' });
+  }
+});
+
+// POST /api/organizations/credits/topup
+router.post('/credits/topup', authenticateClerkToken, rateLimitMiddleware, async (req, res) => {
+  try {
+    const { org_id: orgId, credits_amount } = req.body;
+    if (!orgId || !credits_amount || credits_amount <= 0) {
+      return res.status(400).json({ error: 'Organization ID and positive credits amount required' });
+    }
+
+    const isMember = await verifyUserInOrganization(req.auth.clerkUserId, orgId);
+    if (!isMember) {
+      return res.status(403).json({ error: 'Not authorized for this organization' });
+    }
+
+    // Get current subscription
+    const { data: subscription, error: subError } = await supabase
+      .from('organization_subscriptions')
+      .select('stripe_customer_id')
+      .eq('clerk_org_id', orgId)
+      .eq('status', 'active')
+      .single();
+
+    if (subError || !subscription) {
+      return res.status(400).json({ error: 'No active subscription found' });
+    }
+
+    // Calculate dollar amount (using same conversion as individual credits)
+    const dollarAmount = Math.ceil(credits_amount * (7 / 500)); // $7 for 500 credits
+
+    // Create Stripe checkout session for top-up
+    const session = await stripe.checkout.sessions.create({
+      customer: subscription.stripe_customer_id,
+      payment_method_types: ['card'],
+      line_items: [{
+        price_data: {
+          currency: 'usd',
+          product_data: {
+            name: 'Organization Credit Top-up',
+            description: `${credits_amount} credits for organization`,
+          },
+          unit_amount: dollarAmount * 100, // cents
+        },
+        quantity: 1,
+      }],
+      mode: 'payment',
+      success_url: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/organizations?topup_success=true`,
+      cancel_url: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/organizations?topup_cancelled=true`,
+      metadata: {
+        clerk_org_id: orgId,
+        credits_amount: credits_amount.toString(),
+        type: 'org_credit_topup',
+      },
+    });
+
+    res.json({ success: true, checkout_url: session.url });
+  } catch (error) {
+    console.error('Error creating credit top-up session:', error);
+    res.status(500).json({ error: 'Failed to create top-up session' });
+  }
+});
+
+// Webhook handler for top-up payment success (add to stripe webhook if not present)
+router.post('/credits/topup/webhook', async (req, res) => {
+  try {
+    const sig = req.headers['stripe-signature'];
+    const event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+
+    if (event.type === 'checkout.session.completed') {
+      const session = event.data.object;
+      const orgId = session.metadata.clerk_org_id;
+      const creditsAmount = parseInt(session.metadata.credits_amount);
+
+      if (session.metadata.type === 'org_credit_topup') {
+        // Add credits to org pool
+        await supabase.rpc('add_org_credits', {
+          p_clerk_org_id: orgId,
+          p_credits_amount: creditsAmount
+        });
+
+        console.log(`✅ Added ${creditsAmount} credits to org ${orgId}`);
+      }
+    }
+
+    res.json({ received: true });
+  } catch (error) {
+    console.error('Webhook error:', error);
+    res.status(400).json({ error: 'Webhook error' });
+  }
+});

@@ -122,24 +122,91 @@ router.post('/:clerkUserId/credits/consume', authenticateClerkToken, rateLimitMi
       });
     }
 
-    // Use enhanced credit consumption function
-    const { data, error } = await supabase.rpc('consume_credits_with_session', {
-      p_clerk_id: clerkUserId,
-      p_amount: amount,
-      p_description: description,
-      p_session_id: sessionId || null,
-      p_model_id: modelId || null,
-      p_provider: provider || null,
-      p_tokens_used: tokensUsed || null,
-      p_metadata: metadata
-    });
+    // Check if user is in an organization with active subscription
+    const { data: orgMembership, error: membershipError } = await supabase
+      .from('organization_members')
+      .select('organization_id')
+      .eq('clerk_user_id', clerkUserId)
+      .single();
+
+    let result;
+    if (membershipError && membershipError.code !== 'PGRST116') { // No rows
+      throw membershipError;
+    }
+
+    if (orgMembership) {
+      const { data: subscription, error: subError } = await supabase
+        .from('organization_subscriptions')
+        .select('id')
+        .eq('organization_id', orgMembership.organization_id)
+        .eq('status', 'active')
+        .single();
+
+      if (subError) {
+        throw subError;
+      }
+
+      if (subscription) {
+        // Deduct from org pool
+        const { data: deductData, error: deductError } = await supabase.rpc('deduct_org_credits', {
+          p_clerk_org_id: orgMembership.organization_id,
+          p_credits_amount: amount
+        });
+
+        if (deductError || !deductData) {
+          return res.status(402).json({ error: 'Insufficient organization credits' });
+        }
+
+        result = {
+          success: true,
+          current_credits: deductData.remaining_credits,
+          credits_consumed: amount,
+          description: description,
+          type: 'org_pool_usage'
+        };
+      } else {
+        // Fall back to individual
+        const { data: deductData, error: deductError } = await supabase.rpc('consume_credits_with_session', {
+          p_clerk_id: clerkUserId,
+          p_amount: amount,
+          p_description: description,
+          p_session_id: sessionId || null,
+          p_model_id: modelId || null,
+          p_provider: provider || null,
+          p_tokens_used: tokensUsed || null,
+          p_metadata: metadata
+        });
+
+        if (deductError) {
+          throw deductError;
+        }
+
+        result = deductData;
+      }
+    } else {
+      // No org, use individual
+      const { data: deductData, error: deductError } = await supabase.rpc('consume_credits_with_session', {
+        p_clerk_id: clerkUserId,
+        p_amount: amount,
+        p_description: description,
+        p_session_id: sessionId || null,
+        p_model_id: modelId || null,
+        p_provider: provider || null,
+        p_tokens_used: tokensUsed || null,
+        p_metadata: metadata
+      });
+
+      if (deductError) {
+        throw deductError;
+      }
+
+      result = deductData;
+    }
 
     if (error) {
       console.error('Credit consumption error:', error);
       return res.status(500).json({ error: 'Credit consumption failed' });
     }
-
-    const result = data;
 
     if (!result.success) {
       const statusCode = result.error_code === 'INSUFFICIENT_CREDITS' ? 402 : 400;

@@ -90,3 +90,36 @@ export const CREDIT_LIMITS = {
   MIN_PURCHASE_AMOUNT: 1.00,
   MAX_PURCHASE_AMOUNT: 1000.00,
 } as const;
+
+// Organization credit types
+export interface OrgCreditBalance {
+  total_credits: number;
+  used_credits: number;
+  remaining_credits: number;
+  seats_total: number;
+  seats_used: number;
+  plan_type: string;
+  billing_frequency: string;
+}
+
+export interface OrgCreditTopupRequest {
+  orgId: string;
+  credits_amount: number;
+}
+
+export interface OrgCreditTopupResponse {
+  success: boolean;
+  checkout_url?: string;
+  error?: string;
+}
+
+export interface DeductOrgCreditsRequest {
+  orgId: string;
+  credits_amount: number;
+}
+
+export interface DeductOrgCreditsResponse {
+  success: boolean;
+  remaining_credits?: number;
+  error?: string;
+}

@@ -287,3 +287,79 @@ export const formatSeatCost = (
   const period = billingFrequency === 'monthly' ? 'month' : 'year';
   return `$${cost}/${period}`;
 };
+
+// Organization credit pool functions
+export const getOrgCredits = async (orgId: string, token?: string) => {
+  try {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    
+    const API_BASE = import.meta.env.VITE_API_URL || '';
+    const response = await fetch(`${API_BASE}/api/organizations/credits?org_id=${orgId}`, {
+      method: 'GET',
+      headers,
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch organization credits');
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error fetching organization credits:', error);
+    throw error;
+  }
+};
+
+export const createOrgCreditTopup = async (
+  orgId: string,
+  creditsAmount: number,
+  token?: string
+): Promise<{ success: boolean; checkout_url?: string; error?: string }> => {
+  try {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    
+    const API_BASE = import.meta.env.VITE_API_URL || '';
+    const response = await fetch(`${API_BASE}/api/organizations/credits/topup`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        org_id: orgId,
+        credits_amount: creditsAmount
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to create top-up session');
+    }
+
+    const data = await response.json();
+    return {
+      success: true,
+      checkout_url: data.checkout_url,
+    };
+  } catch (error) {
+    console.error('Error creating org credit top-up:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to create top-up session'
+    };
+  }
+};
+
+export const formatOrgCreditUsage = (used: number, total: number): string => {
+  return `${used}/${total} credits used`;
+};
