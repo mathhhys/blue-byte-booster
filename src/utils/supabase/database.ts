@@ -554,7 +554,7 @@ export const organizationSeatOperations = {
         .select('seats_used, seats_total, quantity, overage_seats')
         .eq('clerk_org_id', clerkOrgId)
         .eq('status', 'active')
-        .single();
+        .maybeSingle();
 
       if (subError) {
         console.error('Error fetching subscription:', subError);
@@ -620,9 +620,9 @@ export const organizationSeatOperations = {
         .select('id, seats_used, seats_total, overage_seats')
         .eq('clerk_org_id', clerkOrgId)
         .eq('status', 'active')
-        .single();
+        .maybeSingle();
 
-      if (subError) {
+      if (subError || !subscription) {
         return { data: null, error: 'Organization subscription not found' };
       }
 
@@ -881,7 +881,7 @@ export const organizationSubscriptionOperations = {
         .select('id, quantity, seats_total, auto_update_quantity')
         .eq('clerk_org_id', clerkOrgId)
         .eq('status', 'active')
-        .single();
+        .maybeSingle();
 
       if (subError || !subscription) {
         return { data: null, error: 'Active subscription not found' };

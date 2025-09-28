@@ -135,7 +135,8 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
         headers['Authorization'] = `Bearer ${token}`;
       }
       
-      const response = await fetch(`/api/organizations/seats?org_id=${organization.id}`, {
+      const API_BASE = import.meta.env.VITE_API_URL || '';
+      const response = await fetch(`${API_BASE}/api/organizations/seats?org_id=${organization.id}`, {
         headers
       });
       if (!response.ok) {
@@ -235,7 +236,8 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
         headers['Authorization'] = `Bearer ${token}`;
       }
       
-      const response = await fetch('/api/organizations/seats/assign', {
+      const API_BASE = import.meta.env.VITE_API_URL || '';
+      const response = await fetch(`${API_BASE}/api/organizations/seats/assign`, {
         method: 'POST',
         headers,
         body: JSON.stringify({

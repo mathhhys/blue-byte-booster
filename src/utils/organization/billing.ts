@@ -13,7 +13,8 @@ export const getOrganizationSubscription = async (orgId: string, token?: string)
       headers['Authorization'] = `Bearer ${token}`;
     }
     
-    const response = await fetch(`/api/organizations/subscription?orgId=${orgId}`, {
+    const API_BASE = import.meta.env.VITE_API_URL || '';
+    const response = await fetch(`${API_BASE}/api/organizations/subscription?orgId=${orgId}`, {
       method: 'GET',
       headers,
     });
@@ -57,7 +58,8 @@ export const createOrganizationSubscription = async (
       headers['Authorization'] = `Bearer ${token}`;
     }
     
-    const response = await fetch('/api/organizations/create-subscription', {
+    const API_BASE = import.meta.env.VITE_API_URL || '';
+    const response = await fetch(`${API_BASE}/api/organizations/create-subscription`, {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -116,7 +118,8 @@ export const createOrganizationBillingPortal = async (
   try {
     console.log('Creating billing portal for organization:', orgId);
 
-    const response = await fetch('/api/organizations/create-billing-portal', {
+    const API_BASE = import.meta.env.VITE_API_URL || '';
+    const response = await fetch(`${API_BASE}/api/organizations/create-billing-portal`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -152,7 +155,8 @@ export const assignSeatToMember = async (
   userName: string
 ): Promise<{ success: boolean; error?: string }> => {
   try {
-    const response = await fetch('/api/organizations/seats/assign', {
+    const API_BASE = import.meta.env.VITE_API_URL || '';
+    const response = await fetch(`${API_BASE}/api/organizations/seats/assign`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -191,7 +195,8 @@ export const removeSeatFromMember = async (
   userId: string
 ): Promise<{ success: boolean; error?: string }> => {
   try {
-    const response = await fetch(`/api/organizations/seats/${userId}`, {
+    const API_BASE = import.meta.env.VITE_API_URL || '';
+    const response = await fetch(`${API_BASE}/api/organizations/seats/${userId}`, {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
@@ -227,7 +232,8 @@ export const updateSubscriptionQuantity = async (
   quantity: number
 ): Promise<{ success: boolean; error?: string }> => {
   try {
-    const response = await fetch('/api/organizations/subscription/quantity', {
+    const API_BASE = import.meta.env.VITE_API_URL || '';
+    const response = await fetch(`${API_BASE}/api/organizations/subscription/quantity`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',

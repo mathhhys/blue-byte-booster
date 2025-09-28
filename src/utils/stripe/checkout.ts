@@ -7,13 +7,13 @@ const API_BASE = import.meta.env.VITE_API_URL || ''; // set VITE_API_URL in your
 // Multi-currency checkout session creation
 export const createMultiCurrencyCheckoutSession = async (checkoutData: StripeCheckoutDataWithCurrency) => {
   try {
-    // Always use mock implementation in development to avoid CORS issues
-    if (import.meta.env.DEV) {
-      console.log('Using development mock for multi-currency checkout');
+    // Use mock implementation only if explicitly requested (for testing)
+    if (import.meta.env.VITE_USE_STRIPE_MOCK === 'true') {
+      console.log('Using Stripe mock implementation (VITE_USE_STRIPE_MOCK=true)');
       return await mockCreateMultiCurrencyCheckoutSession(checkoutData);
     }
 
-    // Call backend API to create checkout session (production only)
+    // Call backend API to create checkout session
     const response = await fetch(`${API_BASE}/api/stripe/create-checkout-session`, {
       method: 'POST',
       headers: {
@@ -63,13 +63,16 @@ export const createCheckoutSession = async (checkoutData: StripeCheckoutData) =>
     }
 
     const { sessionId, url } = await response.json();
-    
+
     if (url) {
       // Redirect to Stripe Checkout
       window.location.href = url;
       return { success: true, sessionId };
+    } else if (sessionId) {
+      // Use Stripe.js redirect for sessions without direct URL (e.g., mock sessions)
+      return await redirectToCheckout(sessionId);
     } else {
-      throw new Error('No checkout URL received');
+      throw new Error('No checkout URL or session ID received');
     }
   } catch (error) {
     console.error('Error creating checkout session:', error);
