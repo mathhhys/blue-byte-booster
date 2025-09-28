@@ -1101,7 +1101,142 @@ async function handleCheckoutSessionCompleted(session) {
 
 async function handlePaymentSucceeded(invoice) {
   console.log('Payment succeeded:', invoice.id);
-  // Handle recurring payment success
+  
+  try {
+    // Get the subscription details from the invoice
+    const subscription = await stripe.subscriptions.retrieve(invoice.subscription, {
+      expand: ['customer']
+    });
+
+    const metadata = subscription.metadata || {};
+    const type = metadata.type || (subscription.items.data[0].price.product === 'prod_teams' ? 'organization' : 'individual');
+
+    if (type === 'organization') {
+      await rechargeOrganizationCredits(subscription);
+    } else {
+      await rechargeIndividualCredits(subscription);
+    }
+
+    console.log(`✅ Successfully processed credit recharge for ${type} subscription:`, subscription.id);
+  } catch (error) {
+    console.error('Error processing payment succeeded webhook:', error);
+  }
+}
+
+async function rechargeIndividualCredits(subscription) {
+  const metadata = subscription.metadata || {};
+  const clerkUserId = metadata.clerk_user_id;
+  const planType = metadata.plan_type || 'pro';
+  const seats = parseInt(metadata.seats) || 1;
+
+  if (!clerkUserId) {
+    console.error('Missing clerk_user_id in subscription metadata');
+    return;
+  }
+
+  // Check if credits were already recharged this billing period
+  const { data: subData, error: subError } = await supabase
+    .from('subscriptions')
+    .select('last_credit_recharge_at, current_period_start')
+    .eq('stripe_subscription_id', subscription.id)
+    .single();
+
+  if (subError) {
+    console.error('Error fetching subscription:', subError);
+    return;
+  }
+
+  // Prevent double charging in same billing period
+  if (subData.last_credit_recharge_at &&
+      new Date(subData.last_credit_recharge_at) >= new Date(subscription.current_period_start * 1000)) {
+    console.log('Credits already recharged for this billing period');
+    return;
+  }
+
+  // Add 500 credits per seat
+  const creditsToAdd = 500 * seats;
+  
+  const { error: creditError } = await supabase.rpc('grant_credits', {
+    p_clerk_id: clerkUserId,
+    p_amount: creditsToAdd,
+    p_description: `Monthly ${planType} plan recharge (${seats} seat${seats > 1 ? 's' : ''})`,
+    p_reference_id: subscription.id,
+  });
+
+  if (creditError) {
+    console.error('Error granting credits:', creditError);
+    return;
+  }
+
+  // Update last recharge timestamp
+  const { error: updateError } = await supabase
+    .from('subscriptions')
+    .update({
+      last_credit_recharge_at: new Date().toISOString()
+    })
+    .eq('stripe_subscription_id', subscription.id);
+
+  if (updateError) {
+    console.error('Error updating last_credit_recharge_at:', updateError);
+  }
+
+  console.log(`Added ${creditsToAdd} credits to user ${clerkUserId}`);
+}
+
+async function rechargeOrganizationCredits(subscription) {
+  const metadata = subscription.metadata || {};
+  const clerkOrgId = metadata.clerk_org_id;
+
+  if (!clerkOrgId) {
+    console.error('Missing clerk_org_id in subscription metadata');
+    return;
+  }
+
+  // Get organization subscription details
+  const { data: orgSub, error: orgError } = await supabase
+    .from('organization_subscriptions')
+    .select('id, seats_total, last_credit_recharge_at, current_period_start')
+    .eq('stripe_subscription_id', subscription.id)
+    .single();
+
+  if (orgError) {
+    console.error('Error fetching organization subscription:', orgError);
+    return;
+  }
+
+  // Prevent double charging in same billing period
+  if (orgSub.last_credit_recharge_at &&
+      new Date(orgSub.last_credit_recharge_at) >= new Date(subscription.current_period_start * 1000)) {
+    console.log('Credits already recharged for this billing period');
+    return;
+  }
+
+  // Add 500 credits per seat to organization pool
+  const creditsToAdd = 500 * orgSub.seats_total;
+  
+  const { error: creditError } = await supabase.rpc('add_org_credits', {
+    p_clerk_org_id: clerkOrgId,
+    p_credits_amount: creditsToAdd,
+  });
+
+  if (creditError) {
+    console.error('Error adding org credits:', creditError);
+    return;
+  }
+
+  // Update last recharge timestamp
+  const { error: updateError } = await supabase
+    .from('organization_subscriptions')
+    .update({
+      last_credit_recharge_at: new Date().toISOString()
+    })
+    .eq('id', orgSub.id);
+
+  if (updateError) {
+    console.error('Error updating last_credit_recharge_at:', updateError);
+  }
+
+  console.log(`Added ${creditsToAdd} credits to organization ${clerkOrgId}`);
 }
 
 async function handlePaymentFailed(invoice) {

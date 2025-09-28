@@ -1,92 +1,46 @@
+// Script to run the credit recharge migration
 const { createClient } = require('@supabase/supabase-js');
 const fs = require('fs');
-const path = require('path');
 require('dotenv').config();
 
-async function runMigration(filename) {
-  if (!filename) {
-    console.log('❌ No migration filename provided. Usage: node run-migration.js <filename.sql>');
-    process.exit(1);
-  }
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
-  console.log(`🚀 Running migration: ${filename}...`);
+async function runMigration() {
+  console.log('🚀 Running credit recharge migration...');
   
-  // Initialize Supabase client
-  const supabase = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY
-  );
-
   try {
-    // Read the migration file
-    const migrationPath = path.join(__dirname, 'migrations', filename);
-    if (!fs.existsSync(migrationPath)) {
-      console.log(`❌ Migration file not found: ${migrationPath}`);
-      process.exit(1);
-    }
-    const migrationSQL = fs.readFileSync(migrationPath, 'utf8');
+    // Read the migration SQL file
+    const migrationSQL = fs.readFileSync('./migrations/20250928_add_credit_recharge_tracking.sql', 'utf8');
     
-    console.log('📄 Migration SQL loaded');
-    console.log('🔧 Executing migration...');
+    // Split into individual statements
+    const statements = migrationSQL.split(';').filter(stmt => stmt.trim());
     
-    // Execute the migration
-    const { data, error } = await supabase.rpc('exec_sql', {
-      sql: migrationSQL
-    });
-    
-    if (error) {
-      // If rpc doesn't work, try direct SQL execution
-      console.log('⚠️  RPC method failed, trying direct execution...');
-      
-      // Split SQL into individual statements and execute them
-      const statements = migrationSQL
-        .split(';')
-        .map(stmt => stmt.trim())
-        .filter(stmt => stmt.length > 0);
-      
-      for (const statement of statements) {
-        if (statement.toLowerCase().includes('create table')) {
-          console.log(`📝 Executing: ${statement.substring(0, 50)}...`);
-        }
+    for (const statement of statements) {
+      if (statement.trim()) {
+        console.log(`Executing: ${statement.trim()}...`);
+        const { error } = await supabase.rpc('exec_sql', { sql: statement });
         
-        const { error: execError } = await supabase
-          .from('_temp_migration')
-          .select('*')
-          .limit(0); // This will fail but we can catch it
-          
-        // Since we can't execute raw SQL directly, we'll need to use the SQL editor
-        console.log('❌ Cannot execute raw SQL via client. Please run the migration manually.');
-        console.log('📋 Copy and paste the following SQL into your Supabase SQL Editor:');
-        console.log('\n' + '='.repeat(60));
-        console.log(migrationSQL);
-        console.log('='.repeat(60) + '\n');
-        return false;
+        if (error) {
+          // If exec_sql doesn't exist, try direct query (for development)
+          console.log('exec_sql not available, trying direct query...');
+          const { error: directError } = await supabase.query(statement);
+          if (directError) {
+            console.error('Error executing migration:', directError);
+            return;
+          }
+        }
       }
-    } else {
-      console.log('✅ Migration executed successfully!');
-      return true;
     }
     
-  } catch (err) {
-    console.error('❌ Migration failed:', err.message);
-    console.log('\n📋 Please run this SQL manually in your Supabase SQL Editor:');
-    console.log('\n' + '='.repeat(60));
+    console.log('✅ Migration completed successfully!');
+    console.log('The last_credit_recharge_at columns have been added to both subscriptions and organization_subscriptions tables.');
     
-    const migrationPath = path.join(__dirname, 'migrations', '20250911_add_clerk_id_unique_and_avatar_url.sql');
-    const migrationSQL = fs.readFileSync(migrationPath, 'utf8');
-    console.log(migrationSQL);
-    console.log('='.repeat(60) + '\n');
-    return false;
+  } catch (error) {
+    console.error('❌ Migration failed:', error);
   }
 }
 
-// Run the migration
-runMigration(process.argv[2]).then((success) => {
-  if (success) {
-    console.log('🎉 Migration completed successfully!');
-    process.exit(0);
-  } else {
-    console.log('⚠️  Please run the migration manually and then re-run the tests.');
-    process.exit(1);
-  }
-});
+runMigration();

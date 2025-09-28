@@ -203,10 +203,6 @@ router.post('/:clerkUserId/credits/consume', authenticateClerkToken, rateLimitMi
       result = deductData;
     }
 
-    if (error) {
-      console.error('Credit consumption error:', error);
-      return res.status(500).json({ error: 'Credit consumption failed' });
-    }
 
     if (!result.success) {
       const statusCode = result.error_code === 'INSUFFICIENT_CREDITS' ? 402 : 400;
