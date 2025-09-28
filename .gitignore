@@ -31,3 +31,6 @@ backend-api-example/.env
 *.sln
 *.sw?
 .vercel
+
+# KiloCode configuration
+.kilocode/
