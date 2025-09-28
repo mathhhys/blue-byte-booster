@@ -244,6 +244,12 @@ async function handleSubscriptionUpdated(subscription, supabase) {
       return;
     }
 
+    // Only process teams plans for seat synchronization
+    if (orgSubscription.plan_type !== 'teams') {
+      console.log('Skipping subscription update - not a teams plan, plan_type:', orgSubscription.plan_type);
+      return;
+    }
+
     // Update organization subscription with new seats_total
     const { error: updateError } = await supabase
       .from('organization_subscriptions')

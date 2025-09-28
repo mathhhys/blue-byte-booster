@@ -37,7 +37,7 @@ interface SeatData {
 
 export const SeatManager: React.FC = () => {
   const { organization } = useOrganization();
-  const { getToken } = useAuth();
+  const { userId, getToken } = useAuth();
   const { toast } = useToast();
   const [seatsData, setSeatsData] = useState<SeatData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -46,6 +46,9 @@ export const SeatManager: React.FC = () => {
   const [assignEmail, setAssignEmail] = useState('');
   const [assignRole, setAssignRole] = useState('member');
   const [showAssignModal, setShowAssignModal] = useState(false);
+  const [showBuySeatsModal, setShowBuySeatsModal] = useState(false);
+  const [buyQuantity, setBuyQuantity] = useState(1);
+  const [buyBillingFrequency, setBuyBillingFrequency] = useState('monthly');
 
   useEffect(() => {
     if (organization?.id) {
@@ -121,11 +124,7 @@ export const SeatManager: React.FC = () => {
       });
 
       if (response.status === 402) {
-        toast({
-          title: "Insufficient Seats",
-          description: "No available seats. Please upgrade your subscription to add more members.",
-          variant: "destructive",
-        });
+        setShowBuySeatsModal(true);
         return;
       }
 
@@ -162,15 +161,15 @@ export const SeatManager: React.FC = () => {
     try {
       const token = await getToken();
       console.log('🔍 DEBUG: SeatManager - Got auth token for revoke:', token ? 'Present' : 'Missing');
-      
+
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
       };
-      
+
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
       }
-      
+
       const API_BASE = import.meta.env.VITE_API_URL || '';
       const response = await fetch(`${API_BASE}/api/organizations/seats/revoke`, {
         method: 'POST',
@@ -201,6 +200,50 @@ export const SeatManager: React.FC = () => {
       });
     } finally {
       setIsRevoking(false);
+    }
+  };
+
+  const handleBuySeats = async () => {
+    if (!organization?.id) return;
+
+    setIsAssigning(true);
+    try {
+      const token = await getToken();
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const API_BASE = import.meta.env.VITE_API_URL || '';
+      const response = await fetch(`${API_BASE}/api/organizations/buy-seats`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          quantity: buyQuantity,
+          billingFrequency: buyBillingFrequency,
+          orgId: organization.id,
+          clerkUserId: userId,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create checkout');
+      }
+
+      const data = await response.json();
+      window.location.href = data.url;
+    } catch (error) {
+      console.error('Error buying seats:', error);
+      toast({
+        title: "Error",
+        description: "Failed to initiate checkout",
+        variant: "destructive",
+      });
+    } finally {
+      setIsAssigning(false);
     }
   };
 
@@ -312,6 +355,74 @@ export const SeatManager: React.FC = () => {
                   <UserPlus className="w-4 h-4 mr-2" />
                 )}
                 Assign Seat
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={showBuySeatsModal} onOpenChange={setShowBuySeatsModal}>
+          <DialogContent className="bg-[#2a2a2a] border-white/10 text-white">
+            <DialogHeader>
+              <DialogTitle>Buy Additional Seats</DialogTitle>
+              <DialogDescription>Purchase additional seats for your team.</DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              {seatsData && (
+                <div className="text-sm text-gray-400">
+                  Current: {seatsData.seats_used} of {seatsData.seats_total} seats used
+                </div>
+              )}
+
+              <div>
+                <Label htmlFor="quantity" className="text-white">Number of Additional Seats</Label>
+                <Input
+                  id="quantity"
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={buyQuantity}
+                  onChange={(e) => setBuyQuantity(parseInt(e.target.value) || 1)}
+                  className="bg-[#1a1a1a] border-white/10 text-white mt-1"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="billing" className="text-white">Billing Frequency</Label>
+                <Select value={buyBillingFrequency} onValueChange={setBuyBillingFrequency}>
+                  <SelectTrigger className="bg-[#1a1a1a] border-white/10 text-white mt-1">
+                    <SelectValue placeholder="Select billing frequency" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#2a2a2a] border-white/10 text-white">
+                    <SelectItem value="monthly">Monthly</SelectItem>
+                    <SelectItem value="yearly">Yearly</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="text-sm text-gray-300">
+                <p>Pricing: ${buyBillingFrequency === 'monthly' ? '10' : '96'} per seat / {buyBillingFrequency}</p>
+                <p>Total: ${(buyQuantity * (buyBillingFrequency === 'monthly' ? 10 : 96)).toFixed(2)} for {buyQuantity} seat{buyQuantity > 1 ? 's' : ''} / {buyBillingFrequency}</p>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setShowBuySeatsModal(false)}
+                className="border-white/20 text-white hover:bg-white/10"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleBuySeats}
+                disabled={isAssigning}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                {isAssigning ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : null}
+                Proceed to Checkout
               </Button>
             </DialogFooter>
           </DialogContent>
