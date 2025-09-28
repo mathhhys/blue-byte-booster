@@ -1,5 +1,5 @@
 // Vercel serverless function for starter plan signup processing
-const { createClient } = require('@supabase/supabase-js');
+import { createClient } from '@supabase/supabase-js';
 
 export default async function handler(req, res) {
   console.log('=== STARTER SIGNUP API ROUTE ENTRY ===');

@@ -1,6 +1,8 @@
 // Vercel serverless function for processing payment success
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-const { createClient } = require('@supabase/supabase-js');
+import Stripe from 'stripe';
+import { createClient } from '@supabase/supabase-js';
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 export default async function handler(req, res) {
   console.log('=== STRIPE PROCESS PAYMENT SUCCESS API ROUTE ENTRY ===');

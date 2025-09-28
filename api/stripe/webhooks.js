@@ -1,6 +1,8 @@
 // Vercel serverless function for handling Stripe webhooks
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-const { createClient } = require('@supabase/supabase-js');
+import Stripe from 'stripe';
+import { createClient } from '@supabase/supabase-js';
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 export default async function handler(req, res) {
   console.log('=== STRIPE WEBHOOKS API ROUTE ENTRY ===');
@@ -72,6 +74,18 @@ export default async function handler(req, res) {
 
       case 'payment_intent.succeeded':
         await handlePaymentIntentSucceeded(event.data.object, supabase);
+        break;
+
+      case 'payment_intent.created':
+        await handlePaymentIntentCreated(event.data.object, supabase);
+        break;
+
+      case 'charge.succeeded':
+        await handleChargeSucceeded(event.data.object, supabase);
+        break;
+
+      case 'charge.updated':
+        await handleChargeUpdated(event.data.object, supabase);
         break;
 
       case 'customer.subscription.updated':
@@ -612,6 +626,43 @@ async function checkIdempotency(eventId, supabase) {
     // If table doesn't exist or error occurs, assume not processed
     return false;
   }
+}
+
+// Handle payment intent created event
+async function handlePaymentIntentCreated(paymentIntent, supabase) {
+  console.log('💳 Processing payment intent created:', paymentIntent.id);
+  // Log the event but no action needed for creation
+  await recordWebhookProcessing(paymentIntent.id, 'payment_intent.created', {
+    amount: paymentIntent.amount,
+    currency: paymentIntent.currency,
+    status: paymentIntent.status
+  }, supabase);
+  console.log('✅ Payment intent created event logged');
+}
+
+// Handle charge succeeded event
+async function handleChargeSucceeded(charge, supabase) {
+  console.log('💳 Processing charge succeeded:', charge.id);
+  // Log the event but no action needed as payment_intent.succeeded handles credits
+  await recordWebhookProcessing(charge.id, 'charge.succeeded', {
+    amount: charge.amount,
+    currency: charge.currency,
+    payment_intent: charge.payment_intent
+  }, supabase);
+  console.log('✅ Charge succeeded event logged');
+}
+
+// Handle charge updated event
+async function handleChargeUpdated(charge, supabase) {
+  console.log('💳 Processing charge updated:', charge.id);
+  // Log the event but no action needed typically
+  await recordWebhookProcessing(charge.id, 'charge.updated', {
+    amount: charge.amount,
+    currency: charge.currency,
+    status: charge.status,
+    payment_intent: charge.payment_intent
+  }, supabase);
+  console.log('✅ Charge updated event logged');
 }
 
 // Helper function to record webhook processing
