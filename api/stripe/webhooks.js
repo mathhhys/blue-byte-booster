@@ -585,9 +585,10 @@ async function handlePaymentIntentSucceeded(paymentIntent, supabase) {
     console.log(`Using metadata from: ${metadataSource}`);
 
     // Check for idempotency to prevent duplicate processing
-    const alreadyProcessed = await checkIdempotency(paymentIntent.id, supabase);
+    // For credit purchases, we need to check if credits were actually granted
+    const alreadyProcessed = await checkCreditPurchaseIdempotency(paymentIntent.id, metadata.clerk_user_id, supabase);
     if (alreadyProcessed) {
-      console.log('Payment intent already processed, skipping');
+      console.log('Credit purchase already processed and credits granted, skipping');
       return;
     }
 
@@ -766,6 +767,46 @@ async function checkIdempotency(eventId, supabase) {
     return !error && data;
   } catch (error) {
     // If table doesn't exist or error occurs, assume not processed
+    return false;
+  }
+}
+
+// Helper function to check if credit purchase was already processed and credits granted
+async function checkCreditPurchaseIdempotency(paymentIntentId, clerkUserId, supabase) {
+  try {
+    // First check if there's a successful webhook event for this payment intent
+    const { data: webhookData, error: webhookError } = await supabase
+      .from('webhook_events')
+      .select('id, payload')
+      .eq('event_id', paymentIntentId)
+      .eq('event_type', 'payment_intent.succeeded')
+      .eq('status', 'success')
+      .single();
+
+    if (webhookError || !webhookData) {
+      console.log('No previous successful webhook event found');
+      return false;
+    }
+
+    // Check if credits were actually granted by looking for a credit transaction
+    const { data: transactionData, error: transactionError } = await supabase
+      .from('credit_transactions')
+      .select('id')
+      .eq('reference_id', paymentIntentId)
+      .eq('transaction_type', 'purchase')
+      .single();
+
+    if (transactionError || !transactionData) {
+      console.log('Previous webhook processed but no credit transaction found - will reprocess');
+      return false;
+    }
+
+    console.log('Credit transaction already exists for this payment intent');
+    return true;
+
+  } catch (error) {
+    console.error('Error checking credit purchase idempotency:', error);
+    // If error occurs, assume not processed to be safe
     return false;
   }
 }
