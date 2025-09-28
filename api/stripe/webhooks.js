@@ -22,9 +22,12 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'Webhook secret not configured' });
     }
 
+    // Get the raw body from the request
+    const rawBody = await getRawBody(req);
+    
     let event;
     try {
-      event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+      event = stripe.webhooks.constructEvent(rawBody, sig, webhookSecret);
       console.log('✅ Webhook signature verified');
     } catch (err) {
       console.log('❌ Webhook signature verification failed:', err.message);
@@ -685,4 +688,18 @@ async function recordWebhookProcessing(eventId, eventType, payload, supabase) {
     // Don't fail webhook processing if logging fails
     console.error('Error recording webhook processing:', error);
   }
+}
+
+// Helper function to get raw body from request
+function getRawBody(req) {
+  return new Promise((resolve, reject) => {
+    let data = [];
+    req.on('data', chunk => {
+      data.push(chunk);
+    });
+    req.on('end', () => {
+      resolve(Buffer.concat(data));
+    });
+    req.on('error', reject);
+  });
 }
