@@ -92,7 +92,60 @@ export default async function handler(req, res) {
       Object.assign(metadata, session.subscription.metadata);
     }
 
-    const { plan_type, billing_frequency, seats = 1 } = metadata;
+    const { plan_type, billing_frequency, seats = 1, type, org_id, quantity } = metadata;
+
+    // Handle additional seats purchase
+    if (type === 'additional_seats') {
+      console.log('Processing additional seats purchase...');
+      if (!org_id || !quantity) {
+        return res.status(400).json({ error: 'Missing org_id or quantity for additional seats' });
+      }
+
+      // Update organization seats_total
+      try {
+        const { data: orgSub, error: fetchError } = await supabase
+          .from('organization_subscriptions')
+          .select('seats_total, stripe_subscription_id')
+          .eq('clerk_org_id', org_id)
+          .eq('status', 'active')
+          .single();
+
+        if (fetchError || !orgSub) {
+          return res.status(404).json({ error: 'Organization subscription not found' });
+        }
+
+        const newSeatsTotal = orgSub.seats_total + parseInt(quantity);
+
+        const { error: updateError } = await supabase
+          .from('organization_subscriptions')
+          .update({ seats_total: newSeatsTotal, updated_at: new Date().toISOString() })
+          .eq('clerk_org_id', org_id);
+
+        if (updateError) throw updateError;
+
+        // Update Stripe subscription quantity if exists
+        if (orgSub.stripe_subscription_id) {
+          await stripe.subscriptions.update(orgSub.stripe_subscription_id, {
+            quantity: newSeatsTotal,
+            proration_behavior: 'create_prorations',
+          });
+        }
+
+        console.log(`✅ Organization seats updated: ${orgSub.seats_total} -> ${newSeatsTotal}`);
+
+        return res.status(200).json({
+          success: true,
+          message: 'Additional seats purchased successfully',
+          data: {
+            seatsAdded: parseInt(quantity),
+            newTotalSeats: newSeatsTotal,
+          }
+        });
+      } catch (error) {
+        console.error('❌ Error processing additional seats:', error);
+        return res.status(500).json({ error: 'Failed to process additional seats' });
+      }
+    }
 
     if (!plan_type || !billing_frequency) {
       console.log('❌ Missing payment metadata');

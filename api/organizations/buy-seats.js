@@ -4,18 +4,6 @@ import { createClient } from '@supabase/supabase-js';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
-// Pricing for additional seats (teams plan)
-const SEAT_PRICING = {
-  monthly: {
-    priceId: 'price_1Qexample_monthly', // Replace with actual Stripe price ID for $10/seat/month
-    amount: 1000, // $10.00 in cents
-  },
-  yearly: {
-    priceId: 'price_1Qexample_yearly', // Replace with actual Stripe price ID for $96/seat/year
-    amount: 9600, // $96.00 in cents
-  },
-};
-
 export default async function handler(req, res) {
   console.log('=== BUY SEATS API ROUTE ENTRY ===');
 
@@ -25,11 +13,11 @@ export default async function handler(req, res) {
       return res.status(405).json({ error: 'Method not allowed' });
     }
 
-    const { orgId, clerkUserId, successUrl, cancelUrl } = req.body;
+    const { orgId, clerkUserId, quantity = 1, successUrl, cancelUrl } = req.body;
 
     // Validate input
-    if (!orgId || !clerkUserId) {
-      return res.status(400).json({ error: 'Missing required parameters' });
+    if (!orgId || !clerkUserId || !quantity || quantity < 1) {
+      return res.status(400).json({ error: 'Missing required parameters or invalid quantity' });
     }
 
     // Initialize Supabase
@@ -60,23 +48,58 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Organization subscription missing Stripe customer ID' });
     }
 
-    // Create customer portal session
-    const portalSession = await stripe.billingPortal.sessions.create({
-      customer: orgSubscription.stripe_customer_id,
-      return_url: successUrl || `${req.headers.origin || 'https://www.softcodes.ai'}/teams`,
-      configuration: {
-        features: {
-          subscription_update: {
-            enabled: true,
-            proration_behavior: 'create_prorations',
-            default_allowed_updates: ['quantity']
-          }
-        }
+    // Get the appropriate price ID for additional seats (teams plan)
+    const billingFrequency = orgSubscription.billing_frequency;
+    const priceIds = {
+      monthly: {
+        USD: 'price_1RwN7VH6gWxKcaTXHVkwwT60',
+        EUR: 'price_1RwN6oH6gWxKcaTXgmKllDYt',
+        GBP: 'price_1RwN7uH6gWxKcaTX0jJCR7uU'
+      },
+      yearly: {
+        USD: 'price_1RwN8hH6gWxKcaTXEaGbVvhz',
+        EUR: 'price_1RwN8QH6gWxKcaTX7thDBBm7',
+        GBP: 'price_1RwN9FH6gWxKcaTXQBUURC9T'
       }
+    };
+
+    // Assume USD for now, can be extended for multi-currency
+    const priceId = priceIds[billingFrequency]?.USD;
+    if (!priceId) {
+      return res.status(400).json({ error: 'Invalid billing frequency' });
+    }
+
+    // Create checkout session for additional seats
+    const session = await stripe.checkout.sessions.create({
+      customer: orgSubscription.stripe_customer_id,
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          price: priceId,
+          quantity: quantity,
+          adjustable_quantity: {
+            enabled: true,
+            minimum: 1,
+            maximum: 100,
+          },
+        },
+      ],
+      mode: 'payment', // One-time payment for additional seats
+      success_url: successUrl || `${req.headers.origin || 'https://www.softcodes.ai'}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: cancelUrl || `${req.headers.origin || 'https://www.softcodes.ai'}/payment-cancelled`,
+      metadata: {
+        clerk_user_id: clerkUserId,
+        org_id: orgId,
+        type: 'additional_seats',
+        quantity: quantity.toString(),
+        billing_frequency: billingFrequency,
+      },
+      allow_promotion_codes: true,
     });
 
     return res.status(200).json({
-      url: portalSession.url,
+      sessionId: session.id,
+      url: session.url,
     });
 
   } catch (error) {

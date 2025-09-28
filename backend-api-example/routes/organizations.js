@@ -180,30 +180,60 @@ router.post('/seats/assign', authenticateClerkToken, rateLimitMiddleware, async 
       return res.status(400).json({ error: 'User already has an active seat' });
     }
 
-    // Create seat
+    // First, try to find the user by email to get their clerk_user_id
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('clerk_id')
+      .eq('email', email)
+      .single();
+
+    if (userError || !userData) {
+      return res.status(400).json({ error: 'User not found. Please ensure the user has signed up for the service first.' });
+    }
+
+    const clerkUserId = userData.clerk_id;
+
+    // Check if user already has seat
+    const { data: existingSeatForUser } = await supabase
+      .from('organization_seats')
+      .select('id')
+      .eq('clerk_org_id', orgId)
+      .eq('clerk_user_id', clerkUserId)
+      .eq('status', 'active')
+      .single();
+
+    if (existingSeatForUser) {
+      return res.status(400).json({ error: 'User already has an active seat' });
+    }
+
+    // Assign seat with credit allocation using database function
+    const { data: seatAssigned, error: assignError } = await supabase.rpc('assign_organization_seat_with_credits', {
+      p_clerk_org_id: orgId,
+      p_clerk_user_id: clerkUserId,
+      p_user_email: email,
+      p_user_name: null, // We don't have user name here
+      p_assigned_by: req.auth.clerkUserId,
+      p_expires_at: null
+    });
+
+    if (assignError || !seatAssigned) {
+      console.error('Error assigning seat with credits:', assignError);
+      return res.status(500).json({ error: 'Failed to assign seat with credits' });
+    }
+
+    // Get the created seat details
     const { data: seat, error: seatError } = await supabase
       .from('organization_seats')
-      .insert({
-        organization_subscription_id: subscription.id,
-        clerk_org_id: orgId,
-        user_email: email,
-        role,
-        status: 'active',
-        assigned_at: new Date().toISOString(),
-        assigned_by: req.auth.clerkUserId,
-      })
-      .select()
+      .select('*')
+      .eq('clerk_org_id', orgId)
+      .eq('clerk_user_id', clerkUserId)
+      .eq('status', 'active')
       .single();
 
     if (seatError) {
-      return res.status(500).json({ error: seatError.message });
+      console.error('Error fetching seat details:', seatError);
+      return res.status(500).json({ error: 'Seat assigned but failed to retrieve details' });
     }
-
-    // Update seats_used
-    await supabase
-      .from('organization_subscriptions')
-      .update({ seats_used: subscription.seats_used + 1, updated_at: new Date().toISOString() })
-      .eq('id', subscription.id);
 
     res.json({ success: true, seat });
   } catch (error) {
@@ -225,48 +255,15 @@ router.post('/seats/revoke', authenticateClerkToken, rateLimitMiddleware, async 
       return res.status(403).json({ error: 'Not authorized for this organization' });
     }
 
-    // Find active seat
-    const { data: seat, error: seatError } = await supabase
-      .from('organization_seats')
-      .select('id, organization_subscription_id')
-      .eq('clerk_org_id', orgId)
-      .eq('clerk_user_id', clerkUserId)
-      .eq('status', 'active')
-      .single();
+    // Revoke seat with credit deallocation using database function
+    const { data: seatRevoked, error: revokeError } = await supabase.rpc('remove_organization_seat_with_credits', {
+      p_clerk_org_id: orgId,
+      p_clerk_user_id: clerkUserId
+    });
 
-    if (seatError || !seat) {
-      return res.status(404).json({ error: 'Active seat not found' });
-    }
-
-    // Revoke seat
-    const { error: revokeError } = await supabase
-      .from('organization_seats')
-      .update({
-        status: 'revoked',
-        revoked_reason: 'admin_revoked',
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', seat.id);
-
-    if (revokeError) {
-      return res.status(500).json({ error: revokeError.message });
-    }
-
-    // Update seats_used
-    const { data: subscription } = await supabase
-      .from('organization_subscriptions')
-      .select('seats_used')
-      .eq('id', seat.organization_subscription_id)
-      .single();
-
-    if (subscription) {
-      await supabase
-        .from('organization_subscriptions')
-        .update({
-          seats_used: Math.max(0, subscription.seats_used - 1),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', seat.organization_subscription_id);
+    if (revokeError || !seatRevoked) {
+      console.error('Error revoking seat with credits:', revokeError);
+      return res.status(500).json({ error: 'Failed to revoke seat with credit deallocation' });
     }
 
     res.json({ success: true });

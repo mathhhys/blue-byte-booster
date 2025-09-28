@@ -47,6 +47,7 @@ export const SeatManager: React.FC = () => {
   const [assignRole, setAssignRole] = useState('member');
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showBuySeatsModal, setShowBuySeatsModal] = useState(false);
+  const [buySeatsQuantity, setBuySeatsQuantity] = useState(1);
 
   useEffect(() => {
     if (organization?.id) {
@@ -201,7 +202,7 @@ export const SeatManager: React.FC = () => {
     }
   };
 
-  const handleBuySeats = async () => {
+  const handleBuySeats = async (quantity: number = 1) => {
     if (!organization?.id) return;
 
     setIsAssigning(true);
@@ -222,20 +223,21 @@ export const SeatManager: React.FC = () => {
         body: JSON.stringify({
           orgId: organization.id,
           clerkUserId: userId,
+          quantity,
         }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to create billing portal session');
+        throw new Error('Failed to create checkout session');
       }
 
       const data = await response.json();
       window.location.href = data.url;
     } catch (error) {
-      console.error('Error opening billing portal:', error);
+      console.error('Error creating checkout session:', error);
       toast({
         title: "Error",
-        description: "Failed to open billing portal",
+        description: "Failed to create checkout session",
         variant: "destructive",
       });
     } finally {
@@ -359,8 +361,8 @@ export const SeatManager: React.FC = () => {
         <Dialog open={showBuySeatsModal} onOpenChange={setShowBuySeatsModal}>
           <DialogContent className="bg-[#2a2a2a] border-white/10 text-white">
             <DialogHeader>
-              <DialogTitle>Manage Team Seats</DialogTitle>
-              <DialogDescription>Update your team's seat allocation through our billing portal.</DialogDescription>
+              <DialogTitle>Buy Additional Seats</DialogTitle>
+              <DialogDescription>Purchase additional seats for your team.</DialogDescription>
             </DialogHeader>
 
             <div className="space-y-4">
@@ -370,13 +372,22 @@ export const SeatManager: React.FC = () => {
                 </div>
               )}
 
+              <div>
+                <Label htmlFor="quantity" className="text-white">Number of Seats</Label>
+                <Input
+                  id="quantity"
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={buySeatsQuantity}
+                  onChange={(e) => setBuySeatsQuantity(parseInt(e.target.value) || 1)}
+                  className="bg-[#1a1a1a] border-white/10 text-white mt-1"
+                />
+              </div>
+
               <div className="text-sm text-gray-300">
-                <p>You'll be redirected to Stripe's secure billing portal where you can:</p>
-                <ul className="list-disc list-inside mt-2 space-y-1">
-                  <li>View your current subscription details</li>
-                  <li>Update the number of seats for your team</li>
-                  <li>Manage billing information and payment methods</li>
-                </ul>
+                <p>Pricing: $30/seat/month or $288/seat/year</p>
+                <p className="mt-2">You'll be redirected to Stripe checkout to complete the purchase.</p>
               </div>
             </div>
 
@@ -389,14 +400,14 @@ export const SeatManager: React.FC = () => {
                 Cancel
               </Button>
               <Button
-                onClick={handleBuySeats}
-                disabled={isAssigning}
+                onClick={() => handleBuySeats(buySeatsQuantity)}
+                disabled={isAssigning || buySeatsQuantity < 1}
                 className="bg-blue-600 hover:bg-blue-700 text-white"
               >
                 {isAssigning ? (
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 ) : null}
-                Manage Billing
+                Buy Seats
               </Button>
             </DialogFooter>
           </DialogContent>
