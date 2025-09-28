@@ -540,11 +540,49 @@ async function handlePaymentIntentSucceeded(paymentIntent, supabase) {
     }
 
     // Check if this is a credit purchase by looking at metadata
-    const metadata = paymentIntent.metadata || {};
+    let metadata = paymentIntent.metadata || {};
+    let metadataSource = 'payment_intent';
+    
+    console.log('Payment intent metadata:', metadata);
+    
+    // If payment intent metadata is missing or doesn't indicate credit purchase,
+    // try to get metadata from the associated checkout session
+    if (!metadata.purchase_type || metadata.purchase_type !== 'credit_purchase') {
+      console.log('Payment intent metadata missing or not a credit purchase, checking checkout session...');
+      
+      try {
+        // Find checkout session associated with this payment intent
+        const sessions = await stripe.checkout.sessions.list({
+          payment_intent: paymentIntent.id,
+          limit: 1
+        });
+        
+        if (sessions.data.length > 0) {
+          const session = sessions.data[0];
+          console.log('Found checkout session:', session.id);
+          console.log('Checkout session metadata:', session.metadata);
+          
+          if (session.metadata && session.metadata.purchase_type === 'credit_purchase') {
+            metadata = session.metadata;
+            metadataSource = 'checkout_session';
+            console.log('✅ Using checkout session metadata for credit purchase');
+          }
+        } else {
+          console.log('No checkout session found for payment intent');
+        }
+      } catch (sessionError) {
+        console.error('Error retrieving checkout session:', sessionError);
+        // Continue with payment intent metadata even if session lookup fails
+      }
+    }
+    
+    // Final check: if still not a credit purchase, skip
     if (metadata.purchase_type !== 'credit_purchase') {
-      console.log('Skipping non-credit purchase payment');
+      console.log('Skipping non-credit purchase payment - no valid metadata found');
       return;
     }
+
+    console.log(`Using metadata from: ${metadataSource}`);
 
     // Check for idempotency to prevent duplicate processing
     const alreadyProcessed = await checkIdempotency(paymentIntent.id, supabase);
@@ -555,14 +593,15 @@ async function handlePaymentIntentSucceeded(paymentIntent, supabase) {
 
     const credits = parseInt(metadata.credits || '0');
     if (credits <= 0) {
-      console.log('❌ Invalid credits amount in metadata');
+      console.log('❌ Invalid credits amount in metadata:', metadata.credits);
       return;
     }
 
     console.log('Granting credits:', {
       clerkUserId,
       credits,
-      paymentIntentId: paymentIntent.id
+      paymentIntentId: paymentIntent.id,
+      metadataSource
     });
 
     // Get user ID first
