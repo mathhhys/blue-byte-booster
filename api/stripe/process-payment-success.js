@@ -239,14 +239,47 @@ export default async function handler(req, res) {
       const baseCredits = billing_frequency === 'yearly' ? 6000 : 500;
       const totalCredits = baseCredits * (parseInt(seats) || 1);
       
-      const { error: creditError } = await supabase.rpc('grant_credits', {
-        p_clerk_id: clerkUserId,
-        p_amount: totalCredits,
-        p_description: `${plan_type} plan ${billing_frequency} credits (${seats || 1} seat${(seats || 1) > 1 ? 's' : ''})`,
-        p_reference_id: session.subscription?.id,
-      });
+      // Get user ID first
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('id, credits')
+        .eq('clerk_id', clerkUserId)
+        .single();
+
+      if (userError || !userData) {
+        throw new Error(`User not found for clerk_id: ${clerkUserId}`);
+      }
+
+      const userId = userData.id;
+      const newCredits = (userData.credits || 0) + totalCredits;
+      
+      // Update credits directly
+      const { error: creditError } = await supabase
+        .from('users')
+        .update({
+          credits: newCredits,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', userId);
 
       if (creditError) throw creditError;
+
+      // Record credit transaction
+      const { error: transactionError } = await supabase
+        .from('credit_transactions')
+        .insert({
+          user_id: userId,
+          amount: totalCredits,
+          description: `${plan_type} plan ${billing_frequency} credits (${seats || 1} seat${(seats || 1) > 1 ? 's' : ''})`,
+          transaction_type: 'purchase',
+          reference_id: session.subscription?.id
+        });
+
+      if (transactionError) {
+        console.error('Failed to record credit transaction:', transactionError);
+        // Don't fail the process if transaction recording fails
+      }
+
       console.log('✅ Credits granted:', totalCredits);
     } catch (error) {
       console.error('❌ Error granting credits:', error);

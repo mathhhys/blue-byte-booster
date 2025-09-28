@@ -187,17 +187,37 @@ async function handleInvoicePaymentSucceeded(invoice, supabase) {
     const userId = userData.id;
 
     // Grant credits by directly updating the users table
+    // First get current credits to calculate new total
+    console.log('Fetching current credits for user ID:', userId);
+    const { data: currentUser, error: fetchError } = await supabase
+      .from('users')
+      .select('credits')
+      .eq('id', userId)
+      .single();
+
+    if (fetchError) {
+      console.error('Failed to fetch current credits:', fetchError);
+      throw new Error(`Failed to fetch current credits: ${fetchError.message}`);
+    }
+
+    console.log('Current credits:', currentUser.credits);
+    const newCredits = (currentUser.credits || 0) + creditsToGrant;
+    console.log('New credits after adding', creditsToGrant, ':', newCredits);
+    
     const { error: creditError } = await supabase
       .from('users')
       .update({
-        credits: supabase.sql`credits + ${creditsToGrant}`,
+        credits: newCredits,
         updated_at: new Date().toISOString()
       })
       .eq('id', userId);
 
     if (creditError) {
+      console.error('Failed to update credits:', creditError);
       throw new Error(`Failed to grant credits: ${creditError.message}`);
     }
+
+    console.log('✅ Credits updated successfully');
 
     // Record credit transaction
     const { error: transactionError } = await supabase
@@ -559,17 +579,37 @@ async function handlePaymentIntentSucceeded(paymentIntent, supabase) {
     const userId = userData.id;
 
     // Grant credits to user by directly updating the users table
+    // First get current credits to calculate new total
+    console.log('Fetching current credits for user ID:', userId);
+    const { data: currentUser, error: fetchError } = await supabase
+      .from('users')
+      .select('credits')
+      .eq('id', userId)
+      .single();
+
+    if (fetchError) {
+      console.error('Failed to fetch current credits:', fetchError);
+      throw new Error(`Failed to fetch current credits: ${fetchError.message}`);
+    }
+
+    console.log('Current credits:', currentUser.credits);
+    const newCredits = (currentUser.credits || 0) + credits;
+    console.log('New credits after adding', credits, ':', newCredits);
+    
     const { error: creditError } = await supabase
       .from('users')
       .update({
-        credits: supabase.sql`credits + ${credits}`,
+        credits: newCredits,
         updated_at: new Date().toISOString()
       })
       .eq('id', userId);
 
     if (creditError) {
+      console.error('Failed to update credits:', creditError);
       throw new Error(`Failed to grant credits: ${creditError.message}`);
     }
+
+    console.log('✅ Credits updated successfully');
 
     // Record credit transaction
     const { error: transactionError } = await supabase
