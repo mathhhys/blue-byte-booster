@@ -69,47 +69,68 @@ router.get('/seats', authenticateClerkToken, rateLimitMiddleware, async (req, re
       return res.status(403).json({ error: 'Not authorized for this organization' });
     }
 
-    const { data: subscription, error: subError } = await supabase
-      .from('organization_subscriptions')
-      .select('seats_used, seats_total')
-      .eq('clerk_org_id', orgId)
-      .eq('status', 'active')
-      .single();
+    let subscription = null;
+    let subError = null;
+    try {
+      const { data, error } = await supabase
+        .from('organization_subscriptions')
+        .select('seats_used, seats_total')
+        .eq('clerk_org_id', orgId)
+        .eq('status', 'active')
+        .maybeSingle();  // Use maybeSingle to avoid error on no row
 
-    if (subError || !subscription) {
-      console.log('No active subscription for orgId:', orgId, 'Error:', subError);
-      return res.status(400).json({ error: 'No active subscription found' });
+      subscription = data;
+      subError = error;
+    } catch (subErr) {
+      subError = subErr;
+    }
+
+    if (subError) {
+      console.error('Subscription query error for orgId:', orgId, subError);
+    }
+
+    if (!subscription) {
+      console.log('No active subscription for orgId:', orgId);
+      return res.status(404).json({
+        seats_used: 0,
+        seats_total: 0,
+        seats: [],
+        error: 'No active subscription or organization not found'
+      });
     }
 
     console.log('Fetched subscription for orgId:', orgId, 'Seats used/total:', subscription.seats_used, '/', subscription.seats_total);
 
+    let seats = [];
+    let seatsError = null;
     try {
-      const { data: seats, error: seatsError } = await supabase
+      const { data, error } = await supabase
         .from('organization_seats')
-        .select('clerk_user_id as user_id, user_email as email, status, role, assigned_at')
+        .select('clerk_user_id as user_id, user_email as email, status')
         .eq('clerk_org_id', orgId)
-        .eq('status', 'active')
-        .order('assigned_at', { ascending: false });
+        .eq('status', 'active');
 
-      if (seatsError) {
-        console.error('Seats query failed for orgId:', orgId);
-        console.error('Error code:', seatsError.code);
-        console.error('Error message:', seatsError.message);
-        console.error('Error details:', seatsError.details);
-        console.error('Full error:', seatsError);
-        return res.status(500).json({ error: 'Failed to fetch seats' });
-      }
-
-      console.log('Fetched seats for orgId:', orgId, 'Count:', seats ? seats.length : 0);
+      seats = data || [];
+      seatsError = error;
     } catch (queryErr) {
-      console.error('Exception in seats query for orgId:', orgId, queryErr);
+      seatsError = queryErr;
+    }
+
+    if (seatsError) {
+      console.error('Seats query failed for orgId:', orgId);
+      console.error('Error code:', seatsError.code);
+      console.error('Error message:', seatsError.message);
+      console.error('Error details:', seatsError.details);
+      console.error('Full error:', seatsError);
       return res.status(500).json({ error: 'Failed to fetch seats' });
     }
 
+    console.log('Fetched seats for orgId:', orgId, 'Count:', seats.length);
+
     res.json({
-      seats_used: subscription.seats_used,
-      seats_total: subscription.seats_total,
-      seats: seats || [],
+      seats_used: subscription.seats_used || 0,
+      seats_total: subscription.seats_total || 0,
+      seats,
     });
   } catch (error) {
     console.error('Error loading seats:', error);
