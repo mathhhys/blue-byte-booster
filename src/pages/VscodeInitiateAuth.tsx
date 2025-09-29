@@ -6,6 +6,8 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'; // 
 export const VscodeInitiateAuth: React.FC = () => {
   const [searchParams] = useSearchParams();
   const vscodeRedirectUri = searchParams.get('vscode_redirect_uri');
+  const codeChallenge = searchParams.get('code_challenge');
+  const state = searchParams.get('state');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -15,9 +17,24 @@ export const VscodeInitiateAuth: React.FC = () => {
         return;
       }
 
+      if (!codeChallenge || !state) {
+        setError('Missing PKCE parameters (code_challenge or state).');
+        return;
+      }
+
       try {
         // Call backend to initiate PKCE flow and get Clerk redirect URL
-        const response = await fetch(`/api/auth/initiate-vscode-auth?redirect_uri=${encodeURIComponent(vscodeRedirectUri)}`);
+        const response = await fetch('/api/auth/initiate-vscode-auth', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            redirect_uri: vscodeRedirectUri,
+            code_challenge: codeChallenge,
+            state: state,
+          }),
+        });
         const data = await response.json();
 
         if (data.success && data.auth_url) {
@@ -35,7 +52,7 @@ export const VscodeInitiateAuth: React.FC = () => {
     };
 
     initiateAuthFlow();
-  }, [vscodeRedirectUri]);
+  }, [vscodeRedirectUri, codeChallenge, state]);
 
   if (error) {
     return (
