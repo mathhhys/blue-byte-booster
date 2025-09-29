@@ -12,8 +12,6 @@ import {
   Copy,
   RefreshCw,
   Code,
-  Search,
-  Bell,
   ChevronDown,
   Plus,
   HelpCircle,
@@ -668,38 +666,8 @@ const Dashboard = () => {
               </div>
               
               <div className="flex items-center gap-4">
-                {/* Search */}
-                <div className="relative hidden md:block">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <Input
-                    placeholder="Search or type a command..."
-                    className="pl-10 w-80 bg-[#2a2a2a] border-white/10 text-white placeholder-gray-400"
-                  />
-                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs text-gray-500">
-                    F
-                  </div>
-                </div>
 
-                {/* Credits */}
-                <div className="flex items-center gap-2">
-                  {isDbUserLoading ? (
-                    <div className="h-4 bg-gray-600 rounded w-20 animate-pulse hidden sm:block"></div>
-                  ) : (
-                    <span className="text-sm text-gray-400 hidden sm:inline">{currentBalance.toLocaleString()} credits</span>
-                  )}
-                  <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white">
-                    <span className="hidden sm:inline">Top up</span>
-                    <span className="sm:hidden">+</span>
-                  </Button>
-                </div>
 
-                {/* Notifications */}
-                <Button variant="ghost" size="icon" className="text-gray-400 hover:text-white relative">
-                  <Bell className="w-4 h-4" />
-                  <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full text-xs flex items-center justify-center text-white">
-                    1
-                  </span>
-                </Button>
 
                 {/* User */}
                 <UserButton 
@@ -731,9 +699,6 @@ const Dashboard = () => {
                     {dbUser ? currentBalance.toLocaleString() : 'Loading...'}
                   </div>
                 )}
-                <div className="text-xs text-gray-400 mt-1">
-                  {dbUser ? 'From database via Clerk ID' : 'Fetching from database...'}
-                </div>
                 <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white mt-2">
                   Top Up
                 </Button>
@@ -752,9 +717,6 @@ const Dashboard = () => {
                     {dbUser?.plan_type ? dbUser.plan_type.charAt(0).toUpperCase() + dbUser.plan_type.slice(1) : 'Loading...'}
                   </div>
                 )}
-                <div className="text-xs text-gray-400 mt-1">
-                  {dbUser ? 'From database via Clerk ID' : 'Looking up user...'}
-                </div>
                 <Button size="sm" variant="outline" className="border-white/20 text-white hover:bg-white/10 mt-2">
                   Upgrade
                 </Button>
