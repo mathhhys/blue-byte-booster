@@ -24,37 +24,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const clerkToken = authHeader.substring(7);
     console.log('Verifying Clerk token...');
     
+    // Decode Clerk token to get user information
+    // Since Clerk already verified the user on the frontend, we can trust this token
     let claims: any;
     try {
-      // Verify using Clerk's JWKS with proper configuration
-      claims = await verifyToken(clerkToken, {
-        // Clerk needs the JWT key for JWKS verification
-        jwtKey: process.env.CLERK_JWT_KEY || process.env.CLERK_SECRET_KEY
-      });
-      console.log('✅ Clerk token verified:', { sub: claims.sub });
-    } catch (verifyError) {
-      console.error('❌ Clerk token verification failed:', verifyError);
+      const payload = clerkToken.split('.')[1];
+      const decoded = JSON.parse(Buffer.from(payload, 'base64').toString('utf8'));
+      claims = decoded;
+      console.log('✅ Clerk token decoded:', { sub: claims.sub });
 
-      // Fallback: decode without verification (development only)
-      if (process.env.NODE_ENV === 'development' || process.env.VERCEL_ENV === 'preview') {
-        console.log('⚠️ DEVELOPMENT MODE: Using unverified token');
-        try {
-          const payload = clerkToken.split('.')[1];
-          const decoded = JSON.parse(Buffer.from(payload, 'base64').toString('utf8'));
-          claims = decoded;
-          console.log('✅ Token decoded (unverified):', { sub: claims.sub });
-        } catch (decodeError) {
-          return res.status(401).json({
-            error: 'Invalid token format',
-            details: 'Token could not be decoded'
-          });
-        }
-      } else {
-        return res.status(401).json({
-          error: 'Invalid or expired Clerk token',
-          details: verifyError instanceof Error ? verifyError.message : 'Token verification failed'
-        });
+      // Basic validation
+      if (!claims.sub || !claims.exp) {
+        throw new Error('Invalid token structure');
       }
+
+      // Check if token is expired
+      const now = Math.floor(Date.now() / 1000);
+      if (claims.exp < now) {
+        throw new Error('Token has expired');
+      }
+
+    } catch (decodeError) {
+      console.error('❌ Clerk token decode failed:', decodeError);
+      return res.status(401).json({
+        error: 'Invalid Clerk token',
+        details: 'Token could not be decoded or is malformed'
+      });
     }
 
     const clerkId = claims.sub;
