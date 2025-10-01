@@ -94,8 +94,11 @@ const Dashboard = () => {
 
   // Extension token state
   const [extensionToken, setExtensionToken] = useState<string>('');
+  const [extensionRefreshToken, setExtensionRefreshToken] = useState<string>('');
+  const [tokenExpiresAt, setTokenExpiresAt] = useState<Date | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
+  const [copyRefreshSuccess, setCopyRefreshSuccess] = useState(false);
   const [autoRenew, setAutoRenew] = useState(true);
 
   // Credits state
@@ -240,102 +243,64 @@ const Dashboard = () => {
     setIsGenerating(true);
     try {
       console.log('=== DASHBOARD TOKEN GENERATION DEBUG ===');
-      console.log('Generating backend JWT token for VSCode extension...');
+      console.log('Generating long-lived JWT tokens for VSCode extension...');
       console.log('Clerk User ID:', user.id);
       
-      // Get Clerk session token for backend authentication
-      const beforeGetToken = Date.now();
-      console.log('🔍 [DASHBOARD] Time before getToken():', new Date(beforeGetToken).toISOString(), 'Unix:', Math.floor(beforeGetToken / 1000));
-      
-      const clerkToken = await getToken();
-      
-      const afterGetToken = Date.now();
-      console.log('🔍 [DASHBOARD] Time after getToken():', new Date(afterGetToken).toISOString(), 'Unix:', Math.floor(afterGetToken / 1000));
-      console.log('🔍 [DASHBOARD] getToken() took:', afterGetToken - beforeGetToken, 'ms');
+      // Get fresh Clerk token (Clerk auto-refreshes if needed)
+      const clerkToken = await getToken({
+        skipCache: true // Force fresh token
+      });
       
       if (!clerkToken) {
         throw new Error('Failed to get Clerk authentication token');
       }
       
-      // Decode token payload for inspection (no verification needed)
-      try {
-        const payloadB64 = clerkToken.split('.')[1];
-        const payloadJson = Buffer.from(payloadB64, 'base64').toString();
-        const payload = JSON.parse(payloadJson);
-        const now = Math.floor(Date.now() / 1000);
-        console.log('🔍 [DASHBOARD] Decoded Clerk token payload:');
-        console.log('  - iss:', payload.iss);
-        console.log('  - iat:', payload.iat, '(Date:', new Date(payload.iat * 1000).toISOString(), ')');
-        console.log('  - exp:', payload.exp, '(Date:', new Date(payload.exp * 1000).toISOString(), ')');
-        console.log('  - nbf:', payload.nbf, '(Date:', new Date(payload.nbf * 1000).toISOString(), ')');
-        console.log('  - sub (first 10 chars):', payload.sub?.substring(0, 10) + '...');
-        console.log('  - Current Unix time:', now);
-        console.log('  - iat vs now:', payload.iat - now, 'seconds (positive = future)');
-        console.log('  - Duration (exp - iat):', (payload.exp || 0) - payload.iat, 'seconds');
-      } catch (decodeError) {
-        console.error('🔍 [DASHBOARD] Failed to decode token payload:', decodeError);
-      }
+      console.log('✅ Got Clerk auth token, calling backend...');
       
-      console.log('Got Clerk auth token, calling backend to generate JWT...');
-      
-      // Call backend to generate backend JWT token
+      // Call backend to generate long-lived JWT tokens
       const response = await fetch('/api/extension/auth/token', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${clerkToken}`
-        }
+        },
+        body: JSON.stringify({
+          token_name: 'VSCode Extension Token'
+        })
       });
-      
-      console.log('Backend response status:', response.status);
       
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Backend token generation failed:', errorText);
-        throw new Error(`Backend token generation failed: ${response.status} - ${errorText}`);
+        console.error('❌ Backend token generation failed:', errorText);
+        throw new Error(`Token generation failed: ${response.status}`);
       }
       
       const data = await response.json();
-      console.log('Backend token generation successful:', {
-        hasToken: !!data.access_token,
-        expiresIn: data.expires_in,
-        expiresAt: data.expires_at,
-        tokenType: data.token_type
-      });
+      console.log('✅ Backend token generation successful');
       
-      if (data.success && data.access_token) {
+      if (data.success && data.access_token && data.refresh_token) {
         setExtensionToken(data.access_token);
-        console.log('✅ Generated backend JWT token for VSCode extension');
+        setExtensionRefreshToken(data.refresh_token);
+        setTokenExpiresAt(new Date(data.expires_at));
+        
+        const daysValid = Math.floor(data.expires_in / (24 * 60 * 60));
         
         toast({
-          title: "Token Generated",
-          description: `Backend JWT token generated successfully. Expires in ${Math.floor(data.expires_in / 60)} minutes.`,
+          title: "Tokens Generated Successfully",
+          description: `Access token valid for ${daysValid} days. Copy both tokens to VSCode extension.`,
         });
       } else {
-        throw new Error('Backend returned invalid response');
+        throw new Error('Invalid response from backend');
       }
       
     } catch (error) {
       console.error('❌ Token generation error:', error);
-      console.log('=== END DASHBOARD TOKEN GENERATION DEBUG ===');
       
-      // Fallback to a mock token for development
-      if (import.meta.env.DEV) {
-        const mockToken = `backend_mock_token_${user.id}_${Date.now()}`;
-        setExtensionToken(mockToken);
-        console.log('🔧 Using mock backend token for development:', mockToken);
-        
-        toast({
-          title: "Development Mode",
-          description: "Using mock backend token for development",
-        });
-      } else {
-        toast({
-          title: "Token Generation Failed",
-          description: error instanceof Error ? error.message : "Failed to generate extension token",
-          variant: "destructive",
-        });
-      }
+      toast({
+        title: "Token Generation Failed",
+        description: error instanceof Error ? error.message : "Failed to generate extension tokens",
+        variant: "destructive",
+      });
     } finally {
       setIsGenerating(false);
     }
@@ -348,14 +313,97 @@ const Dashboard = () => {
       await navigator.clipboard.writeText(extensionToken);
       setCopySuccess(true);
       setTimeout(() => setCopySuccess(false), 2000);
+      
+      toast({
+        title: "Copied",
+        description: "Access token copied to clipboard",
+      });
     } catch (error) {
       console.error('Failed to copy token:', error);
+      toast({
+        title: "Copy Failed",
+        description: "Failed to copy token to clipboard",
+        variant: "destructive",
+      });
     }
   };
 
-  const refreshToken = () => {
+  const copyRefreshToken = async () => {
+    if (!extensionRefreshToken) return;
+    
+    try {
+      await navigator.clipboard.writeText(extensionRefreshToken);
+      setCopyRefreshSuccess(true);
+      setTimeout(() => setCopyRefreshSuccess(false), 2000);
+      
+      toast({
+        title: "Copied",
+        description: "Refresh token copied to clipboard",
+      });
+    } catch (error) {
+      console.error('Failed to copy refresh token:', error);
+      toast({
+        title: "Copy Failed",
+        description: "Failed to copy refresh token to clipboard",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleRefreshToken = () => {
     setExtensionToken('');
+    setExtensionRefreshToken('');
+    setTokenExpiresAt(null);
     generateToken();
+  };
+
+  const revokeToken = async () => {
+    if (!user?.id) {
+      toast({
+        title: "Error",
+        description: "User not authenticated",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const clerkToken = await getToken();
+      if (!clerkToken) {
+        throw new Error('Failed to get authentication token');
+      }
+
+      const response = await fetch('/api/extension/auth/revoke', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${clerkToken}`
+        },
+        body: JSON.stringify({
+          token_to_revoke: extensionToken
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to revoke token');
+      }
+
+      setExtensionToken('');
+      setExtensionRefreshToken('');
+      setTokenExpiresAt(null);
+
+      toast({
+        title: "Token Revoked",
+        description: "Extension token has been revoked successfully",
+      });
+    } catch (error) {
+      console.error('Token revocation error:', error);
+      toast({
+        title: "Revocation Failed",
+        description: error instanceof Error ? error.message : "Failed to revoke token",
+        variant: "destructive",
+      });
+    }
   };
 
   // Credit validation function
@@ -829,26 +877,29 @@ const Dashboard = () => {
             </Card>
 
             {/* VSCode Extension Integration */}
-            <Card className="bg-[#2a2a2a] border-white/10 p-6 mb-8 flex flex-col min-h-[200px] max-w-2xl">
+            <Card className="bg-[#2a2a2a] border-white/10 p-6 mb-8 max-w-3xl">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-white">VSCode Extension</h3>
-                <div className="flex items-center gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="border-white/20 text-white hover:bg-white/10"
-                    onClick={refreshToken}
-                    disabled={isGenerating}
-                  >
-                    <RefreshCw className={`w-4 h-4 mr-2 ${isGenerating ? 'animate-spin' : ''}`} />
-                    Refresh
-                  </Button>
-                </div>
+                <h3 className="text-lg font-semibold text-white">VSCode Extension Authentication</h3>
+                {extensionToken && (
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-white/20 text-white hover:bg-white/10"
+                      onClick={handleRefreshToken}
+                      disabled={isGenerating}
+                    >
+                      <RefreshCw className={`w-4 h-4 mr-2 ${isGenerating ? 'animate-spin' : ''}`} />
+                      Generate New
+                    </Button>
+                  </div>
+                )}
               </div>
               
-              <div className="space-y-4 flex-1">
+              <div className="space-y-4">
                 <div className="text-sm text-gray-400 mb-3">
-                  Generate an authentication token to connect your VSCode extension to your account.
+                  Generate long-lived authentication tokens (30 days) to connect your VSCode extension.
+                  The tokens will automatically refresh to keep you connected.
                 </div>
                 
                 {!extensionToken ? (
@@ -860,44 +911,125 @@ const Dashboard = () => {
                     {isGenerating ? (
                       <>
                         <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                        Generating Token...
+                        Generating Tokens...
                       </>
                     ) : (
                       <>
                         <Code className="w-4 h-4 mr-2" />
-                        Generate Extension Token
+                        Generate Extension Tokens
                       </>
                     )}
                   </Button>
                 ) : (
-                  <div className="space-y-3">
-                    <div className="text-sm font-medium text-white">Your Extension Token:</div>
-                    <div className="flex gap-2">
-                      <Input
-                        value={extensionToken}
-                        readOnly
-                        className="bg-[#1a1a1a] border-white/10 text-white font-mono text-sm flex-1"
-                      />
-                      <Button
-                        onClick={copyToken}
-                        variant="outline"
-                        className="border-white/20 text-white hover:bg-white/10 shrink-0"
-                      >
-                        {copySuccess ? (
-                          <>
-                            <span className="text-green-400">✓</span>
-                            <span className="ml-1 hidden sm:inline">Copied</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="w-4 h-4" />
-                            <span className="ml-1 hidden sm:inline">Copy</span>
-                          </>
-                        )}
-                      </Button>
+                  <div className="space-y-4">
+                    {/* Token Status */}
+                    {tokenExpiresAt && (
+                      <div className="bg-[#1a1a1a] border border-white/10 rounded-lg p-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-medium text-white">Token Status</span>
+                          <span className="text-xs bg-green-600/20 text-green-400 px-2 py-1 rounded">Active</span>
+                        </div>
+                        <div className="text-xs text-gray-400 space-y-1">
+                          <div>Expires: {tokenExpiresAt.toLocaleString()}</div>
+                          <div>
+                            Valid for: {Math.ceil((tokenExpiresAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24))} days remaining
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Access Token */}
+                    <div>
+                      <div className="text-sm font-medium text-white mb-2">1. Access Token:</div>
+                      <div className="flex gap-2">
+                        <Input
+                          value={extensionToken}
+                          readOnly
+                          className="bg-[#1a1a1a] border-white/10 text-white font-mono text-xs flex-1"
+                        />
+                        <Button
+                          onClick={copyToken}
+                          variant="outline"
+                          className="border-white/20 text-white hover:bg-white/10 shrink-0"
+                        >
+                          {copySuccess ? (
+                            <>
+                              <span className="text-green-400">✓</span>
+                              <span className="ml-1 hidden sm:inline">Copied</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-4 h-4" />
+                              <span className="ml-1 hidden sm:inline">Copy</span>
+                            </>
+                          )}
+                        </Button>
+                      </div>
                     </div>
-                    <div className="text-xs text-gray-500">
-                      This is your backend JWT token. Use this token in your VSCode extension settings.
+
+                    {/* Refresh Token */}
+                    <div>
+                      <div className="text-sm font-medium text-white mb-2">2. Refresh Token:</div>
+                      <div className="flex gap-2">
+                        <Input
+                          value={extensionRefreshToken}
+                          readOnly
+                          type="password"
+                          className="bg-[#1a1a1a] border-white/10 text-white font-mono text-xs flex-1"
+                        />
+                        <Button
+                          onClick={copyRefreshToken}
+                          variant="outline"
+                          className="border-white/20 text-white hover:bg-white/10 shrink-0"
+                        >
+                          {copyRefreshSuccess ? (
+                            <>
+                              <span className="text-green-400">✓</span>
+                              <span className="ml-1 hidden sm:inline">Copied</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-4 h-4" />
+                              <span className="ml-1 hidden sm:inline">Copy</span>
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Instructions */}
+                    <div className="bg-blue-600/10 border border-blue-600/20 rounded-lg p-4">
+                      <div className="text-sm font-medium text-blue-400 mb-2">📋 Setup Instructions:</div>
+                      <ol className="text-xs text-gray-300 space-y-1 list-decimal list-inside">
+                        <li>Open VSCode and run: <code className="bg-[#1a1a1a] px-1 py-0.5 rounded">Softcodes: Authenticate</code></li>
+                        <li>Paste the <strong>Access Token</strong> when prompted</li>
+                        <li>Paste the <strong>Refresh Token</strong> when prompted</li>
+                        <li>You're all set! Tokens will auto-refresh every 29 days</li>
+                      </ol>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex gap-2 pt-2">
+                      <Button
+                        onClick={revokeToken}
+                        variant="destructive"
+                        size="sm"
+                        className="flex-1"
+                      >
+                        Revoke Token
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          setExtensionToken('');
+                          setExtensionRefreshToken('');
+                          setTokenExpiresAt(null);
+                        }}
+                        variant="outline"
+                        size="sm"
+                        className="border-white/20 text-white hover:bg-white/10"
+                      >
+                        Clear Display
+                      </Button>
                     </div>
                   </div>
                 )}

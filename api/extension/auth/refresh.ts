@@ -1,4 +1,3 @@
-import { verifyToken } from '@clerk/backend';
 import { createClient } from '@supabase/supabase-js';
 import type { NextApiRequest, NextApiResponse } from 'next';
 import jwt from 'jsonwebtoken';
@@ -13,35 +12,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    console.log('=== TOKEN GENERATION API START ===');
+    console.log('=== TOKEN REFRESH API START ===');
 
-    // 1. Verify Clerk token
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Missing or invalid Authorization header' });
+    const { refresh_token, current_token } = req.body;
+
+    if (!refresh_token) {
+      return res.status(400).json({ error: 'Missing refresh_token' });
     }
 
-    const clerkToken = authHeader.substring(7);
-    console.log('Verifying Clerk token...');
-    
-    let claims: any;
+    // 1. Verify refresh token
+    let decoded: any;
     try {
-      claims = await verifyToken(clerkToken, {
-        jwtKey: process.env.CLERK_SECRET_KEY!
-      });
-      console.log('✅ Clerk token verified:', { sub: claims.sub });
-    } catch (verifyError) {
-      console.error('❌ Clerk token verification failed:', verifyError);
-      return res.status(401).json({
-        error: 'Invalid or expired Clerk token',
-        details: 'Please refresh the page and try again'
-      });
+      if (!process.env.JWT_SECRET) {
+        throw new Error('JWT_SECRET not configured');
+      }
+      decoded = jwt.verify(refresh_token, process.env.JWT_SECRET);
+    } catch (error) {
+      console.error('Refresh token verification failed:', error);
+      return res.status(401).json({ error: 'Invalid or expired refresh token' });
     }
 
-    const clerkId = claims.sub;
-    if (!clerkId) {
-      return res.status(401).json({ error: 'Invalid Clerk token' });
+    if (decoded.type !== 'refresh') {
+      return res.status(401).json({ error: 'Invalid token type' });
     }
+
+    console.log('✅ Refresh token verified for user:', decoded.sub);
 
     // 2. Initialize Supabase
     const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
@@ -60,11 +55,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     );
 
-    // 3. Fetch user from Supabase
+    // 3. Fetch user
     const { data: userData, error: userError } = await supabase
       .from('users')
-      .select('id, clerk_id, email, plan_type, credits')
-      .eq('clerk_id', clerkId)
+      .select('id, clerk_id, email, plan_type')
+      .eq('clerk_id', decoded.sub)
       .single();
 
     if (userError || !userData) {
@@ -72,26 +67,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(404).json({ error: 'User not found' });
     }
 
-    console.log('✅ User fetched:', { id: userData.id, plan: userData.plan_type });
+    // 4. Revoke old token if provided
+    if (current_token) {
+      const oldTokenHash = crypto
+        .createHash('sha256')
+        .update(current_token)
+        .digest('hex');
 
-    // 4. Revoke existing active tokens (single token policy)
-    console.log('Revoking existing tokens...');
-    const { error: revokeError } = await supabase.rpc(
-      'revoke_user_extension_tokens',
-      { p_user_id: userData.id }
-    );
-
-    if (revokeError) {
-      console.error('Token revocation warning:', revokeError);
-      // Don't fail if revocation fails, continue with token generation
+      await supabase
+        .from('extension_tokens')
+        .update({ revoked_at: new Date().toISOString() })
+        .eq('token_hash', oldTokenHash)
+        .eq('user_id', userData.id);
+      
+      console.log('✅ Old token revoked');
     }
 
     // 5. Generate new access token
-    const sessionId = crypto.randomUUID();
     const now = Math.floor(Date.now() / 1000);
     const expiresIn = EXTENSION_TOKEN_DURATION_DAYS * 24 * 60 * 60;
+    const sessionId = decoded.session_id; // Maintain session ID
     
-    const accessTokenPayload = {
+    const newAccessTokenPayload = {
       sub: userData.clerk_id,
       email: userData.email,
       session_id: sessionId,
@@ -103,16 +100,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       aud: 'vscode-extension'
     };
     
-    if (!process.env.JWT_SECRET) {
-      console.error('❌ JWT_SECRET not configured');
-      return res.status(500).json({ error: 'Server configuration error' });
-    }
+    const newAccessToken = jwt.sign(newAccessTokenPayload, process.env.JWT_SECRET);
 
-    const accessToken = jwt.sign(accessTokenPayload, process.env.JWT_SECRET);
-
-    // 6. Generate refresh token
+    // 6. Generate new refresh token
     const refreshExpiresIn = REFRESH_TOKEN_DURATION_DAYS * 24 * 60 * 60;
-    const refreshTokenPayload = {
+    const newRefreshTokenPayload = {
       sub: userData.clerk_id,
       session_id: sessionId,
       type: 'refresh',
@@ -122,12 +114,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       aud: 'vscode-extension'
     };
     
-    const refreshToken = jwt.sign(refreshTokenPayload, process.env.JWT_SECRET);
+    const newRefreshToken = jwt.sign(newRefreshTokenPayload, process.env.JWT_SECRET);
 
-    // 7. Store token hash in database
+    // 7. Store new token hash
     const tokenHash = crypto
       .createHash('sha256')
-      .update(accessToken)
+      .update(newAccessToken)
       .digest('hex');
 
     const { error: insertError } = await supabase
@@ -135,33 +127,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .insert({
         user_id: userData.id,
         token_hash: tokenHash,
-        name: req.body.token_name || 'VSCode Extension Token',
+        name: 'VSCode Extension Token (Refreshed)',
         expires_at: new Date((now + expiresIn) * 1000).toISOString()
       });
 
     if (insertError) {
       console.error('Token storage error:', insertError);
-      return res.status(500).json({ error: 'Failed to store token' });
+      return res.status(500).json({ error: 'Failed to store refreshed token' });
     }
 
-    console.log('✅ Token generated and stored successfully');
+    console.log('✅ New tokens generated and stored');
 
-    // 8. Return tokens
+    // 8. Return new tokens
     res.status(200).json({
       success: true,
-      access_token: accessToken,
-      refresh_token: refreshToken,
+      access_token: newAccessToken,
+      refresh_token: newRefreshToken,
       expires_in: expiresIn,
       expires_at: new Date((now + expiresIn) * 1000).toISOString(),
-      token_type: 'Bearer',
-      session_id: sessionId
+      token_type: 'Bearer'
     });
 
-    console.log('=== TOKEN GENERATION API END ===');
+    console.log('=== TOKEN REFRESH API END ===');
 
   } catch (error) {
-    console.error('❌ TOKEN API EXCEPTION:', error);
-    res.status(500).json({
+    console.error('❌ TOKEN REFRESH API EXCEPTION:', error);
+    res.status(500).json({ 
       error: 'Internal server error',
       details: error instanceof Error ? error.message : 'Unknown error'
     });
