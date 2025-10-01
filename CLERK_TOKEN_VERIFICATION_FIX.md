@@ -16,34 +16,40 @@ The `CLERK_SECRET_KEY` is for server-to-server API calls, not for verifying sess
 
 ## Solution Applied
 
-Updated [`api/extension/auth/token.ts`](api/extension/auth/token.ts) to use JWKS verification:
+Updated [`api/extension/auth/token.ts`](api/extension/auth/token.ts) to use proper JWT key verification:
 
 ```typescript
-// Correct: Let Clerk handle JWKS verification automatically
+// Correct: Use CLERK_JWT_KEY for verification
 claims = await verifyToken(clerkToken, {
-  // Don't pass secretKey or jwtKey - Clerk uses JWKS automatically
+  jwtKey: process.env.CLERK_JWT_KEY || process.env.CLERK_SECRET_KEY
 });
 ```
 
 **What happens:**
-1. `verifyToken()` without parameters fetches Clerk's public JWKS keys
-2. Verifies the token signature using the correct public key
+1. Clerk's `verifyToken()` uses the JWT public key to verify the token signature
+2. Validates the token hasn't expired and is properly signed
 3. Returns validated claims with user information
+4. Falls back to development mode if verification fails (for local testing)
 
 ## Environment Variables Required
 
-Ensure these are set in Vercel (only needed for server-to-server API calls, not token verification):
+Set these in Vercel Dashboard → Project → Settings → Environment Variables:
 
-1. **VITE_CLERK_PUBLISHABLE_KEY** (Frontend)
+1. **CLERK_JWT_KEY** (Required for token verification)
+   - Format: `-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----`
+   - Get from: Clerk Dashboard → API Keys → JWT Public Key
+   - Used for verifying Clerk session tokens
+
+2. **VITE_CLERK_PUBLISHABLE_KEY** (Frontend)
    - Format: `pk_live_...` or `pk_test_...`
    - Get from: Clerk Dashboard → API Keys
    - Used by React app
 
-2. **JWT_SECRET** (Backend)
+3. **JWT_SECRET** (Backend)
    - For signing custom extension tokens
    - Generate: `openssl rand -base64 32`
 
-3. **CLERK_SECRET_KEY** (Optional - for Clerk API calls)
+4. **CLERK_SECRET_KEY** (Optional - for Clerk API calls)
    - Format: `sk_live_...` or `sk_test_...`
    - Only needed if making Clerk API calls
    - NOT used for token verification
