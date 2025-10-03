@@ -8,6 +8,7 @@ The dashboard token generation feature was failing with multiple errors:
 2. **Wrong Endpoint Error**: `400 Bad Request - Invalid grant_type`
 3. **Authentication Flow Mismatch**: Dashboard was calling VSCode OAuth endpoint instead of dashboard token endpoint
 4. **Clerk Token Verification Error**: `Failed to resolve JWK during verification` - Wrong environment variable used
+5. **Supabase Configuration Error**: `supabaseUrl is required` - Missing environment variable fallback
 
 ## Root Cause Analysis
 
@@ -49,7 +50,21 @@ const claims = await verifyToken(clerkToken, {
 
 **Problem**: Using `jwtKey` parameter with non-existent `CLERK_JWT_KEY` environment variable. The correct parameter is `secretKey` with `CLERK_SECRET_KEY`.
 
-### Issue 4: Architecture Mismatch
+### Issue 4: Missing Supabase Environment Variable Fallback
+**Location**: [`api/dashboard-token/generate.ts:29`](api/dashboard-token/generate.ts:29)
+
+```typescript
+// ❌ BEFORE (No fallback)
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,  // Only checks one env var
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  // ...
+);
+```
+
+**Problem**: Only checking `NEXT_PUBLIC_SUPABASE_URL` but Vercel serverless functions may use `SUPABASE_URL` or `VITE_SUPABASE_URL`. Other API endpoints use a fallback pattern but this one didn't.
+
+### Issue 5: Architecture Mismatch
 
 The project has **two distinct token generation flows**:
 
@@ -114,7 +129,34 @@ const response = await fetch('/api/dashboard-token/generate', {
 - Aligns with intended dashboard authentication architecture
 - Uses proper Clerk token verification flow
 
-### Fix 4: Request Structure Verification
+### Fix 4: Supabase Environment Variable Fallback
+**File**: [`api/dashboard-token/generate.ts`](api/dashboard-token/generate.ts:29)
+
+```typescript
+// ✅ AFTER (Multiple fallbacks)
+const supabaseUrl = process.env.SUPABASE_URL ||
+                    process.env.NEXT_PUBLIC_SUPABASE_URL ||
+                    process.env.VITE_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!supabaseUrl || !supabaseServiceKey) {
+  return res.status(500).json({
+    error: 'Server configuration error: Missing Supabase credentials'
+  });
+}
+
+const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+  auth: { autoRefreshToken: false, persistSession: false }
+});
+```
+
+**Changes**:
+- Added fallback pattern: `SUPABASE_URL` → `NEXT_PUBLIC_SUPABASE_URL` → `VITE_SUPABASE_URL`
+- Matches pattern used in other API endpoints
+- Added proper error handling for missing credentials
+- Provides clear error message when configuration is missing
+
+### Fix 5: Request Structure Verification
 
 **Dashboard Token Generation Flow**:
 1. User clicks "Generate Extension Token" in dashboard
@@ -170,7 +212,8 @@ const response = await fetch('/api/dashboard-token/generate', {
 
 2. **[`api/dashboard-token/generate.ts`](api/dashboard-token/generate.ts:1)**
    - Line 18-20: Fixed Clerk verification to use `secretKey` instead of `jwtKey`
-   - Uses correct `CLERK_SECRET_KEY` environment variable
+   - Line 29-47: Added Supabase environment variable fallback pattern
+   - Added proper error handling for missing configuration
 
 ## Architecture Overview
 
@@ -228,12 +271,20 @@ const response = await fetch('/api/dashboard-token/generate', {
 
 Ensure these environment variables are set in your deployment:
 
-- `CLERK_SECRET_KEY` - Clerk secret key for token verification (required)
-- `NEXT_PUBLIC_SUPABASE_URL` - Supabase project URL (required)
-- `SUPABASE_SERVICE_ROLE_KEY` - Supabase service role key (required)
-- `JWT_SECRET` - Secret for signing backend JWT tokens (required)
+### Required Variables:
+- `CLERK_SECRET_KEY` - Clerk secret key for token verification
+- `SUPABASE_SERVICE_ROLE_KEY` - Supabase service role key for database access
+- `JWT_SECRET` - Secret for signing backend JWT tokens
 
-**Note**: `CLERK_JWT_KEY` is NOT used and should not be set.
+### Supabase URL (one of these is required):
+- `SUPABASE_URL` (preferred for Vercel)
+- `NEXT_PUBLIC_SUPABASE_URL` (Next.js default)
+- `VITE_SUPABASE_URL` (Vite default)
+
+**Note**: The code will check for these in order and use the first one found.
+
+### Not Used:
+- ❌ `CLERK_JWT_KEY` - Do NOT set this (it's not used)
 
 ## Related Files
 
