@@ -260,7 +260,8 @@ const Dashboard = () => {
       // Decode token payload for inspection (no verification needed)
       try {
         const payloadB64 = clerkToken.split('.')[1];
-        const payloadJson = Buffer.from(payloadB64, 'base64').toString();
+        // Use browser-compatible atob() instead of Node.js Buffer
+        const payloadJson = atob(payloadB64);
         const payload = JSON.parse(payloadJson);
         const now = Math.floor(Date.now() / 1000);
         console.log('🔍 [DASHBOARD] Decoded Clerk token payload:');
@@ -276,10 +277,10 @@ const Dashboard = () => {
         console.error('🔍 [DASHBOARD] Failed to decode token payload:', decodeError);
       }
       
-      console.log('Got Clerk auth token, calling backend to generate JWT...');
+      console.log('Got Clerk auth token, calling dashboard token generation endpoint...');
       
-      // Call backend to generate backend JWT token
-      const response = await fetch('/api/extension/auth/token', {
+      // Call dashboard token generation endpoint (not the VSCode OAuth endpoint)
+      const response = await fetch('/api/dashboard-token/generate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
