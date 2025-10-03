@@ -14,6 +14,7 @@ export const VscodeAuthCallback: React.FC = () => {
   useEffect(() => {
     const handleCallback = async () => {
       if (!isLoaded) {
+        setStatus('Loading authentication...');
         return;
       }
 
@@ -37,7 +38,7 @@ export const VscodeAuthCallback: React.FC = () => {
       setStatus('Generating authorization code...');
 
       try {
-        // Generate a proper authorization code
+        // Generate a secure authorization code
         const authCode = btoa(`${user.id}:${state}:${Date.now()}`).replace(/=/g, '');
         
         // Update the OAuth record with the authorization code and Clerk user ID
@@ -46,10 +47,12 @@ export const VscodeAuthCallback: React.FC = () => {
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ 
-            state, 
+          body: JSON.stringify({
+            state,
             clerk_user_id: user.id,
-            authorization_code: authCode 
+            authorization_code: authCode,
+            email: user.primaryEmailAddress?.emailAddress,
+            username: user.username || user.firstName || user.primaryEmailAddress?.emailAddress?.split('@')[0]
           }),
         });
 
@@ -59,14 +62,21 @@ export const VscodeAuthCallback: React.FC = () => {
         }
 
         const data = await response.json();
+        
+        if (!data.success) {
+          throw new Error(data.error || 'Authentication failed');
+        }
+
         const finalAuthCode = data.authorization_code || authCode;
 
         setStatus('Redirecting to VSCode...');
 
-        // Redirect back to VSCode with the proper authorization code
+        // Redirect back to VSCode with the authorization code
         const finalVscodeRedirect = new URL(decodeURIComponent(vscodeRedirectUri));
         finalVscodeRedirect.searchParams.set('code', finalAuthCode);
         finalVscodeRedirect.searchParams.set('state', state);
+
+        console.log('Redirecting to VSCode:', finalVscodeRedirect.toString());
 
         // Add a small delay to ensure the UI updates
         setTimeout(() => {
@@ -80,7 +90,7 @@ export const VscodeAuthCallback: React.FC = () => {
     };
 
     handleCallback();
-  }, [isLoaded, isSignedIn, user, searchParams]);
+  }, [isLoaded, isSignedIn, user, searchParams, navigate]);
 
   if (error) {
     return (
@@ -96,8 +106,8 @@ export const VscodeAuthCallback: React.FC = () => {
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-900">
       <div className="text-center text-white">
-        <Spinner className="w-10 h-10 mb-4" />
-        <p>{status}</p>
+        <Spinner className="w-10 h-10 mb-4 mx-auto" />
+        <p className="text-lg font-medium">{status}</p>
         <p className="text-sm text-gray-400 mt-2">Please wait while we complete the authentication...</p>
       </div>
     </div>

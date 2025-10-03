@@ -1,173 +1,188 @@
-import { verifyToken } from '@clerk/backend';
-import { createClient } from '@supabase/supabase-js';
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { createClient } from '@supabase/supabase-js';
+import { generateAccessToken, generateRefreshToken, generateSessionId, validatePKCE } from '../../utils/jwt.js';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const { method } = req;
-  
-  
-  // Original token generation endpoint
-  if (method !== 'POST') {
+  if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  const { code, grant_type, code_verifier, refresh_token, state } = req.body;
+
   try {
-    console.log('=== TOKEN API DEBUG START ===');
-    console.log('Env vars check: CLERK_SECRET_KEY:', !!process.env.CLERK_SECRET_KEY);
-    console.log('Env vars check: SUPABASE_SERVICE_ROLE_KEY:', !!process.env.SUPABASE_SERVICE_ROLE_KEY);
-    console.log('Env vars check: SUPABASE_URL:', !!process.env.SUPABASE_URL);
-    console.log('Env vars check: VITE_SUPABASE_URL:', !!process.env.VITE_SUPABASE_URL);
-    console.log('Env vars check: JWT_SECRET:', !!process.env.JWT_SECRET);
-    console.log('JWT_SECRET length:', process.env.JWT_SECRET ? process.env.JWT_SECRET.length : 'unset');
+    const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-    const authHeader = req.headers.authorization;
-    console.log('Auth header present:', !!authHeader);
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      console.log('❌ Invalid auth header');
-      return res.status(401).json({ error: 'Missing or invalid Authorization header' });
+    if (!supabaseUrl || !supabaseServiceKey) {
+      return res.status(500).json({ error: 'Server configuration error' });
     }
 
-    const clerkToken = authHeader.substring(7);
-    console.log('Clerk token length:', clerkToken.length);
-    console.log('Verifying Clerk token...');
-    console.log('CLERK_SECRET_KEY length:', process.env.CLERK_SECRET_KEY ? process.env.CLERK_SECRET_KEY.length : 'unset');
-    
-    const now = Math.floor(Date.now() / 1000);
-    let claims: any;
-    try {
-      // Decode header without verification to inspect
-      const header = JSON.parse(Buffer.from(clerkToken.split('.')[0], 'base64').toString());
-      const payload = JSON.parse(Buffer.from(clerkToken.split('.')[1], 'base64').toString());
-      const now = Math.floor(Date.now() / 1000);
-      console.log('🔍 [BACKEND] Current server time:', new Date(now * 1000).toISOString(), 'Unix:', now);
-      console.log('Token header:', { alg: header.alg, kid: header.kid, iss: header.iss });
-      console.log('🔍 [BACKEND] Decoded Clerk token payload:');
-      console.log('  - iss:', payload.iss);
-      console.log('  - iat:', payload.iat, '(Date:', new Date(payload.iat * 1000).toISOString(), ')');
-      console.log('  - exp:', payload.exp, '(Date:', new Date(payload.exp * 1000).toISOString(), ')');
-      console.log('  - nbf:', payload.nbf, '(Date:', new Date(payload.nbf * 1000).toISOString(), ')');
-      console.log('  - sub (first 10 chars):', payload.sub?.substring(0, 10) + '...');
-      console.log('  - iat vs now:', payload.iat - now, 'seconds (positive = future)');
-      console.log('  - Duration (exp - iat):', (payload.exp || 0) - payload.iat, 'seconds');
-      
-      // Check if token is expired (pre-verification check)
-      if (payload.exp && payload.exp < now) {
-        console.error('❌ Token is expired');
-        return res.status(401).json({
-          error: 'Token expired',
-          details: 'The provided token has expired'
-        });
-      }
-
-      // Try verification with different approaches
-      console.log('Attempting Clerk token verification...');
-      console.log('Using CLERK_SECRET_KEY length:', process.env.CLERK_SECRET_KEY?.length);
-      
-      // Method 1: Standard verification
-      try {
-        claims = await verifyToken(clerkToken, {
-          jwtKey: process.env.CLERK_SECRET_KEY!,
-          // Add issuer check if needed
-          ...(payload.iss && { issuer: payload.iss })
-        });
-        console.log('✅ Clerk claims (method 1):', { sub: claims.sub, email: claims.email });
-      } catch (method1Error) {
-        console.log('Method 1 failed, trying alternative...');
-        
-        // Method 2: Try with different options
-        try {
-          claims = await verifyToken(clerkToken, {
-            secretKey: process.env.CLERK_SECRET_KEY!
-          });
-          console.log('✅ Clerk claims (method 2):', { sub: claims.sub, email: claims.email });
-        } catch (method2Error) {
-          console.error('Both verification methods failed');
-          throw method1Error; // Throw the original error
-        }
-      }
-
-      
-    } catch (verifyError) {
-      const err = verifyError as Error;
-      console.error('🔍 VerifyToken detailed error:', err.message);
-      console.error('🔍 VerifyToken error name:', err.name);
-      console.error('🔍 Token preview (first 50 chars):', clerkToken.substring(0, 50));
-      console.error('🔍 CLERK_SECRET_KEY preview (first 20 chars):', process.env.CLERK_SECRET_KEY?.substring(0, 20));
-      console.error('🔍 Environment check:');
-      console.error('  - CLERK_DOMAIN:', process.env.CLERK_DOMAIN);
-      console.error('  - VITE_CLERK_PUBLISHABLE_KEY present:', !!process.env.VITE_CLERK_PUBLISHABLE_KEY);
-      
-      return res.status(500).json({
-        error: 'Internal server error',
-        details: `JWT signature is invalid. ${err.message}`
-      });
-    }
-
-    // Calculate expiration from verified claims
-    const expiresIn = claims.exp - now;
-    const expiresAt = new Date(claims.exp * 1000).toISOString();
-    console.log('Clerk token expires in:', expiresIn, 'seconds');
-
-    const clerkId = claims.sub;
-    if (!clerkId) {
-      return res.status(401).json({ error: 'Invalid Clerk token' });
-    }
-
-    // Fetch user data from Supabase (using service role for server-side)
-    console.log('Creating Supabase client...');
-    const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-    
-    if (!supabaseUrl || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      console.error('❌ Missing Supabase configuration');
-      console.error('SUPABASE_URL:', !!supabaseUrl);
-      console.error('SUPABASE_SERVICE_ROLE_KEY:', !!process.env.SUPABASE_SERVICE_ROLE_KEY);
-      return res.status(500).json({ error: 'Server configuration error', details: 'Missing Supabase configuration' });
-    }
-    
-    const supabase = createClient(
-      supabaseUrl,
-      process.env.SUPABASE_SERVICE_ROLE_KEY,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      }
-    );
-    console.log('✅ Supabase client created');
-
-    console.log('Querying users table for clerkId:', clerkId);
-    const { data: userData, error } = await supabase
-      .from('users')
-      .select('clerk_id, email, plan_type, credits')
-      .eq('clerk_id', clerkId)
-      .single();
-
-    console.log('Supabase query result:', { data: !!userData, error: error?.message });
-    if (error || !userData) {
-      console.error('User fetch error:', error);
-      return res.status(404).json({ error: 'User not found in database' });
-    }
-    console.log('✅ User data fetched:', { clerk_id: userData.clerk_id, plan_type: userData.plan_type });
-
-    console.log('Returning success response with Clerk token');
-    res.status(200).json({
-      success: true,
-      access_token: clerkToken,
-      expires_in: expiresIn,
-      expires_at: expiresAt,
-      token_type: 'Bearer'
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
     });
-    console.log('=== TOKEN API DEBUG END ===');
 
+    // Handle refresh token flow
+    if (grant_type === 'refresh_token') {
+      return await handleRefreshToken(supabase, refresh_token, res);
+    }
+
+    // Handle authorization code flow
+    if (grant_type === 'authorization_code') {
+      return await handleAuthorizationCode(
+        supabase,
+        code,
+        code_verifier,
+        state,
+        res
+      );
+    }
+
+    return res.status(400).json({ error: 'Invalid grant_type' });
   } catch (error) {
-    const err = error as Error;
-    console.error('❌ TOKEN API EXCEPTION:', err);
-    console.error('Error type:', err.constructor.name);
-    console.error('Error message:', err.message);
-    console.error('Error stack:', err.stack);
-    console.error('JWT_SECRET length:', process.env.JWT_SECRET ? process.env.JWT_SECRET.length : 'unset');
-    res.status(500).json({ error: 'Internal server error', details: err.message });
-    console.log('=== TOKEN API DEBUG END (ERROR) ===');
+    console.error('Token exchange error:', error);
+    return res.status(500).json({ error: 'Token exchange failed' });
   }
+}
+
+async function handleAuthorizationCode(
+  supabase: any,
+  code: string,
+  codeVerifier: string,
+  state: string,
+  res: NextApiResponse
+) {
+  // Retrieve OAuth session
+  const { data: oauthSession, error: fetchError } = await supabase
+    .from('oauth_codes')
+    .select('*')
+    .eq('state', state)
+    .eq('authorization_code', code)
+    .single();
+
+  if (fetchError || !oauthSession) {
+    return res.status(400).json({ error: 'Invalid authorization code' });
+  }
+
+  // Validate PKCE
+  const isPKCEValid = await validatePKCE(codeVerifier, oauthSession.code_challenge);
+  
+  if (!isPKCEValid) {
+    console.error('PKCE verification failed');
+    await supabase.from('oauth_codes').delete().eq('id', oauthSession.id);
+    return res.status(400).json({ error: 'Invalid code verifier' });
+  }
+
+  // Check expiration
+  if (new Date(oauthSession.expires_at) < new Date()) {
+    await supabase.from('oauth_codes').delete().eq('id', oauthSession.id);
+    return res.status(400).json({ error: 'Authorization code expired' });
+  }
+
+  // Get user data
+  const { data: user, error: userError } = await supabase
+    .from('users')
+    .select('*')
+    .eq('clerk_id', oauthSession.clerk_user_id)
+    .single();
+
+  if (userError || !user) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+
+  // Generate tokens
+  const sessionId = generateSessionId();
+  const accessToken = generateAccessToken(user, sessionId);
+  const refreshToken = generateRefreshToken(user, sessionId);
+
+  // Store refresh token
+  await supabase.from('refresh_tokens').insert({
+    clerk_user_id: user.clerk_id,
+    token: refreshToken,
+    session_id: sessionId,
+    expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+  });
+
+  // Update user's last login
+  await supabase
+    .from('users')
+    .update({
+      last_vscode_login: new Date().toISOString(),
+      vscode_session_id: sessionId
+    })
+    .eq('id', user.id);
+
+  // Delete used OAuth session
+  await supabase.from('oauth_codes').delete().eq('id', oauthSession.id);
+
+  return res.status(200).json({
+    access_token: accessToken,
+    refresh_token: refreshToken,
+    token_type: 'Bearer',
+    expires_in: 86400,
+    session_id: sessionId,
+    user: {
+      clerk_id: user.clerk_id,
+      email: user.email,
+      username: user.username,
+      plan_type: user.plan_type,
+      credits: user.credits,
+      organization_id: user.organization_id
+    }
+  });
+}
+
+async function handleRefreshToken(
+  supabase: any,
+  refreshToken: string,
+  res: NextApiResponse
+) {
+  if (!refreshToken) {
+    return res.status(400).json({ error: 'Missing refresh_token' });
+  }
+
+  // Validate refresh token exists
+  const { data: tokenRecord, error: tokenError } = await supabase
+    .from('refresh_tokens')
+    .select('*')
+    .eq('token', refreshToken)
+    .single();
+
+  if (tokenError || !tokenRecord) {
+    return res.status(401).json({ error: 'Invalid refresh token' });
+  }
+
+  // Check expiration
+  if (new Date(tokenRecord.expires_at) < new Date()) {
+    await supabase.from('refresh_tokens').delete().eq('id', tokenRecord.id);
+    return res.status(401).json({ error: 'Refresh token expired' });
+  }
+
+  // Get user data
+  const { data: user, error: userError } = await supabase
+    .from('users')
+    .select('*')
+    .eq('clerk_id', tokenRecord.clerk_user_id)
+    .single();
+
+  if (userError || !user) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+
+  // Generate new access token
+  const accessToken = generateAccessToken(user, tokenRecord.session_id);
+
+  // Update last_used_at for refresh token
+  await supabase
+    .from('refresh_tokens')
+    .update({ last_used_at: new Date().toISOString() })
+    .eq('id', tokenRecord.id);
+
+  return res.status(200).json({
+    access_token: accessToken,
+    token_type: 'Bearer',
+    expires_in: 86400
+  });
 }

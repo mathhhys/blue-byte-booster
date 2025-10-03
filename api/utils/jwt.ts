@@ -1,11 +1,11 @@
-import jwt from 'jsonwebtoken'
-import crypto from 'crypto'
+import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 
 /**
  * Generate a unique session ID using UUID v4
  */
 export function generateSessionId(): string {
-  return crypto.randomUUID()
+  return crypto.randomUUID();
 }
 
 /**
@@ -25,9 +25,9 @@ export function generateAccessToken(user: any, sessionId: string): string {
     exp: Math.floor(Date.now() / 1000) + (24 * 60 * 60), // 24 hours
     iss: 'softcodes.ai',
     aud: 'vscode-extension'
-  }
+  };
   
-  return jwt.sign(payload, process.env.JWT_SECRET!, { algorithm: 'HS256' })
+  return jwt.sign(payload, process.env.JWT_SECRET!, { algorithm: 'HS256' });
 }
 
 /**
@@ -42,42 +42,42 @@ export function generateRefreshToken(user: any, sessionId: string): string {
     iat: Math.floor(Date.now() / 1000),
     exp: Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60), // 30 days
     iss: 'softcodes.ai'
-  }
+  };
   
-  return jwt.sign(payload, process.env.JWT_SECRET!, { algorithm: 'HS256' })
+  return jwt.sign(payload, process.env.JWT_SECRET!, { algorithm: 'HS256' });
 }
 
 /**
- * Legacy function - use generateAccessToken instead
- * @deprecated
+ * Verify and decode JWT token
  */
-export function generateJWT(userData: any, sessionId: string): string {
-  return generateAccessToken(userData, sessionId)
-}
-
-export async function generateCodeChallenge(codeVerifier: string): Promise<string> {
-  // For Node.js environment, use crypto module
-  const hash = crypto.createHash('sha256').update(codeVerifier).digest()
-  return hash.toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=/g, '')
-}
-
 export function verifyJWT(token: string): any {
   try {
-    return jwt.verify(token, process.env.JWT_SECRET!)
+    return jwt.verify(token, process.env.JWT_SECRET!, { algorithms: ['HS256'] });
   } catch (error) {
-    throw new Error('Invalid token')
+    throw new Error('Invalid token');
   }
 }
 
-// Helper function to validate code verifier against challenge
+/**
+ * Generate PKCE code challenge from code verifier
+ * Uses SHA256 hashing and base64url encoding
+ */
+export async function generateCodeChallenge(codeVerifier: string): Promise<string> {
+  const hash = crypto.createHash('sha256').update(codeVerifier).digest();
+  return hash.toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=/g, '');
+}
+
+/**
+ * Validate code verifier against stored code challenge
+ */
 export async function validatePKCE(codeVerifier: string, codeChallenge: string): Promise<boolean> {
   try {
-    const generatedChallenge = await generateCodeChallenge(codeVerifier)
-    return generatedChallenge === codeChallenge
+    const generatedChallenge = await generateCodeChallenge(codeVerifier);
+    return generatedChallenge === codeChallenge;
   } catch (error) {
-    return false
+    return false;
   }
 }
