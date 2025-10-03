@@ -7,6 +7,7 @@ The dashboard token generation feature was failing with multiple errors:
 1. **Browser Compatibility Error**: `ReferenceError: Buffer is not defined`
 2. **Wrong Endpoint Error**: `400 Bad Request - Invalid grant_type`
 3. **Authentication Flow Mismatch**: Dashboard was calling VSCode OAuth endpoint instead of dashboard token endpoint
+4. **Clerk Token Verification Error**: `Failed to resolve JWK during verification` - Wrong environment variable used
 
 ## Root Cause Analysis
 
@@ -36,7 +37,19 @@ const response = await fetch('/api/extension/auth/token', {
 
 **Problem**: The dashboard was calling [`/api/extension/auth/token`](api/extension/auth/token.ts:1) which expects OAuth2 flow parameters (`grant_type`, `code`, `code_verifier`) but dashboard only provided Authorization header.
 
-### Issue 3: Architecture Mismatch
+### Issue 3: Incorrect Clerk Verification Parameter
+**Location**: [`api/dashboard-token/generate.ts:18`](api/dashboard-token/generate.ts:18)
+
+```typescript
+// ❌ BEFORE (Wrong parameter)
+const claims = await verifyToken(clerkToken, {
+  jwtKey: process.env.CLERK_JWT_KEY!  // This env var doesn't exist!
+});
+```
+
+**Problem**: Using `jwtKey` parameter with non-existent `CLERK_JWT_KEY` environment variable. The correct parameter is `secretKey` with `CLERK_SECRET_KEY`.
+
+### Issue 4: Architecture Mismatch
 
 The project has **two distinct token generation flows**:
 
@@ -67,7 +80,22 @@ const payloadJson = atob(payloadB64);
 - `atob()` is a standard browser API for base64 decoding
 - Maintains token inspection functionality for debugging
 
-### Fix 2: Correct Endpoint Usage
+### Fix 2: Correct Clerk Token Verification
+**File**: [`api/dashboard-token/generate.ts`](api/dashboard-token/generate.ts:18)
+
+```typescript
+// ✅ AFTER (Correct parameter)
+const claims = await verifyToken(clerkToken, {
+  secretKey: process.env.CLERK_SECRET_KEY!
+});
+```
+
+**Changes**:
+- Changed from `jwtKey: process.env.CLERK_JWT_KEY` to `secretKey: process.env.CLERK_SECRET_KEY`
+- Uses the correct environment variable that exists in the project
+- Matches verification pattern used in [`api/extension/auth/validate.ts`](api/extension/auth/validate.ts:17)
+
+### Fix 3: Correct Endpoint Usage
 **File**: [`src/pages/Dashboard.tsx`](src/pages/Dashboard.tsx:283)
 
 ```typescript
@@ -86,7 +114,7 @@ const response = await fetch('/api/dashboard-token/generate', {
 - Aligns with intended dashboard authentication architecture
 - Uses proper Clerk token verification flow
 
-### Fix 3: Request Structure Verification
+### Fix 4: Request Structure Verification
 
 **Dashboard Token Generation Flow**:
 1. User clicks "Generate Extension Token" in dashboard
@@ -136,9 +164,13 @@ const response = await fetch('/api/dashboard-token/generate', {
 ## Files Modified
 
 1. **[`src/pages/Dashboard.tsx`](src/pages/Dashboard.tsx:1)**
-   - Line 264: Replaced `Buffer.from()` with `atob()`
+   - Line 264: Replaced `Buffer.from()` with `atob()` for browser compatibility
    - Line 283: Changed endpoint to `/api/dashboard-token/generate`
    - Line 280: Updated console message for clarity
+
+2. **[`api/dashboard-token/generate.ts`](api/dashboard-token/generate.ts:1)**
+   - Line 18-20: Fixed Clerk verification to use `secretKey` instead of `jwtKey`
+   - Uses correct `CLERK_SECRET_KEY` environment variable
 
 ## Architecture Overview
 
@@ -184,12 +216,24 @@ const response = await fetch('/api/dashboard-token/generate', {
 
 - [x] Fix browser compatibility issue (Buffer → atob)
 - [x] Update endpoint path
+- [x] Fix Clerk token verification parameter
 - [x] Verify request structure
 - [x] Test error handling
 - [x] Update documentation
 - [ ] Deploy to production
 - [ ] Monitor logs for errors
 - [ ] Verify token generation works in production
+
+## Environment Variables Required
+
+Ensure these environment variables are set in your deployment:
+
+- `CLERK_SECRET_KEY` - Clerk secret key for token verification (required)
+- `NEXT_PUBLIC_SUPABASE_URL` - Supabase project URL (required)
+- `SUPABASE_SERVICE_ROLE_KEY` - Supabase service role key (required)
+- `JWT_SECRET` - Secret for signing backend JWT tokens (required)
+
+**Note**: `CLERK_JWT_KEY` is NOT used and should not be set.
 
 ## Related Files
 

@@ -15,8 +15,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const clerkToken = authHeader.substring(7);
-    const claims = await verifyToken(clerkToken, { 
-      jwtKey: process.env.CLERK_JWT_KEY!
+    const claims = await verifyToken(clerkToken, {
+      secretKey: process.env.CLERK_SECRET_KEY!
     });
 
     const clerkId = claims.sub;
