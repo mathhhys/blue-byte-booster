@@ -1,8 +1,8 @@
-import { VercelRequest, VercelResponse } from '@vercel/node'
+import type { NextApiRequest, NextApiResponse } from 'next'
 import { createClient } from '@supabase/supabase-js'
 import { Webhook } from 'svix'
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Add debugging logs to validate deployment
   console.log('🚀 Clerk webhook handler called at /api/clerk/webhooks - URL:', req.url)
   console.log('🚀 Request method:', req.method)
@@ -181,18 +181,58 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
         console.log(`Successfully upserted user ${user.id} from webhook with email: ${primaryEmailAddress}`);
 
-      } else if (eventType === 'user.deleted') {
+      } else if (eventType === 'user.deleted' || eventType === 'user.banned') {
         const user = evt.data;
         if (!user.id) {
           console.error('User ID not found in user.deleted webhook payload');
           return res.status(400).json({ error: 'User ID not found in payload.' });
         }
 
-        // In a real application, you might want to soft-delete the user
-        // or remove sensitive information. For this example, we'll log.
-        console.log(`User with Clerk ID ${user.id} marked for deletion.`);
-        // Example: await supabase.from('users').update({ deleted: true }).eq('clerk_id', user.id);
-        // Or delete: await supabase.from('users').delete().eq('clerk_id', user.id);
+        // Revoke all active VSCode sessions for this user
+        const { error: sessionError } = await supabase
+          .from('vscode_sessions')
+          .update({ is_active: false })
+          .eq('user_id', user.id);
+
+        if (sessionError) {
+          console.error('Error revoking VSCode sessions:', sessionError);
+        } else {
+          console.log(`Revoked all VSCode sessions for user ${user.id} due to ${eventType}`);
+        }
+
+        // Soft-delete or mark user as inactive in database
+        const { error: userError } = await supabase
+          .from('users')
+          .update({
+            is_active: false,
+            deleted_at: new Date().toISOString()
+          })
+          .eq('clerk_id', user.id);
+
+        if (userError) {
+          console.error('Error marking user as inactive:', userError);
+        } else {
+          console.log(`Marked user ${user.id} as inactive due to ${eventType}`);
+        }
+
+      } else if (eventType === 'session.ended' || eventType === 'session.revoked') {
+        const session = evt.data;
+        if (!session.user_id) {
+          console.log('No user_id in session event, skipping revocation');
+          return res.json({ received: true });
+        }
+
+        // Revoke VSCode sessions associated with this Clerk session
+        const { error: sessionError } = await supabase
+          .from('vscode_sessions')
+          .update({ is_active: false })
+          .eq('clerk_session_id', session.id);  // Assuming we store Clerk session ID
+
+        if (sessionError && sessionError.code !== 'PGRST116') {  // PGRST116 = no rows updated
+          console.error('Error revoking VSCode sessions for session event:', sessionError);
+        } else {
+          console.log(`Revoked VSCode sessions for Clerk session ${session.id} due to ${eventType}`);
+        }
 
       } else {
         console.log(`Unhandled Clerk webhook event type: ${eventType}`);

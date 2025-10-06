@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { createClient } from '@supabase/supabase-js';
+import { verifyToken } from '@clerk/backend';
 import * as jwt from 'jsonwebtoken';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -7,32 +8,55 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { refresh_token } = req.body;
+  const { token } = req.body;  // Expect the access token for refresh
 
-  if (!refresh_token) {
-    return res.status(400).json({ error: 'Missing refresh_token' });
+  if (!token) {
+    return res.status(400).json({ error: 'Missing token' });
   }
 
   try {
-    const jwtSecret = process.env.JWT_SECRET;
-    if (!jwtSecret) {
-      return res.status(500).json({ error: 'Server configuration error: Missing JWT_SECRET' });
-    }
-
-    // Verify refresh token
-    let decodedRefresh: any;
+    // First, try to verify the token with Clerk
+    let claims;
     try {
-      decodedRefresh = jwt.verify(refresh_token, jwtSecret, { algorithms: ['HS256'] });
+      claims = await verifyToken(token, {
+        secretKey: process.env.CLERK_SECRET_KEY!
+      });
     } catch (verifyError) {
-      console.error('Refresh token verification failed:', verifyError);
-      return res.status(401).json({ error: 'Invalid refresh token' });
+      console.error('Clerk token verification failed:', verifyError);
+      
+      // If verification fails due to expiration, check if session is still active
+      if (verifyError.message.includes('expired') || verifyError.message.includes('TokenExpiredError')) {
+        // Decode the token to extract sub without verification
+        const decoded = jwt.decode(token, { complete: true });
+        if (decoded && decoded.payload && decoded.payload.sub) {
+          const userId = decoded.payload.sub;
+          
+          // For session activity check, we need Clerk client
+          const { createClerkClient } = await import('@clerk/backend');
+          const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY! });
+          
+          // Check if user is still active (not banned)
+          const user = await clerk.users.getUser(userId as string);
+          
+          if (user.banned) {
+            return res.status(401).json({ error: 'User account inactive. Please re-authenticate.' });
+          }
+          
+          // User is active, proceed to generate new token
+          claims = decoded.payload;  // Use decoded claims (not verified, but user active)
+          console.log('Token expired but user active, generating new access token');
+        } else {
+          return res.status(401).json({ error: 'Invalid token format' });
+        }
+      } else {
+        return res.status(401).json({ error: 'Invalid token' });
+      }
     }
 
-    if (decodedRefresh.type !== 'refresh' || !decodedRefresh.sub) {
-      return res.status(401).json({ error: 'Invalid refresh token payload' });
+    const clerkUserId = claims.sub;
+    if (!clerkUserId) {
+      return res.status(401).json({ error: 'Invalid token payload' });
     }
-
-    const clerkUserId = decodedRefresh.sub;
 
     // Create Supabase client
     const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -61,7 +85,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(404).json({ error: 'User not found' });
     }
 
-    // Generate new access token
+    // Generate new custom access token (since we can't issue new Clerk token from backend)
+    // This maintains compatibility while using Clerk for verification
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret) {
+      return res.status(500).json({ error: 'Server configuration error: Missing JWT_SECRET' });
+    }
+
     const accessTokenPayload = {
       sub: clerkUserId,
       user_id: userData.id,
@@ -75,7 +105,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const newAccessToken = jwt.sign(accessTokenPayload, jwtSecret, { algorithm: 'HS256' });
 
-    // Optionally generate new refresh token (rotation for security)
+    // Generate new refresh token for future refreshes
     const newRefreshTokenPayload = {
       sub: clerkUserId,
       type: 'refresh',

@@ -1,6 +1,5 @@
-const jwt = require('jsonwebtoken');
 const { createClient } = require('@supabase/supabase-js');
-const axios = require('axios');
+const { verifyToken } = require('@clerk/backend');
 
 console.log('middleware/auth.js: SUPABASE_URL:', process.env.SUPABASE_URL ? 'Loaded' : 'Not Loaded');
 console.log('middleware/auth.js: SUPABASE_SERVICE_ROLE_KEY:', process.env.SUPABASE_SERVICE_ROLE_KEY ? 'Loaded' : 'Not Loaded');
@@ -9,84 +8,35 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-console.log('middleware/auth.js: JWT_SECRET:', process.env.JWT_SECRET ? 'Loaded' : 'Not Loaded');
-const JWT_SECRET = process.env.JWT_SECRET;
+console.log('middleware/auth.js: CLERK_SECRET_KEY:', process.env.CLERK_SECRET_KEY ? 'Loaded' : 'Not Loaded');
 
-// Cache for Clerk's public keys
-let clerkPublicKeys = null;
-let keysLastFetched = 0;
-const KEYS_CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
-
-// Fetch Clerk's public keys from JWKS endpoint
-async function fetchClerkPublicKeys() {
-  try {
-    const now = Date.now();
-    if (clerkPublicKeys && (now - keysLastFetched) < KEYS_CACHE_DURATION) {
-      return clerkPublicKeys;
-    }
-
-    const response = await axios.get('https://softcodes.ai/.well-known/jwks.json');
-    const jwks = response.data;
-    clerkPublicKeys = jwks.keys;
-    keysLastFetched = now;
-
-    return clerkPublicKeys;
-  } catch (error) {
-    console.error('Error fetching Clerk public keys:', error);
-    // Fallback to decode-only mode if JWKS fetch fails
-    return null;
-  }
-}
-
-// Helper function to verify Clerk session token
+// Helper function to verify Clerk session token using @clerk/backend
 async function verifyClerkToken(token) {
   try {
-    // Try to get Clerk's public keys for proper verification
-    const publicKeys = await fetchClerkPublicKeys();
-
-    if (publicKeys && publicKeys.length > 0) {
-      // Use proper JWT verification with Clerk's public key
-      const decoded = jwt.verify(token, publicKeys[0], {
-        algorithms: ['RS256'],
-        issuer: 'https://softcodes.ai'
-      });
-
-      if (!decoded || !decoded.sub) {
-        throw new Error('Invalid Clerk token structure');
-      }
-
-      return {
-        clerkUserId: decoded.sub,
-        sessionId: decoded.sid,
-        exp: decoded.exp
-      };
-    } else {
-      // Fallback: decode and manually check expiration
-      const decoded = jwt.decode(token, { complete: true });
-
-      if (!decoded || !decoded.payload || !decoded.payload.sub) {
-        throw new Error('Invalid Clerk token structure');
-      }
-
-      // Check if token has expired (with 5 second tolerance)
-      const currentTime = Math.floor(Date.now() / 1000);
-      const clockTolerance = 5;
-      if (decoded.payload.exp && decoded.payload.exp < (currentTime - clockTolerance)) {
-        throw new Error('Clerk token has expired. Please generate a new token from the dashboard.');
-      }
-
-      return {
-        clerkUserId: decoded.payload.sub,
-        sessionId: decoded.payload.sid,
-        exp: decoded.payload.exp
-      };
+    if (!process.env.CLERK_SECRET_KEY) {
+      throw new Error('Missing CLERK_SECRET_KEY environment variable');
     }
+
+    const claims = await verifyToken(token, {
+      secretKey: process.env.CLERK_SECRET_KEY
+    });
+
+    if (!claims.sub) {
+      throw new Error('Invalid Clerk token: missing user ID');
+    }
+
+    return {
+      clerkUserId: claims.sub,
+      sessionId: claims.sid,
+      exp: claims.exp,
+      email: claims.email
+    };
   } catch (error) {
-    if (error.name === 'TokenExpiredError' || error.message.includes('expired')) {
+    if (error.message.includes('expired')) {
       throw new Error('Clerk token has expired. Please generate a new token from the dashboard.');
-    } else if (error.name === 'JsonWebTokenError') {
+    } else if (error.message.includes('invalid signature')) {
       throw new Error('Invalid Clerk token signature');
-    } else if (error.name === 'NotBeforeError') {
+    } else if (error.message.includes('not before')) {
       throw new Error('Clerk token not yet valid');
     }
     throw new Error('Invalid Clerk token: ' + error.message);
@@ -117,25 +67,26 @@ const authenticateClerkToken = async (req, res, next) => {
       return next();
     }
 
-    // Try to verify as custom JWT first (for backward compatibility)
-    let decoded;
+    // Verify as Clerk token (primary method for new flow)
     let clerkUserId;
+    let decoded;
     
     try {
-      // First try custom JWT with clock tolerance
-      decoded = jwt.verify(token, JWT_SECRET, { clockTolerance: 5 });
-      clerkUserId = decoded.clerkUserId;
-      console.log('middleware/auth.js: Custom JWT token verified. Decoded:', decoded);
-    } catch (jwtError) {
-      console.log('middleware/auth.js: Custom JWT verification failed, trying Clerk token...');
+      const clerkDecoded = await verifyClerkToken(token);
+      clerkUserId = clerkDecoded.clerkUserId;
+      decoded = clerkDecoded;
+      console.log('middleware/auth.js: Clerk token verified. User ID:', clerkUserId);
+    } catch (clerkError) {
+      console.error('middleware/auth.js: Clerk token verification failed:', clerkError);
       
-      // If custom JWT fails, try Clerk token
+      // Backward compatibility: try custom JWT as fallback
       try {
-        const clerkDecoded = await verifyClerkToken(token);
-        clerkUserId = clerkDecoded.clerkUserId;
-        console.log('middleware/auth.js: Clerk token verified. User ID:', clerkUserId);
-      } catch (clerkError) {
-        console.error('middleware/auth.js: Both JWT and Clerk token verification failed:', clerkError);
+        const jwt = require('jsonwebtoken');
+        decoded = jwt.verify(token, process.env.JWT_SECRET, { clockTolerance: 5 });
+        clerkUserId = decoded.clerkUserId || decoded.sub;
+        console.log('middleware/auth.js: Custom JWT token verified (legacy). User ID:', clerkUserId);
+      } catch (jwtError) {
+        console.error('middleware/auth.js: Both Clerk and custom JWT verification failed:', jwtError);
         return res.status(401).json({ error: 'Invalid token' });
       }
     }
@@ -164,7 +115,8 @@ const authenticateClerkToken = async (req, res, next) => {
       clerkUserId: clerkUserId,
       userId: userData.id,
       planType: userData.plan_type,
-      isAdmin: userData.plan_type === 'admin' // Simple admin check
+      isAdmin: userData.plan_type === 'admin', // Simple admin check
+      tokenDecoded: decoded
     };
 
     next();
