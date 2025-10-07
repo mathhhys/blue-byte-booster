@@ -94,9 +94,12 @@ const Dashboard = () => {
 
   // Extension token state
   const [extensionToken, setExtensionToken] = useState<string>('');
+  const [tokenType, setTokenType] = useState<'short' | 'long'>('short');
   const [isGenerating, setIsGenerating] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
   const [autoRenew, setAutoRenew] = useState(true);
+  const [hasActiveLongLivedToken, setHasActiveLongLivedToken] = useState(false);
+  const [isCheckingToken, setIsCheckingToken] = useState(false);
 
   // Credits state
   const [currentBalance, setCurrentBalance] = useState<number>(0); // Initialize with 0, will be updated from dbUser
@@ -106,6 +109,9 @@ const Dashboard = () => {
 
   // Billing portal state
   const [isBillingPortalLoading, setIsBillingPortalLoading] = useState(false);
+
+  // Backend URL - adjust based on environment
+  const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
 
   useEffect(() => {
     setAuthPageMeta('dashboard');
@@ -227,6 +233,35 @@ const Dashboard = () => {
   }, [userLoaded, user?.id, toast]);
 
 
+  // Check for active long-lived token
+  const checkActiveLongLivedToken = async () => {
+    if (!user?.id) return;
+
+    setIsCheckingToken(true);
+    try {
+      const clerkToken = await getToken(); // Session token for auth
+      const response = await fetch(`${BACKEND_URL}/extension-token/active`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${clerkToken}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setHasActiveLongLivedToken(data.hasActive);
+      }
+    } catch (error) {
+      console.error('Error checking active token:', error);
+    } finally {
+      setIsCheckingToken(false);
+    }
+  };
+
+  useEffect(() => {
+    checkActiveLongLivedToken();
+  }, [user?.id]);
+
   const generateToken = async () => {
     if (!user?.id) {
       toast({
@@ -240,71 +275,92 @@ const Dashboard = () => {
     setIsGenerating(true);
     try {
       console.log('=== DASHBOARD TOKEN GENERATION DEBUG ===');
-      console.log('Generating Clerk session token for VSCode extension...');
+      console.log(`Generating ${tokenType === 'short' ? 'short-lived' : 'long-lived'} token for VSCode extension...`);
       console.log('Clerk User ID:', user.id);
       
-      // Get Clerk session token using custom template for long-lived tokens
-      const beforeGetToken = Date.now();
-      console.log('🔍 [DASHBOARD] Time before getToken():', new Date(beforeGetToken).toISOString(), 'Unix:', Math.floor(beforeGetToken / 1000));
-      
-      const clerkToken = await getToken({
-        template: 'vscode-extension',  // Custom JWT template for long-lived tokens
-        skipCache: true
-      });
-      
-      const afterGetToken = Date.now();
-      console.log('🔍 [DASHBOARD] Time after getToken():', new Date(afterGetToken).toISOString(), 'Unix:', Math.floor(afterGetToken / 1000));
-      console.log('🔍 [DASHBOARD] getToken() took:', afterGetToken - beforeGetToken, 'ms');
-      
-      if (!clerkToken) {
-        throw new Error('Failed to get Clerk session token');
+      let backendToken;
+
+      if (tokenType === 'short') {
+        // Short-lived: Use Clerk session token
+        const beforeGetToken = Date.now();
+        console.log('🔍 [DASHBOARD] Time before getToken():', new Date(beforeGetToken).toISOString(), 'Unix:', Math.floor(beforeGetToken / 1000));
+        
+        const clerkToken = await getToken({
+          template: 'vscode-extension',
+          skipCache: true
+        });
+        
+        const afterGetToken = Date.now();
+        console.log('🔍 [DASHBOARD] Time after getToken():', new Date(afterGetToken).toISOString(), 'Unix:', Math.floor(afterGetToken / 1000));
+        console.log('🔍 [DASHBOARD] getToken() took:', afterGetToken - beforeGetToken, 'ms');
+        
+        if (!clerkToken) {
+          throw new Error('Failed to get Clerk session token');
+        }
+
+        // Decode for logging
+        try {
+          const payloadB64 = clerkToken.split('.')[1];
+          const payloadJson = atob(payloadB64);
+          const payload = JSON.parse(payloadJson);
+          const now = Math.floor(Date.now() / 1000);
+          console.log('🔍 [DASHBOARD] Decoded short-lived Clerk token payload:');
+          console.log('  - exp:', payload.exp, '(Date:', new Date(payload.exp * 1000).toISOString(), ')');
+          console.log('  - Current Unix time:', now);
+        } catch (decodeError) {
+          console.error('Failed to decode token payload:', decodeError);
+        }
+        
+        backendToken = clerkToken;
+        console.log('✅ Generated short-lived Clerk session token');
+      } else {
+        // Long-lived: Call backend endpoint
+        const clerkToken = await getToken(); // Session token for auth
+        const response = await fetch(`${BACKEND_URL}/extension-token/generate`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${clerkToken}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to generate long-lived token');
+        }
+
+        const data = await response.json();
+        if (!data.access_token) {
+          throw new Error('No access token in response');
+        }
+
+        backendToken = data.access_token;
+        console.log('✅ Generated long-lived backend token');
+        setHasActiveLongLivedToken(true);
       }
       
-      // Decode token payload for inspection (no verification needed)
-      try {
-        const payloadB64 = clerkToken.split('.')[1];
-        // Use browser-compatible atob() instead of Node.js Buffer
-        const payloadJson = atob(payloadB64);
-        const payload = JSON.parse(payloadJson);
-        const now = Math.floor(Date.now() / 1000);
-        console.log('🔍 [DASHBOARD] Decoded Clerk token payload:');
-        console.log('  - iss:', payload.iss);
-        console.log('  - iat:', payload.iat, '(Date:', new Date(payload.iat * 1000).toISOString(), ')');
-        console.log('  - exp:', payload.exp, '(Date:', new Date(payload.exp * 1000).toISOString(), ')');
-        console.log('  - nbf:', payload.nbf, '(Date:', new Date(payload.nbf * 1000).toISOString(), ')');
-        console.log('  - sub (first 10 chars):', payload.sub?.substring(0, 10) + '...');
-        console.log('  - Current Unix time:', now);
-        console.log('  - iat vs now:', payload.iat - now, 'seconds (positive = future)');
-        console.log('  - Duration (exp - iat):', (payload.exp || 0) - payload.iat, 'seconds');
-      } catch (decodeError) {
-        console.error('🔍 [DASHBOARD] Failed to decode token payload:', decodeError);
-      }
+      setExtensionToken(backendToken);
       
-      console.log('✅ Generated Clerk session token for VSCode extension');
-      
-      setExtensionToken(clerkToken);
-      
-      // Calculate expiry for display (assuming 24 hours, adjust based on template config)
-      const expiryMinutes = 24 * 60;
+      const expiryText = tokenType === 'short' ? '24 hours' : '4 months';
       
       toast({
         title: "Token Generated",
-        description: `Clerk session token generated successfully. Expires in ${expiryMinutes} minutes. Copy and paste this into your VSCode extension settings.`,
+        description: `${tokenType === 'short' ? 'Short-lived' : 'Long-lived'} token generated successfully. Expires in ${expiryText}. Copy and paste this into your VSCode extension settings.`,
       });
       
     } catch (error) {
       console.error('❌ Token generation error:', error);
       console.log('=== END DASHBOARD TOKEN GENERATION DEBUG ===');
       
-      // Fallback to a mock token for development
+      // Fallback mock for dev
       if (import.meta.env.DEV) {
-        const mockToken = `clerk_mock_token_${user.id}_${Date.now()}`;
+        const mockToken = `mock_${tokenType}_token_${user.id}_${Date.now()}`;
         setExtensionToken(mockToken);
-        console.log('🔧 Using mock Clerk token for development:', mockToken);
+        console.log('🔧 Using mock token for development:', mockToken);
         
         toast({
           title: "Development Mode",
-          description: "Using mock Clerk token for development",
+          description: `Using mock ${tokenType} token for development`,
         });
       } else {
         toast({
@@ -333,6 +389,43 @@ const Dashboard = () => {
   const refreshToken = () => {
     setExtensionToken('');
     generateToken();
+  };
+
+  const revokeLongLivedToken = async () => {
+    if (!user?.id || !hasActiveLongLivedToken) return;
+
+    if (!confirm('This will revoke your active long-lived extension token. You will need to generate a new one to continue using the VSCode extension. Continue?')) {
+      return;
+    }
+
+    try {
+      const clerkToken = await getToken();
+      const response = await fetch(`${BACKEND_URL}/extension-token/revoke`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${clerkToken}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        setHasActiveLongLivedToken(false);
+        toast({
+          title: "Token Revoked",
+          description: "Your long-lived extension token has been revoked.",
+        });
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to revoke token');
+      }
+    } catch (error) {
+      console.error('Error revoking token:', error);
+      toast({
+        title: "Revocation Failed",
+        description: error instanceof Error ? error.message : "Failed to revoke token",
+        variant: "destructive",
+      });
+    }
   };
 
   // Credit validation function
@@ -827,28 +920,50 @@ const Dashboard = () => {
                 <div className="text-sm text-gray-400 mb-3">
                   Generate an authentication token to connect your VSCode extension to your account.
                 </div>
+
+                {/* Token Type Toggle */}
+                <div className="flex items-center space-x-2 p-3 bg-[#1a1a1a] rounded-md border border-white/10">
+                  <Switch
+                    id="token-type"
+                    checked={tokenType === 'long'}
+                    onCheckedChange={(checked) => setTokenType(checked ? 'long' : 'short')}
+                    className="data-[state=checked]:bg-blue-600"
+                  />
+                  <Label htmlFor="token-type" className="text-sm font-medium text-white">
+                    Use long-lived token (4 months){tokenType === 'long' && hasActiveLongLivedToken && ' - Active'}
+                  </Label>
+                </div>
+
+                {/* Warning for Long-Lived */}
+                {tokenType === 'long' && (
+                  <div className="p-3 bg-orange-500/10 border border-orange-500/20 rounded-md text-orange-300 text-xs">
+                    Long-lived tokens grant extended access. Store securely and revoke if compromised.
+                  </div>
+                )}
                 
                 {!extensionToken ? (
                   <Button
                     onClick={generateToken}
-                    disabled={isGenerating}
+                    disabled={isGenerating || (tokenType === 'long' && hasActiveLongLivedToken)}
                     className="w-full bg-blue-600 hover:bg-blue-700 text-white"
                   >
                     {isGenerating ? (
                       <>
                         <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                        Generating Token...
+                        Generating {tokenType === 'short' ? 'Short-Lived' : 'Long-Lived'} Token...
                       </>
                     ) : (
                       <>
                         <Code className="w-4 h-4 mr-2" />
-                        Generate Extension Token
+                        Generate {tokenType === 'short' ? 'Short-Lived (24h)' : 'Long-Lived (4 months)'} Token
                       </>
                     )}
                   </Button>
                 ) : (
                   <div className="space-y-3">
-                    <div className="text-sm font-medium text-white">Your Extension Token:</div>
+                    <div className="text-sm font-medium text-white">
+                      Your {tokenType === 'short' ? 'Short-Lived' : 'Long-Lived'} Extension Token:
+                    </div>
                     <div className="flex gap-2">
                       <Input
                         value={extensionToken}
@@ -874,8 +989,21 @@ const Dashboard = () => {
                       </Button>
                     </div>
                     <div className="text-xs text-gray-500">
-                      This is your Clerk session token (RS256). Use this token in your VSCode extension settings. It will auto-refresh via the backend API.
+                      {tokenType === 'short'
+                        ? 'Short-lived Clerk session token (RS256). Expires in 24 hours. Use in VSCode extension settings.'
+                        : 'Long-lived backend JWT token. Expires in 4 months. Copy now - it won\'t be shown again. Use in VSCode extension settings.'
+                      }
                     </div>
+                    {tokenType === 'long' && (
+                      <Button
+                        variant="destructive"
+                        onClick={revokeLongLivedToken}
+                        disabled={isCheckingToken}
+                        className="w-full"
+                      >
+                        {isCheckingToken ? 'Checking...' : 'Revoke Active Long-Lived Token'}
+                      </Button>
+                    )}
                   </div>
                 )}
               </div>
