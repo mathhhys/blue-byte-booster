@@ -111,7 +111,7 @@ const Dashboard = () => {
   const [isBillingPortalLoading, setIsBillingPortalLoading] = useState(false);
 
   // Backend URL - adjust based on environment
-  const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+  // const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
 
   useEffect(() => {
     setAuthPageMeta('dashboard');
@@ -240,7 +240,7 @@ const Dashboard = () => {
     setIsCheckingToken(true);
     try {
       const clerkToken = await getToken(); // Session token for auth
-      const response = await fetch(`${BACKEND_URL}/extension-token/active`, {
+      const response = await fetch('/api/extension-token/active', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${clerkToken}`,
@@ -316,7 +316,7 @@ const Dashboard = () => {
       } else {
         // Long-lived: Call backend endpoint
         const clerkToken = await getToken(); // Session token for auth
-        const response = await fetch(`${BACKEND_URL}/extension-token/generate`, {
+        const response = await fetch('/api/extension-token/generate', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${clerkToken}`,
@@ -400,7 +400,7 @@ const Dashboard = () => {
 
     try {
       const clerkToken = await getToken();
-      const response = await fetch(`${BACKEND_URL}/extension-token/revoke`, {
+      const response = await fetch('/api/extension-token/revoke', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${clerkToken}`,

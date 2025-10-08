@@ -203,6 +203,10 @@ app.use('/api/auth', authRoutes);
 app.use('/api/dashboard-token', dashboardTokenRoutes);
 app.use('/api/organizations', organizationsRoutes);
 
+// Add the new extension token routes
+const extensionTokenRoutes = require('./routes/extension-token');
+app.use('/api/extension-token', extensionTokenRoutes);
+
 // Create Stripe checkout session
 app.post('/api/stripe/create-checkout-session', async (req, res) => {
   try {
