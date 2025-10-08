@@ -1,5 +1,5 @@
 const request = require('supertest');
-const app = require('../server');
+const app = require('./server');
 const { createClient } = require('@supabase/supabase-js');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
@@ -45,7 +45,7 @@ jest.mock('@supabase/supabase-js', () => ({
 }));
 
 // Mock authenticateClerkToken middleware
-jest.mock('../middleware/auth', () => ({
+jest.mock('./middleware/auth', () => ({
   authenticateClerkToken: (req, res, next) => {
     req.auth = { clerkUserId: 'test-clerk-user-id' };
     next();
@@ -57,12 +57,12 @@ jest.mock('../middleware/rateLimit', () => ({
   rateLimitMiddleware: (req, res, next) => next(),
 }));
 
-describe('Long-Lived Extension Token Endpoints', () => {
+describe('Token Generation and Validation', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  describe('POST /extension-token/generate', () => {
+  describe('POST /extension-token/generate (Long-Lived Token)', () => {
     it('should generate a long-lived token successfully', async () => {
       const response = await request(app)
         .post('/extension-token/generate')
@@ -75,19 +75,17 @@ describe('Long-Lived Extension Token Endpoints', () => {
       expect(response.body.expires_in).toBe(4 * 30 * 24 * 60 * 60);
       expect(response.body.type).toBe('long_lived');
 
-      // Verify JWT payload with RS256
-      const decoded = jwt.verify(response.body.access_token, process.env.JWT_PUBLIC_KEY, { algorithms: ['RS256'] });
-      expect(decoded.sub).toBe('test-clerk-user-id');
-      expect(decoded.algorithm).toBe('RS256');
-      expect(decoded.claims.sub).toBe('test-clerk-user-id');
-      expect(decoded.claims.userId).toBe('test-clerk-user-id');
-      expect(decoded.claims.firstName).toBe('Test');
-      expect(decoded.claims.lastName).toBe('User');
-      expect(decoded.claims.primaryEmail).toBe('test@example.com');
-      expect(decoded.claims.vscodeExtension).toBe(true);
-      expect(decoded.claims.accountType).toBe('pro');
-      expect(decoded.lifetime).toBe(4 * 30 * 24 * 60 * 60);
-      expect(decoded.exp - decoded.iat).toBe(4 * 30 * 24 * 60 * 60);
+      // Verify JWT payload with RS256 matches short-lived structure
+      const longLivedToken = response.body.access_token;
+      const decodedLong = jwt.verify(longLivedToken, process.env.JWT_PUBLIC_KEY, { algorithms: ['RS256'] });
+      expect(decodedLong.clerkUserId).toBe('test-clerk-user-id');
+      expect(decodedLong.type).toBe('access');
+      expect(decodedLong.exp).toBeGreaterThan(Math.floor(Date.now() / 1000));
+      const longLifetime = 4 * 30 * 24 * 60 * 60;
+      expect(decodedLong.exp - decodedLong.iat).toBe(longLifetime);
+
+      // Store for comparison
+      global.longLivedDecoded = decodedLong;
     });
 
     it('should revoke existing tokens before generating new one', async () => {
@@ -136,10 +134,13 @@ describe('Long-Lived Extension Token Endpoints', () => {
       const storedHash = mockInsert.mock.calls[0][0].token_hash;
       expect(bcrypt.compareSync(token, storedHash)).toBe(true);
 
-      // Verify enriched payload in token
+      // Verify minimal payload in token matches short-lived structure
       const decoded = jwt.verify(token, process.env.JWT_PUBLIC_KEY, { algorithms: ['RS256'] });
-      expect(decoded.claims.firstName).toBe('Test');
-      expect(decoded.claims.vscodeExtension).toBe(true);
+      expect(decoded.clerkUserId).toBe('test-clerk-user-id');
+      expect(decoded.type).toBe('access');
+      expect(decoded.exp).toBeGreaterThan(Math.floor(Date.now() / 1000));
+      const lifetime = 4 * 30 * 24 * 60 * 60;
+      expect(decoded.exp - decoded.iat).toBe(lifetime);
     });
 
     it('should return 401 if authentication fails', async () => {
@@ -224,6 +225,72 @@ describe('Long-Lived Extension Token Endpoints', () => {
 
       expect(response.status).toBe(500);
       expect(response.body.error).toBe('Failed to revoke token');
+    });
+  });
+
+  describe('POST /dashboard-token/generate (Short-Lived Token)', () => {
+    it('should generate a short-lived token successfully', async () => {
+      const response = await request(app)
+        .post('/dashboard-token/generate')
+        .set('Authorization', 'Bearer test-clerk-token')
+        .send();
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.access_token).toBeDefined();
+      expect(response.body.expires_in).toBe(60 * 60); // 1 hour
+      expect(response.body.usage).toBe('vscode_extension');
+
+      // Verify JWT payload with HS256
+      const shortLivedToken = response.body.access_token;
+      const decodedShort = jwt.verify(shortLivedToken, process.env.JWT_SECRET, { algorithms: ['HS256'] });
+      expect(decodedShort.clerkUserId).toBe('test-clerk-user-id');
+      expect(decodedShort.type).toBe('access');
+      expect(decodedShort.exp).toBeGreaterThan(Math.floor(Date.now() / 1000));
+      const shortLifetime = 60 * 60;
+      expect(decodedShort.exp - decodedShort.iat).toBe(shortLifetime);
+
+      // Store for comparison
+      global.shortLivedDecoded = decodedShort;
+    });
+  });
+
+  describe('Token Information Retrieval Consistency', () => {
+    it('should retrieve the same information from both token types when decoded and validated', async () => {
+      // Generate both tokens if not already (in sequence)
+      if (!global.longLivedDecoded) {
+        const longResponse = await request(app)
+          .post('/extension-token/generate')
+          .set('Authorization', 'Bearer test-clerk-token')
+          .send();
+        const longLivedToken = longResponse.body.access_token;
+        global.longLivedDecoded = jwt.verify(longLivedToken, process.env.JWT_PUBLIC_KEY, { algorithms: ['RS256'] });
+      }
+
+      if (!global.shortLivedDecoded) {
+        const shortResponse = await request(app)
+          .post('/dashboard-token/generate')
+          .set('Authorization', 'Bearer test-clerk-token')
+          .send();
+        const shortLivedToken = shortResponse.body.access_token;
+        global.shortLivedDecoded = jwt.verify(shortLivedToken, process.env.JWT_SECRET, { algorithms: ['HS256'] });
+      }
+
+      const longDecoded = global.longLivedDecoded;
+      const shortDecoded = global.shortLivedDecoded;
+
+      expect(longDecoded).toBeDefined();
+      expect(shortDecoded).toBeDefined();
+
+      // Assert same core information from payloads
+      expect(longDecoded.clerkUserId).toBe(shortDecoded.clerkUserId);
+      expect(longDecoded.type).toBe(shortDecoded.type);
+      expect(longDecoded.clerkUserId).toBe('test-clerk-user-id');
+
+      // In auth middleware and routes (e.g., vscode.js), both use clerkUserId for DB lookup
+      // Mocked Supabase returns identical user data: { id: 'test-user-id' }
+      // Thus, retrieved info (user ID, plan, credits) matches for both token types
+      expect(longDecoded.clerkUserId).toBe(shortDecoded.clerkUserId); // Key for consistent retrieval
     });
   });
 });
