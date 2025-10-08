@@ -207,13 +207,16 @@ router.get('/active', authenticateClerkToken, rateLimitMiddleware, async (req, r
     const userId = userData.id;
 
     // Check for active token (not revoked and not expired)
+    // Order by created_at descending to get the most recent token
     const { data: tokenData, error: tokenError } = await supabase
       .from('extension_tokens')
       .select('id, expires_at, revoked_at')
       .eq('user_id', userId)
       .is('revoked_at', null)
       .gte('expires_at', new Date().toISOString())
-      .maybeSingle(); // Use maybeSingle to handle no rows gracefully
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
     if (tokenError) {
       console.error('Token check error:', tokenError);
