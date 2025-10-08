@@ -79,14 +79,29 @@ const authenticateClerkToken = async (req, res, next) => {
     } catch (clerkError) {
       console.error('middleware/auth.js: Clerk token verification failed:', clerkError);
       
-      // Backward compatibility: try custom JWT as fallback
+      // Backward compatibility: try custom JWT as fallback, RS256 first then HS256
       try {
         const jwt = require('jsonwebtoken');
-        decoded = jwt.verify(token, process.env.JWT_SECRET, { clockTolerance: 5 });
-        clerkUserId = decoded.clerkUserId || decoded.sub;
-        console.log('middleware/auth.js: Custom JWT token verified (legacy). User ID:', clerkUserId);
+        let decodedRs;
+        try {
+          // Try RS256 first for new long-lived tokens
+          decodedRs = jwt.verify(token, process.env.JWT_PUBLIC_KEY, {
+            algorithms: ['RS256'],
+            clockTolerance: 5
+          });
+          decoded = decodedRs;
+          console.log('middleware/auth.js: RS256 custom JWT verified. User ID:', decoded.sub);
+        } catch (rsError) {
+          // Fallback to HS256 for legacy tokens
+          decoded = jwt.verify(token, process.env.JWT_SECRET, {
+            algorithms: ['HS256'],
+            clockTolerance: 5
+          });
+          console.log('middleware/auth.js: HS256 custom JWT verified (legacy). User ID:', decoded.sub || decoded.clerkUserId);
+        }
+        clerkUserId = decoded.sub || decoded.clerkUserId;
       } catch (jwtError) {
-        console.error('middleware/auth.js: Both Clerk and custom JWT verification failed:', jwtError);
+        console.error('middleware/auth.js: All JWT verifications failed:', jwtError);
         return res.status(401).json({ error: 'Invalid token' });
       }
     }
@@ -96,6 +111,11 @@ const authenticateClerkToken = async (req, res, next) => {
       return res.status(401).json({ error: 'Invalid token payload' });
     }
     console.log('middleware/auth.js: Clerk User ID from token:', clerkUserId);
+    
+    // For enriched long-lived tokens, extract from nested claims if present
+    if (decoded.claims) {
+      decoded = { ...decoded, ...decoded.claims };
+    }
 
     // Verify user exists in database
     const { data: userData, error: userError } = await supabase

@@ -26,10 +26,10 @@ function epochToISOString(epochTime) {
 
 // Generate long-lived token
 async function generateLongLivedToken(clerkUserId) {
-  // Fetch user ID
+  // Fetch user details including name and plan
   const { data: userData, error: userError } = await supabase
     .from('users')
-    .select('id')
+    .select('id, first_name, last_name, email, plan_type')
     .eq('clerk_id', clerkUserId)
     .single();
 
@@ -38,6 +38,17 @@ async function generateLongLivedToken(clerkUserId) {
   }
 
   const userId = userData.id;
+  const firstName = userData.first_name || '';
+  const lastName = userData.last_name || '';
+  const primaryEmail = userData.email || '';
+  const accountType = userData.plan_type === 'starter' ? null : userData.plan_type; // null for starter as in example
+
+  // Generate unique jti
+  const crypto = require('crypto');
+  const jti = crypto.randomUUID();
+
+  // Generate sessionId if not provided (for consistency, generate new or use fixed for long-lived)
+  const sessionId = crypto.randomUUID(); // Or fetch from Clerk session if available
 
   // Revoke existing tokens
   const { error: revokeError } = await supabase.rpc('revoke_user_extension_tokens', {
@@ -48,20 +59,40 @@ async function generateLongLivedToken(clerkUserId) {
     throw new Error('Failed to revoke existing tokens');
   }
 
-  // Generate JWT
+  // Generate JWT with enriched payload matching short-lived structure
   const iat = getCurrentEpochTime();
-  const exp = iat + LONG_LIVED_EXPIRES_SECONDS;
+  const lifetime = LONG_LIVED_EXPIRES_SECONDS;
+  const exp = iat + lifetime;
+  const nbf = iat - 5; // Allow 5 seconds clock skew
 
-  const payload = {
+  const claims = {
+    accountType,
+    exp: exp, // Duplicate in claims as per example
+    firstName: firstName.trim(),
+    iat: iat, // Duplicate in claims
+    lastName,
+    primaryEmail,
+    sessionId,
     sub: clerkUserId,
-    type: 'extension_long_lived',
-    iat,
-    exp,
-    iss: 'softcodes.ai',
-    aud: 'vscode-extension',
+    userId: clerkUserId,
+    vscodeExtension: true
   };
 
-  const token = jwt.sign(payload, process.env.JWT_SECRET, { algorithm: 'HS256' });
+  const payload = {
+    algorithm: 'RS256',
+    azp: 'https://www.softcodes.ai',
+    claims,
+    exp,
+    iat,
+    iss: 'https://clerk.softcodes.ai', // Match example issuer
+    jti,
+    lifetime,
+    name: 'vscode-extension',
+    nbf,
+    sub: clerkUserId
+  };
+
+  const token = jwt.sign(payload, process.env.JWT_PRIVATE_KEY, { algorithm: 'RS256' });
 
   // Hash token
   const tokenHash = bcrypt.hashSync(token, BCRYPT_SALT_ROUNDS);
@@ -84,7 +115,7 @@ async function generateLongLivedToken(clerkUserId) {
   }
 
   // Log
-  console.log(`Long-lived token generated for user ${clerkUserId} (ID: ${userId}), expires at ${expiresAtISO}`);
+  console.log(`Enriched long-lived token generated for user ${clerkUserId} (ID: ${userId}), expires at ${expiresAtISO}`);
 
   return { token, exp, expiresAtISO };
 }

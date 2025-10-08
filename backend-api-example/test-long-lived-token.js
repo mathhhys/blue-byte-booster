@@ -7,16 +7,27 @@ const bcrypt = require('bcrypt');
 // Mock environment variables
 process.env.SUPABASE_URL = 'test-supabase-url';
 process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-role-key';
-process.env.JWT_SECRET = 'test-jwt-secret';
+process.env.JWT_SECRET = 'test-jwt-secret'; // For legacy HS256 fallback
+process.env.JWT_PRIVATE_KEY = '-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEAwHB3N1bR8V8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX\n8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX\n8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX\n8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX\n8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX\n8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX\n-----END RSA PRIVATE KEY-----'; // Test private key
+process.env.JWT_PUBLIC_KEY = '-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwHB3N1bR8V8eX8eX8eX8e\nX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX\n8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX\n8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX\n8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX\n8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX8eX\n-----END PUBLIC KEY-----'; // Corresponding public key
 process.env.CLERK_JWT_KEY = 'test-clerk-jwt-key';
 
-// Mock Supabase client
+// Mock Supabase client with enriched user data
 jest.mock('@supabase/supabase-js', () => ({
   createClient: () => ({
     from: () => ({
       select: () => ({
         eq: () => ({
-          single: () => ({ data: { id: 'test-user-id' }, error: null }),
+          single: () => ({
+            data: {
+              id: 'test-user-id',
+              first_name: 'Test',
+              last_name: 'User',
+              email: 'test@example.com',
+              plan_type: 'pro'
+            },
+            error: null
+          }),
         }),
       }),
       insert: () => ({
@@ -64,10 +75,18 @@ describe('Long-Lived Extension Token Endpoints', () => {
       expect(response.body.expires_in).toBe(4 * 30 * 24 * 60 * 60);
       expect(response.body.type).toBe('long_lived');
 
-      // Verify JWT payload
-      const decoded = jwt.verify(response.body.access_token, 'test-jwt-secret');
+      // Verify JWT payload with RS256
+      const decoded = jwt.verify(response.body.access_token, process.env.JWT_PUBLIC_KEY, { algorithms: ['RS256'] });
       expect(decoded.sub).toBe('test-clerk-user-id');
-      expect(decoded.type).toBe('extension_long_lived');
+      expect(decoded.algorithm).toBe('RS256');
+      expect(decoded.claims.sub).toBe('test-clerk-user-id');
+      expect(decoded.claims.userId).toBe('test-clerk-user-id');
+      expect(decoded.claims.firstName).toBe('Test');
+      expect(decoded.claims.lastName).toBe('User');
+      expect(decoded.claims.primaryEmail).toBe('test@example.com');
+      expect(decoded.claims.vscodeExtension).toBe(true);
+      expect(decoded.claims.accountType).toBe('pro');
+      expect(decoded.lifetime).toBe(4 * 30 * 24 * 60 * 60);
       expect(decoded.exp - decoded.iat).toBe(4 * 30 * 24 * 60 * 60);
     });
 
@@ -116,6 +135,11 @@ describe('Long-Lived Extension Token Endpoints', () => {
       // Verify hash matches token
       const storedHash = mockInsert.mock.calls[0][0].token_hash;
       expect(bcrypt.compareSync(token, storedHash)).toBe(true);
+
+      // Verify enriched payload in token
+      const decoded = jwt.verify(token, process.env.JWT_PUBLIC_KEY, { algorithms: ['RS256'] });
+      expect(decoded.claims.firstName).toBe('Test');
+      expect(decoded.claims.vscodeExtension).toBe(true);
     });
 
     it('should return 401 if authentication fails', async () => {

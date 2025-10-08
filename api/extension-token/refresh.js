@@ -41,7 +41,9 @@ async function verifyClerkToken(token) {
       clerkUserId: claims.sub,
       sessionId: claims.sid,
       exp: claims.exp,
-      email: claims.email
+      email: claims.email,
+      firstName: claims.first_name || '',
+      lastName: claims.last_name || ''
     };
   } catch (error) {
     throw new Error('Invalid Clerk token: ' + error.message);
@@ -71,22 +73,30 @@ async function handler(req, res) {
     
     // Verify Clerk session token
     const decoded = await verifyClerkToken(clerkToken);
-    const clerkUserId = decoded.sub;
+    const clerkUserId = decoded.clerkUserId;
+    const sessionId = decoded.sessionId;
+    const firstNameFromClerk = decoded.firstName;
+    const lastNameFromClerk = decoded.lastName;
 
-    // Get user
+    // Get user details from Supabase (fallback for names if not in Clerk claims, and for plan)
     const { data: user, error: userError } = await supabase
       .from('users')
-      .select('id, clerk_id')
+      .select('id, clerk_id, first_name, last_name, email, plan_type')
       .eq('clerk_id', clerkUserId)
       .single();
 
     if (userError || !user) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         error: 'USER_NOT_FOUND',
         message: 'User not found',
         userMessage: 'Your account was not found. Please sign in again.'
       });
     }
+
+    const firstName = firstNameFromClerk || user.first_name || '';
+    const lastName = lastNameFromClerk || user.last_name || '';
+    const primaryEmail = decoded.email || user.email || '';
+    const accountType = user.plan_type === 'starter' ? null : user.plan_type;
 
     // Set auth for rate limiting
     req.auth = { userId: user.id, clerkUserId: clerkUserId };
@@ -137,20 +147,44 @@ async function handler(req, res) {
       });
     }
 
-    // Generate new token
+    // Generate new token with enriched payload
     const iat = getCurrentEpochTime();
-    const exp = iat + LONG_LIVED_EXPIRES_SECONDS;
+    const lifetime = LONG_LIVED_EXPIRES_SECONDS;
+    const exp = iat + lifetime;
+    const nbf = iat - 5; // Allow 5 seconds clock skew
 
-    const payload = {
+    // Generate unique jti
+    const crypto = await import('crypto');
+    const jti = crypto.randomUUID();
+
+    const claims = {
+      accountType,
+      exp: exp, // Duplicate in claims as per example
+      firstName: firstName.trim(),
+      iat: iat, // Duplicate in claims
+      lastName,
+      primaryEmail,
+      sessionId,
       sub: clerkUserId,
-      type: 'extension_long_lived',
-      iat,
-      exp,
-      iss: 'softcodes.ai',
-      aud: 'vscode-extension'
+      userId: clerkUserId,
+      vscodeExtension: true
     };
 
-    const newToken = jwt.sign(payload, process.env.JWT_SECRET, { algorithm: 'HS256' });
+    const payload = {
+      algorithm: 'RS256',
+      azp: 'https://www.softcodes.ai',
+      claims,
+      exp,
+      iat,
+      iss: 'https://clerk.softcodes.ai', // Match example
+      jti,
+      lifetime,
+      name: 'vscode-extension',
+      nbf,
+      sub: clerkUserId
+    };
+
+    const newToken = jwt.sign(payload, process.env.JWT_PRIVATE_KEY, { algorithm: 'RS256' });
     const tokenHash = await bcrypt.hash(newToken, BCRYPT_SALT_ROUNDS);
     const newExpiresAt = epochToISOString(exp);
 
