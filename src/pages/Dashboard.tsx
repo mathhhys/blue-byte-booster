@@ -944,8 +944,8 @@ const Dashboard = () => {
                 {!extensionToken ? (
                   <Button
                     onClick={generateToken}
-                    disabled={isGenerating || (tokenType === 'long' && hasActiveLongLivedToken)}
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                    disabled={isGenerating}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
                   >
                     {isGenerating ? (
                       <>
