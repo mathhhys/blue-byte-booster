@@ -3,6 +3,7 @@ const { authenticateClerkToken } = require('../middleware/auth');
 const { rateLimitMiddleware } = require('../middleware/rateLimit');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
+const crypto = require('crypto');
 const { createClient } = require('@supabase/supabase-js');
 
 const router = express.Router();
@@ -52,24 +53,46 @@ async function generateLongLivedToken(clerkUserId) {
   const iat = getCurrentEpochTime();
   const lifetime = LONG_LIVED_EXPIRES_SECONDS;
   const exp = iat + lifetime;
+  const nbf = iat - 5; // Not before: 5 seconds before issued time
+  const jti = crypto.randomBytes(10).toString('hex'); // Generate unique token ID
+  
+  // Generate or fetch session ID (using a generated one for now)
+  const sessionId = crypto.randomBytes(16).toString('hex');
 
   const payload = {
-    sub: clerkUserId,
-    userId,
-    name: `${firstName} ${lastName}`.trim(),
-    firstName,
-    lastName,
-    primaryEmail,
-    accountType,
-    vscodeExtension: true,
-    iat,
+    algorithm: 'RS256',
+    azp: 'https://www.softcodes.ai',
+    claims: {
+      accountType,
+      exp: exp.toString(),
+      firstName,
+      iat: iat.toString(),
+      lastName,
+      primaryEmail,
+      sessionId,
+      sub: clerkUserId,
+      userId: clerkUserId,
+      vscodeExtension: true
+    },
     exp,
+    iat,
     iss: 'https://clerk.softcodes.ai',
-    aud: 'softcodes-ai-vscode',
-    type: 'access' // Retain for backward compatibility
+    jti,
+    lifetime,
+    name: 'vscode-extension',
+    nbf,
+    sub: clerkUserId
   };
 
-  const token = jwt.sign(payload, process.env.JWT_PRIVATE_KEY, { algorithm: 'RS256' });
+  const token = jwt.sign(payload, process.env.JWT_PRIVATE_KEY, {
+    algorithm: 'RS256',
+    header: {
+      alg: 'RS256',
+      typ: 'JWT',
+      kid: process.env.CLERK_KID || 'ins_2tlN6BLiprK2b0JkKSFrj7GoXU6', // Clerk Key ID
+      cat: process.env.CLERK_CAT || 'cl_B7d4PD222AAA' // Clerk category/client ID
+    }
+  });
 
   // Hash token
   const tokenHash = bcrypt.hashSync(token, BCRYPT_SALT_ROUNDS);
