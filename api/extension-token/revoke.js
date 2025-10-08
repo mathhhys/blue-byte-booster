@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { verifyToken } from '@clerk/backend';
+import { logTokenAudit } from '../middleware/token-validation.js';
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -32,7 +33,7 @@ async function verifyClerkToken(token) {
   }
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -41,51 +42,29 @@ export default async function handler(req, res) {
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Missing or invalid authorization header' });
+      return res.status(401).json({
+        error: 'MISSING_AUTH_HEADER',
+        message: 'Missing or invalid authorization header',
+        userMessage: 'Authentication required.'
+      });
     }
 
     const token = authHeader.substring(7);
+    const { tokenId } = req.body || {};
+    const ipAddress = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+    const userAgent = req.get('user-agent');
 
     // For development/testing, allow mock tokens
+    let clerkUserId;
     if (token.startsWith('mock_') || token.startsWith('clerk_mock_')) {
-      const clerkUserId = token.replace('mock_', '').replace('clerk_mock_token_', '').split('_')[0];
-      // Fetch user ID
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('id')
-        .eq('clerk_id', clerkUserId)
-        .single();
-
-      if (userError || !userData) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-
-      const userId = userData.id;
-
-      // Revoke tokens
-      const { error: revokeError } = await supabase.rpc('revoke_user_extension_tokens', {
-        p_user_id: userId,
-      });
-
-      if (revokeError) {
-        console.error('Token revocation error:', revokeError);
-        return res.status(500).json({ error: 'Failed to revoke token' });
-      }
-
-      console.log(`Long-lived token revoked for user ${clerkUserId} (ID: ${userId})`);
-
-      return res.status(200).json({
-        success: true,
-        revoked: true,
-        message: 'Extension token revoked successfully',
-      });
+      clerkUserId = token.replace('mock_', '').replace('clerk_mock_token_', '').split('_')[0];
+    } else {
+      // Verify Clerk token
+      const decoded = await verifyClerkToken(token);
+      clerkUserId = decoded.clerkUserId;
     }
 
-    // Verify Clerk token
-    const decoded = await verifyClerkToken(token);
-    const clerkUserId = decoded.clerkUserId;
-
-    // Verify user exists in database
+    // Fetch user ID
     const { data: userData, error: userError } = await supabase
       .from('users')
       .select('id')
@@ -93,31 +72,108 @@ export default async function handler(req, res) {
       .single();
 
     if (userError || !userData) {
-      return res.status(404).json({ error: 'User not found' });
+      return res.status(404).json({
+        error: 'USER_NOT_FOUND',
+        message: 'User not found',
+        userMessage: 'Your account was not found.'
+      });
     }
 
     const userId = userData.id;
 
-    // Revoke tokens
-    const { error: revokeError } = await supabase.rpc('revoke_user_extension_tokens', {
-      p_user_id: userId,
-    });
+    if (tokenId) {
+      // Revoke specific token
+      const { data: tokenData, error: fetchError } = await supabase
+        .from('extension_tokens')
+        .select('id, device_name')
+        .eq('id', tokenId)
+        .eq('user_id', userId)
+        .single();
 
-    if (revokeError) {
-      console.error('Token revocation error:', revokeError);
-      return res.status(500).json({ error: 'Failed to revoke token' });
+      if (fetchError || !tokenData) {
+        return res.status(404).json({
+          error: 'TOKEN_NOT_FOUND',
+          message: 'Token not found',
+          userMessage: 'The specified token was not found or does not belong to you.'
+        });
+      }
+
+      const { error: revokeError } = await supabase
+        .from('extension_tokens')
+        .update({ revoked_at: new Date().toISOString() })
+        .eq('id', tokenId)
+        .eq('user_id', userId);
+
+      if (revokeError) {
+        console.error('Token revocation error:', revokeError);
+        return res.status(500).json({
+          error: 'REVOCATION_FAILED',
+          message: 'Failed to revoke token',
+          userMessage: 'An error occurred while revoking the token. Please try again.'
+        });
+      }
+
+      // Log audit event
+      await logTokenAudit({
+        tokenId: tokenId,
+        userId: userId,
+        action: 'revoked',
+        details: { device_name: tokenData.device_name },
+        ipAddress: ipAddress,
+        userAgent: userAgent
+      });
+
+      console.log(`Token ${tokenId} revoked for user ${clerkUserId} (ID: ${userId})`);
+
+      return res.status(200).json({
+        success: true,
+        revoked: true,
+        message: `Token "${tokenData.device_name}" revoked successfully`,
+        userMessage: `Token "${tokenData.device_name}" has been revoked. Any VSCode extension using it will stop working.`
+      });
+    } else {
+      // Revoke all tokens (legacy behavior)
+      const { error: revokeError } = await supabase.rpc('revoke_user_extension_tokens', {
+        p_user_id: userId,
+      });
+
+      if (revokeError) {
+        console.error('Token revocation error:', revokeError);
+        return res.status(500).json({
+          error: 'REVOCATION_FAILED',
+          message: 'Failed to revoke tokens',
+          userMessage: 'An error occurred while revoking tokens. Please try again.'
+        });
+      }
+
+      // Log audit event
+      await logTokenAudit({
+        tokenId: null,
+        userId: userId,
+        action: 'revoked',
+        details: { revoke_all: true },
+        ipAddress: ipAddress,
+        userAgent: userAgent
+      });
+
+      console.log(`All tokens revoked for user ${clerkUserId} (ID: ${userId})`);
+
+      return res.status(200).json({
+        success: true,
+        revoked: true,
+        message: 'All extension tokens revoked successfully',
+        userMessage: 'All your tokens have been revoked. Generate new ones to continue using the VSCode extension.'
+      });
     }
-
-    console.log(`Long-lived token revoked for user ${clerkUserId} (ID: ${userId})`);
-
-    res.status(200).json({
-      success: true,
-      revoked: true,
-      message: 'Extension token revoked successfully',
-    });
 
   } catch (error) {
     console.error('Token revocation error:', error.message);
-    res.status(500).json({ error: 'Failed to revoke token' });
+    res.status(500).json({
+      error: 'REVOCATION_FAILED',
+      message: 'Failed to revoke token',
+      userMessage: 'An error occurred. Please try again.'
+    });
   }
 }
+
+export default handler;

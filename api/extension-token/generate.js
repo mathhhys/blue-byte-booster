@@ -2,6 +2,9 @@ import { createClient } from '@supabase/supabase-js';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
 import { verifyToken } from '@clerk/backend';
+import { encryptData } from '../utils/encryption.js';
+import { tokenRateLimitMiddleware } from '../middleware/token-rate-limit.js';
+import { logTokenAudit } from '../middleware/token-validation.js';
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -10,6 +13,7 @@ const supabase = createClient(
 
 const LONG_LIVED_EXPIRES_SECONDS = 4 * 30 * 24 * 60 * 60; // 4 months in seconds
 const BCRYPT_SALT_ROUNDS = 12;
+const MAX_TOKENS_PER_USER = 5; // Maximum number of active tokens per user
 
 // Helper functions for time
 function getCurrentEpochTime() {
@@ -47,7 +51,7 @@ async function verifyClerkToken(token) {
 }
 
 // Generate long-lived token
-async function generateLongLivedToken(clerkUserId) {
+async function generateLongLivedToken(clerkUserId, deviceName, ipAddress, userAgent) {
   // Fetch user ID
   const { data: userData, error: userError } = await supabase
     .from('users')
@@ -61,13 +65,22 @@ async function generateLongLivedToken(clerkUserId) {
 
   const userId = userData.id;
 
-  // Revoke existing tokens
-  const { error: revokeError } = await supabase.rpc('revoke_user_extension_tokens', {
-    p_user_id: userId,
-  });
+  // Check number of active tokens
+  const { data: existingTokens, error: countError } = await supabase
+    .from('extension_tokens')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .is('revoked_at', null)
+    .gte('expires_at', new Date().toISOString());
 
-  if (revokeError) {
-    throw new Error('Failed to revoke existing tokens');
+  if (countError) {
+    console.error('Error checking token count:', countError);
+  }
+
+  const activeTokenCount = existingTokens?.length || 0;
+
+  if (activeTokenCount >= MAX_TOKENS_PER_USER) {
+    throw new Error(`Maximum of ${MAX_TOKENS_PER_USER} active tokens allowed. Please revoke an existing token first.`);
   }
 
   // Generate JWT
@@ -86,32 +99,67 @@ async function generateLongLivedToken(clerkUserId) {
   const token = jwt.sign(payload, process.env.JWT_SECRET, { algorithm: 'HS256' });
 
   // Hash token
-  const tokenHash = bcrypt.hashSync(token, BCRYPT_SALT_ROUNDS);
+  const tokenHash = await bcrypt.hash(token, BCRYPT_SALT_ROUNDS);
 
   // Expires at ISO
   const expiresAtISO = epochToISOString(exp);
 
+  // Encrypt sensitive metadata
+  let deviceInfoEncrypted = null;
+  let ipAddressEncrypted = null;
+
+  try {
+    if (userAgent) {
+      deviceInfoEncrypted = encryptData(userAgent);
+    }
+    if (ipAddress) {
+      ipAddressEncrypted = encryptData(ipAddress);
+    }
+  } catch (encryptError) {
+    console.error('Failed to encrypt metadata:', encryptError);
+    // Continue without encryption rather than failing
+  }
+
   // Insert into extension_tokens
-  const { error: insertError } = await supabase
+  const { data: newToken, error: insertError } = await supabase
     .from('extension_tokens')
     .insert({
       user_id: userId,
       token_hash: tokenHash,
       name: 'VSCode Long-Lived Token',
+      device_name: deviceName || 'VSCode Extension',
       expires_at: expiresAtISO,
-    });
+      device_info_encrypted: deviceInfoEncrypted,
+      ip_address_encrypted: ipAddressEncrypted
+    })
+    .select('id')
+    .single();
 
   if (insertError) {
+    console.error('Token insert error:', insertError);
     throw new Error('Failed to store token');
   }
 
-  // Log
-  console.log(`Long-lived token generated for user ${clerkUserId} (ID: ${userId}), expires at ${expiresAtISO}`);
+  // Log audit event
+  await logTokenAudit({
+    tokenId: newToken.id,
+    userId: userId,
+    action: 'generated',
+    details: {
+      device_name: deviceName || 'VSCode Extension',
+      expires_at: expiresAtISO
+    },
+    ipAddress: ipAddress,
+    userAgent: userAgent
+  });
 
-  return { token, exp, expiresAtISO };
+  // Log
+  console.log(`Long-lived token generated for user ${clerkUserId} (ID: ${userId}), device: ${deviceName}, expires at ${expiresAtISO}`);
+
+  return { token, exp, expiresAtISO, tokenId: newToken.id };
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -120,15 +168,42 @@ export default async function handler(req, res) {
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Missing or invalid authorization header' });
+      return res.status(401).json({
+        error: 'MISSING_AUTH_HEADER',
+        message: 'Missing or invalid authorization header',
+        userMessage: 'Authentication required. Please sign in again.'
+      });
     }
 
-    const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+    const token = authHeader.substring(7);
+    const { deviceName } = req.body || {};
+    const ipAddress = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+    const userAgent = req.get('user-agent');
 
     // For development/testing, allow mock tokens
     if (token.startsWith('mock_') || token.startsWith('clerk_mock_')) {
       const clerkUserId = token.replace('mock_', '').replace('clerk_mock_token_', '').split('_')[0];
-      const tokenData = await generateLongLivedToken(clerkUserId);
+      
+      // Create mock auth for rate limiting
+      req.auth = { userId: clerkUserId, clerkUserId: clerkUserId };
+      
+      // Apply rate limiting
+      const rateLimitCheck = tokenRateLimitMiddleware('generate');
+      await new Promise((resolve, reject) => {
+        rateLimitCheck(req, res, (err) => {
+          if (err) reject(err);
+          else if (res.headersSent) reject(new Error('Rate limit exceeded'));
+          else resolve();
+        });
+      });
+      
+      const tokenData = await generateLongLivedToken(
+        clerkUserId,
+        deviceName || 'Development Token',
+        ipAddress,
+        userAgent
+      );
+      
       return res.status(200).json({
         success: true,
         access_token: tokenData.token,
@@ -137,6 +212,7 @@ export default async function handler(req, res) {
         token_type: 'Bearer',
         type: 'long_lived',
         usage: 'vscode_extension',
+        token_id: tokenData.tokenId
       });
     }
 
@@ -152,10 +228,32 @@ export default async function handler(req, res) {
       .single();
 
     if (userError || !userData) {
-      return res.status(401).json({ error: 'User not found' });
+      return res.status(404).json({
+        error: 'USER_NOT_FOUND',
+        message: 'User not found',
+        userMessage: 'Your account was not found. Please try signing in again.'
+      });
     }
 
-    const tokenData = await generateLongLivedToken(clerkUserId);
+    // Set auth for rate limiting
+    req.auth = { userId: userData.id, clerkUserId: clerkUserId };
+    
+    // Apply rate limiting
+    const rateLimitCheck = tokenRateLimitMiddleware('generate');
+    await new Promise((resolve, reject) => {
+      rateLimitCheck(req, res, (err) => {
+        if (err) reject(err);
+        else if (res.headersSent) reject(new Error('Rate limit exceeded'));
+        else resolve();
+      });
+    });
+
+    const tokenData = await generateLongLivedToken(
+      clerkUserId,
+      deviceName || 'VSCode Extension',
+      ipAddress,
+      userAgent
+    );
 
     res.status(200).json({
       success: true,
@@ -165,10 +263,36 @@ export default async function handler(req, res) {
       token_type: 'Bearer',
       type: 'long_lived',
       usage: 'vscode_extension',
+      token_id: tokenData.tokenId,
+      message: 'Token generated successfully. Store it securely - it won\'t be shown again.'
     });
 
   } catch (error) {
     console.error('Long-lived token generation error:', error.message);
-    res.status(500).json({ error: 'Failed to generate long-lived token' });
+    
+    // User-friendly error messages
+    if (error.message.includes('Maximum of')) {
+      return res.status(400).json({
+        error: 'TOKEN_LIMIT_EXCEEDED',
+        message: error.message,
+        userMessage: error.message
+      });
+    }
+    
+    if (error.message.includes('Rate limit exceeded')) {
+      return res.status(429).json({
+        error: 'RATE_LIMIT_EXCEEDED',
+        message: 'Rate limit exceeded',
+        userMessage: 'Too many token generation requests. Please try again later.'
+      });
+    }
+    
+    res.status(500).json({
+      error: 'GENERATION_FAILED',
+      message: 'Failed to generate long-lived token',
+      userMessage: 'An error occurred while generating your token. Please try again.'
+    });
   }
 }
+
+export default handler;
