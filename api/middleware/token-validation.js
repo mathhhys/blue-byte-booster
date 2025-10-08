@@ -144,14 +144,12 @@ async function validateLongLivedToken(req, res, next) {
     const daysUntilExpiry = Math.floor((expiresAt - Date.now()) / (1000 * 60 * 60 * 24));
     
     if (daysUntilExpiry <= 30) {
-      res.set({
-        'X-Token-Expires-Soon': 'true',
-        'X-Token-Days-Until-Expiry': daysUntilExpiry.toString(),
-        'X-Token-Expiry-Date': expiresAt.toISOString()
-      });
+      res.setHeader('X-Token-Expires-Soon', 'true');
+      res.setHeader('X-Token-Days-Until-Expiry', daysUntilExpiry.toString());
+      res.setHeader('X-Token-Expiry-Date', expiresAt.toISOString());
       
       if (daysUntilExpiry <= 7) {
-        res.set('X-Token-Expiry-Critical', 'true');
+        res.setHeader('X-Token-Expiry-Critical', 'true');
       }
     }
 
