@@ -1,6 +1,6 @@
-const jwt = require('jsonwebtoken');
-const bcrypt = require('bcrypt');
-const { createClient } = require('@supabase/supabase-js');
+import jwt from 'jsonwebtoken';
+import bcrypt from 'bcrypt';
+import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -23,9 +23,15 @@ async function logTokenAudit(data) {
     });
     
     if (error) {
-      console.error('Failed to log token audit:', error);
+      // Gracefully handle if table doesn't exist yet
+      if (error.message?.includes('relation "token_audit_logs" does not exist')) {
+        console.warn('⚠️ token_audit_logs table not found - run migration to enable audit logging');
+      } else {
+        console.error('Failed to log token audit:', error);
+      }
     }
   } catch (error) {
+    // Don't throw - audit logging is non-critical
     console.error('Token audit logging error:', error);
   }
 }
@@ -192,7 +198,7 @@ async function validateLongLivedToken(req, res, next) {
   }
 }
 
-module.exports = { 
+export {
   validateLongLivedToken,
   logTokenAudit
 };

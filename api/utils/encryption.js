@@ -1,4 +1,4 @@
-const crypto = require('crypto');
+import crypto from 'crypto';
 
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 16;
@@ -6,20 +6,27 @@ const AUTH_TAG_LENGTH = 16;
 
 /**
  * Get encryption key from environment variable
- * @returns {Buffer} The encryption key
+ * @returns {Buffer|null} The encryption key or null if not configured
  */
 function getEncryptionKey() {
   if (!process.env.ENCRYPTION_KEY) {
-    throw new Error('ENCRYPTION_KEY environment variable is required');
+    console.warn('ENCRYPTION_KEY not set - encryption disabled');
+    return null;
   }
   
-  const key = Buffer.from(process.env.ENCRYPTION_KEY, 'hex');
-  
-  if (key.length !== 32) {
-    throw new Error('ENCRYPTION_KEY must be 64 hex characters (32 bytes)');
+  try {
+    const key = Buffer.from(process.env.ENCRYPTION_KEY, 'hex');
+    
+    if (key.length !== 32) {
+      console.error('ENCRYPTION_KEY must be 64 hex characters (32 bytes) - encryption disabled');
+      return null;
+    }
+    
+    return key;
+  } catch (error) {
+    console.error('Invalid ENCRYPTION_KEY format - encryption disabled:', error);
+    return null;
   }
-  
-  return key;
 }
 
 /**
@@ -30,8 +37,14 @@ function getEncryptionKey() {
 function encryptData(text) {
   if (!text) return null;
   
+  const key = getEncryptionKey();
+  if (!key) {
+    // Encryption not configured - return null (data won't be encrypted)
+    console.warn('Encryption skipped - ENCRYPTION_KEY not configured');
+    return null;
+  }
+  
   try {
-    const key = getEncryptionKey();
     const iv = crypto.randomBytes(IV_LENGTH);
     const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
     
@@ -44,7 +57,8 @@ function encryptData(text) {
     return `${iv.toString('hex')}:${authTag.toString('hex')}:${encrypted}`;
   } catch (error) {
     console.error('Encryption error:', error);
-    throw new Error('Failed to encrypt data');
+    // Return null instead of throwing - allow operation to continue
+    return null;
   }
 }
 
@@ -56,8 +70,13 @@ function encryptData(text) {
 function decryptData(encryptedText) {
   if (!encryptedText) return null;
   
+  const key = getEncryptionKey();
+  if (!key) {
+    console.warn('Decryption skipped - ENCRYPTION_KEY not configured');
+    return null;
+  }
+  
   try {
-    const key = getEncryptionKey();
     const parts = encryptedText.split(':');
     
     if (parts.length !== 3) {
@@ -77,7 +96,7 @@ function decryptData(encryptedText) {
     return decrypted;
   } catch (error) {
     console.error('Decryption error:', error);
-    throw new Error('Failed to decrypt data');
+    return null;
   }
 }
 
@@ -103,7 +122,7 @@ function generateEncryptionKey() {
   return crypto.randomBytes(32).toString('hex');
 }
 
-module.exports = {
+export {
   encryptData,
   decryptData,
   hashSensitiveData,

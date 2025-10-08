@@ -121,26 +121,61 @@ async function generateLongLivedToken(clerkUserId, deviceName, ipAddress, userAg
   }
 
   // Insert into extension_tokens
-  const { data: newToken, error: insertError } = await supabase
-    .from('extension_tokens')
-    .insert({
-      user_id: userId,
-      token_hash: tokenHash,
-      name: 'VSCode Long-Lived Token',
+  // Try with new columns first, fallback to basic if migration not run
+  let newToken;
+  let insertData = {
+    user_id: userId,
+    token_hash: tokenHash,
+    name: 'VSCode Long-Lived Token',
+    expires_at: expiresAtISO
+  };
+
+  // Try to add new columns if they exist
+  try {
+    insertData = {
+      ...insertData,
       device_name: deviceName || 'VSCode Extension',
-      expires_at: expiresAtISO,
       device_info_encrypted: deviceInfoEncrypted,
       ip_address_encrypted: ipAddressEncrypted
-    })
-    .select('id')
-    .single();
+    };
 
-  if (insertError) {
-    console.error('Token insert error:', insertError);
+    const { data, error: insertError } = await supabase
+      .from('extension_tokens')
+      .insert(insertData)
+      .select('id')
+      .single();
+
+    if (insertError) {
+      // If column doesn't exist, try basic insert
+      if (insertError.message?.includes('column') && insertError.message?.includes('does not exist')) {
+        console.warn('⚠️ New columns not found - using basic insert. Run migration for enhanced features.');
+        const { data: basicData, error: basicError } = await supabase
+          .from('extension_tokens')
+          .insert({
+            user_id: userId,
+            token_hash: tokenHash,
+            name: 'VSCode Long-Lived Token',
+            expires_at: expiresAtISO
+          })
+          .select('id')
+          .single();
+
+        if (basicError) {
+          throw basicError;
+        }
+        newToken = basicData;
+      } else {
+        throw insertError;
+      }
+    } else {
+      newToken = data;
+    }
+  } catch (error) {
+    console.error('Token insert error:', error);
     throw new Error('Failed to store token');
   }
 
-  // Log audit event
+  // Log audit event (gracefully handles missing table)
   await logTokenAudit({
     tokenId: newToken.id,
     userId: userId,

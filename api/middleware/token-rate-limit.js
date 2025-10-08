@@ -1,4 +1,4 @@
-const { createClient } = require('@supabase/supabase-js');
+import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -42,6 +42,11 @@ async function checkTokenRateLimit(userId, action = 'generate') {
       .maybeSingle();
 
     if (hourlyError) {
+      // If table doesn't exist, allow request (migration not run yet)
+      if (hourlyError.message?.includes('relation "token_rate_limits" does not exist')) {
+        console.warn('⚠️ token_rate_limits table not found - rate limiting disabled until migration is run');
+        return { allowed: true, warning: 'Rate limiting disabled - run migration' };
+      }
       console.error('Hourly rate limit check error:', hourlyError);
     }
 
@@ -88,7 +93,13 @@ async function checkTokenRateLimit(userId, action = 'generate') {
     });
 
     if (incrementError) {
-      console.error('Failed to increment rate limit:', incrementError);
+      // Gracefully handle if function doesn't exist yet
+      if (incrementError.message?.includes('function increment_token_rate_limit') ||
+          incrementError.message?.includes('does not exist')) {
+        console.warn('⚠️ increment_token_rate_limit function not found - run migration to enable rate limiting');
+      } else {
+        console.error('Failed to increment rate limit:', incrementError);
+      }
       // Allow request even if we couldn't increment
     }
 
@@ -157,7 +168,7 @@ function tokenRateLimitMiddleware(action = 'generate') {
   };
 }
 
-module.exports = {
+export {
   tokenRateLimitMiddleware,
   checkTokenRateLimit,
   LIMITS
