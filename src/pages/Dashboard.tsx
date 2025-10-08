@@ -51,6 +51,7 @@ import {
 
 // Mock data for the dashboard
 import { createStripeCustomerPortalSession } from '@/api/stripe';
+import { TokenManagement } from '@/components/dashboard/TokenManagement';
 
 // Dark theme appearance configuration for Clerk components
 const clerkAppearance = {
