@@ -51,8 +51,8 @@ async function handler(req, res) {
 
     const token = authHeader.substring(7);
     const { tokenId } = req.body || {};
-    const ipAddress = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
-    const userAgent = req.get('user-agent');
+    const ipAddress = req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || 'unknown';
+    const userAgent = req.headers['user-agent'] || 'unknown';
 
     // For development/testing, allow mock tokens
     let clerkUserId;

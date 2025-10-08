@@ -169,12 +169,12 @@ async function validateLongLivedToken(req, res, next) {
       tokenId: matchedToken.id,
       userId: user.id,
       action: 'used',
-      details: { 
+      details: {
         endpoint: req.path,
         method: req.method
       },
-      ipAddress: req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress,
-      userAgent: req.get('user-agent')
+      ipAddress: req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || 'unknown',
+      userAgent: req.headers['user-agent'] || 'unknown'
     });
 
     // Attach auth info to request

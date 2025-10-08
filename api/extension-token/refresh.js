@@ -66,8 +66,8 @@ async function handler(req, res) {
 
     const clerkToken = authHeader.substring(7);
     const { tokenId } = req.body || {};
-    const ipAddress = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
-    const userAgent = req.get('user-agent');
+    const ipAddress = req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || 'unknown';
+    const userAgent = req.headers['user-agent'] || 'unknown';
     
     // Verify Clerk session token
     const decoded = await verifyClerkToken(clerkToken);
