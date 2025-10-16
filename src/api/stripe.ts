@@ -3,17 +3,6 @@
 
 import { StripeCheckoutData, StripeCheckoutDataWithCurrency, CurrencyCode } from '@/types/database';
 import { STRIPE_PRODUCTS, STRIPE_PRODUCTS_MULTI_CURRENCY, getPriceConfig } from '@/utils/stripe/client';
-import Stripe from 'stripe';
-import { createClient } from '@supabase/supabase-js';
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-  apiVersion: '2025-08-27.basil',
-});
-
-const supabase = createClient(
-  process.env.SUPABASE_URL || '',
-  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
-);
 
 // TypeScript types for billing portal responses
 export interface StripeCustomerPortalResponse {
@@ -469,249 +458,44 @@ export const processStripeWebhook = async (event: any) => {
 
 // Webhook event handlers (for backend use)
 const handleCheckoutSessionCompleted = async (session: any) => {
+  // Extract metadata from session
   const { customer, subscription, metadata } = session;
-  const clerkUserId = metadata.clerkUserId;
-  const plan = metadata.plan;
-  const skipTrial = metadata.skipTrial === 'true';
-
-  if (!clerkUserId || plan !== 'pro') return;
-
-  try {
-    const { data: user } = await supabase
-      .from('users')
-      .select('id')
-      .eq('clerk_id', clerkUserId)
-      .single();
-
-    if (!user) return;
-
-    if (skipTrial) {
-      // Direct paid: grant full 500 credits
-      await supabase.rpc('grant_credits', {
-        p_clerk_id: clerkUserId,
-        p_amount: 500,
-        p_description: 'Pro subscription - full credits',
-        p_transaction_type: 'grant',
-        p_reference_id: subscription || session.id,
-      });
-
-      // Set anniversary date
-      await supabase
-        .from('users')
-        .update({ subscription_anniversary_date: new Date().toISOString() })
-        .eq('clerk_id', clerkUserId);
-    } else {
-      // Trial start: grant 200 trial credits (full grant will happen on conversion)
-      await supabase.rpc('grant_credits', {
-        p_clerk_id: clerkUserId,
-        p_amount: 200,
-        p_description: 'Pro trial start - 200 credits',
-        p_transaction_type: 'trial_grant',
-        p_reference_id: subscription || session.id,
-      });
-    }
-
-    // Update subscription in database
-    await supabase
-      .from('subscriptions')
-      .upsert({
-        user_id: user.id,
-        stripe_subscription_id: subscription,
-        plan_type: plan,
-        billing_frequency: metadata.billingFrequency,
-        status: 'active',
-        current_period_start: new Date().toISOString(),
-        current_period_end: skipTrial ? null : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days for trial
-      });
-
-  } catch (error) {
-    console.error('Error handling checkout completion:', error);
-  }
-
+  
+  // Update user's subscription status in database
+  // Grant credits based on plan
+  // Send confirmation email
+  
   console.log('Checkout session completed:', session.id);
 };
 
 const handlePaymentSucceeded = async (invoice: any) => {
-  const subscription = invoice.subscription;
-  const customer = invoice.customer;
-
-  if (!subscription || !customer) return;
-
-  try {
-    // Get customer metadata for clerkUserId
-    const stripeCustomer = await stripe.customers.retrieve(customer as string);
-    const clerkUserId = (stripeCustomer as any).metadata.clerkUserId;
-
-    if (!clerkUserId) return;
-
-    const { data: user } = await supabase
-      .from('users')
-      .select('id, plan_type, credits, subscription_anniversary_date')
-      .eq('clerk_id', clerkUserId)
-      .single();
-
-    if (!user || user.plan_type !== 'pro') return;
-
-    // Check if this is anniversary (monthly reset)
-    const anniversary = user.subscription_anniversary_date;
-    const now = new Date();
-    const isAnniversary = anniversary &&
-      now.getFullYear() === new Date(anniversary).getFullYear() &&
-      now.getMonth() === new Date(anniversary).getMonth() &&
-      now.getDate() === new Date(anniversary).getDate();
-
-    if (isAnniversary) {
-      // Monthly reset to 500 credits
-      await supabase.rpc('reset_monthly_credits', {
-        p_clerk_id: clerkUserId,
-        p_plan_credits: 500,
-      });
-    } else {
-      // Regular payment: add credits if needed (for overages or something, but for Pro it's fixed)
-      // For Pro, monthly allotment is already handled by reset
-    }
-
-    // Update subscription period
-    await supabase
-      .from('subscriptions')
-      .update({
-        current_period_start: invoice.period_start ? new Date(invoice.period_start * 1000).toISOString() : now.toISOString(),
-        current_period_end: invoice.period_end ? new Date(invoice.period_end * 1000).toISOString() : null,
-        status: 'active',
-      })
-      .eq('stripe_subscription_id', subscription);
-
-  } catch (error) {
-    console.error('Error handling payment success:', error);
-  }
-
+  // Handle successful recurring payment
+  // Grant additional credits if needed
+  // Update subscription status
+  
   console.log('Payment succeeded:', invoice.id);
 };
 
 const handlePaymentFailed = async (invoice: any) => {
-  const subscription = invoice.subscription;
-  const customer = invoice.customer;
-
-  if (!subscription || !customer) return;
-
-  try {
-    const stripeCustomer = await stripe.customers.retrieve(customer as string);
-    const clerkUserId = (stripeCustomer as any).metadata.clerkUserId;
-
-    if (!clerkUserId) return;
-
-    // Update subscription status to past_due
-    await supabase
-      .from('subscriptions')
-      .update({ status: 'past_due' })
-      .eq('stripe_subscription_id', subscription);
-
-    // Optionally notify user of failed payment
-
-  } catch (error) {
-    console.error('Error handling payment failure:', error);
-  }
-
+  // Handle failed payment
+  // Notify user
+  // Update subscription status
+  
   console.log('Payment failed:', invoice.id);
 };
 
 const handleSubscriptionUpdated = async (subscription: any) => {
-  const { id, customer, items, current_period_end, trial_end } = subscription;
-  const plan = items.data[0]?.price?.metadata?.plan || 'pro'; // Assume Pro
-
-  try {
-    const stripeCustomer = await stripe.customers.retrieve(customer as string);
-    const clerkUserId = (stripeCustomer as any).metadata.clerkUserId;
-
-    if (!clerkUserId) return;
-
-    const { data: user } = await supabase
-      .from('users')
-      .select('id, plan_type, credits, subscription_anniversary_date')
-      .eq('clerk_id', clerkUserId)
-      .single();
-
-    if (!user) return;
-
-    // Check if trial ended (conversion)
-    if (trial_end && !subscription.trial_end) {
-      // Trial conversion: grant 300 bonus to reach 500
-      const currentCredits = user.credits || 0;
-      const bonus = 300;
-      const total = 500;
-
-      if (currentCredits < 200) {
-        // If less than trial credits, reset to full
-        await supabase.rpc('grant_credits', {
-          p_clerk_id: clerkUserId,
-          p_amount: total,
-          p_description: 'Pro trial conversion - full 500 credits',
-          p_transaction_type: 'grant',
-          p_reference_id: id,
-        });
-      } else {
-        // Add bonus
-        await supabase.rpc('grant_credits', {
-          p_clerk_id: clerkUserId,
-          p_amount: bonus,
-          p_description: 'Pro trial conversion - 300 bonus credits',
-          p_transaction_type: 'conversion_bonus',
-          p_reference_id: id,
-        });
-      }
-
-      // Set anniversary if not set
-      if (!user.subscription_anniversary_date) {
-        await supabase
-          .from('users')
-          .update({ subscription_anniversary_date: new Date().toISOString() })
-          .eq('clerk_id', clerkUserId);
-      }
-    }
-
-    // Update subscription
-    await supabase
-      .from('subscriptions')
-      .upsert({
-        stripe_subscription_id: id,
-        user_id: user.id,
-        plan_type: plan,
-        status: subscription.status,
-        current_period_end: current_period_end ? new Date(current_period_end * 1000).toISOString() : null,
-      });
-
-  } catch (error) {
-    console.error('Error handling subscription update:', error);
-  }
-
-  console.log('Subscription updated:', id);
+  // Handle subscription changes (plan upgrades, downgrades, etc.)
+  // Update user's plan in database
+  // Adjust credits accordingly
+  
+  console.log('Subscription updated:', subscription.id);
 };
 
 const handleSubscriptionDeleted = async (subscription: any) => {
-  const { id, customer } = subscription;
-
-  try {
-    const stripeCustomer = await stripe.customers.retrieve(customer as string);
-    const clerkUserId = (stripeCustomer as any).metadata.clerkUserId;
-
-    if (!clerkUserId) return;
-
-    // Update user plan to starter and reset credits if needed
-    await supabase
-      .from('users')
-      .update({ plan_type: 'starter' })
-      .eq('clerk_id', clerkUserId);
-
-    await supabase
-      .from('subscriptions')
-      .update({ status: 'canceled' })
-      .eq('stripe_subscription_id', id);
-
-    // Optionally refund remaining credits or handle cancellation logic
-
-  } catch (error) {
-    console.error('Error handling subscription deletion:', error);
-  }
-
-  console.log('Subscription deleted:', id);
+  // Handle subscription cancellation
+  // Update user's plan to free tier
+  // Send cancellation confirmation
+  
+  console.log('Subscription deleted:', subscription.id);
 };

@@ -45,43 +45,6 @@ export const createMultiCurrencyCheckoutSession = async (checkoutData: StripeChe
   }
 };
 
-// Pro subscription checkout
-export const createProSubscription = async (skipTrial = false, billingFrequency = 'monthly', currency = 'USD') => {
-  try {
-    const response = await fetch('/api/stripe/create-pro-subscription', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        clerkUserId: '', // Get from auth context in component
-        billingFrequency,
-        skipTrial,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to create Pro subscription checkout');
-    }
-
-    const { url } = await response.json();
-
-    if (url) {
-      window.location.href = url;
-      return { success: true };
-    } else {
-      throw new Error('No checkout URL received');
-    }
-  } catch (error) {
-    console.error('Error creating Pro subscription:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error occurred'
-    };
-  }
-};
-
 // Legacy checkout session creation for backward compatibility
 export const createCheckoutSession = async (checkoutData: StripeCheckoutData) => {
   try {
