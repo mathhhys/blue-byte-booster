@@ -95,7 +95,6 @@ const Dashboard = () => {
 
   // Extension token state
   const [extensionToken, setExtensionToken] = useState<string>('');
-  const [tokenType, setTokenType] = useState<'short' | 'long'>('short');
   const [isGenerating, setIsGenerating] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
   const [autoRenew, setAutoRenew] = useState(true);
@@ -276,77 +275,40 @@ const Dashboard = () => {
     setIsGenerating(true);
     try {
       console.log('=== DASHBOARD TOKEN GENERATION DEBUG ===');
-      console.log(`Generating ${tokenType === 'short' ? 'short-lived' : 'long-lived'} token for VSCode extension...`);
+      console.log(`Generating long-lived token for VSCode extension...`);
       console.log('Clerk User ID:', user.id);
       
-      let backendToken;
+      // Long-lived: Call backend endpoint
+      const clerkToken = await getToken(); // Session token for auth
+      const response = await fetch('/api/extension-token/generate', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${clerkToken}`,
+          'Content-Type': 'application/json',
+        },
+      });
 
-      if (tokenType === 'short') {
-        // Short-lived: Use Clerk session token
-        const beforeGetToken = Date.now();
-        console.log('🔍 [DASHBOARD] Time before getToken():', new Date(beforeGetToken).toISOString(), 'Unix:', Math.floor(beforeGetToken / 1000));
-        
-        const clerkToken = await getToken({
-          template: 'vscode-extension',
-          skipCache: true
-        });
-        
-        const afterGetToken = Date.now();
-        console.log('🔍 [DASHBOARD] Time after getToken():', new Date(afterGetToken).toISOString(), 'Unix:', Math.floor(afterGetToken / 1000));
-        console.log('🔍 [DASHBOARD] getToken() took:', afterGetToken - beforeGetToken, 'ms');
-        
-        if (!clerkToken) {
-          throw new Error('Failed to get Clerk session token');
-        }
-
-        // Decode for logging
-        try {
-          const payloadB64 = clerkToken.split('.')[1];
-          const payloadJson = atob(payloadB64);
-          const payload = JSON.parse(payloadJson);
-          const now = Math.floor(Date.now() / 1000);
-          console.log('🔍 [DASHBOARD] Decoded short-lived Clerk token payload:');
-          console.log('  - exp:', payload.exp, '(Date:', new Date(payload.exp * 1000).toISOString(), ')');
-          console.log('  - Current Unix time:', now);
-        } catch (decodeError) {
-          console.error('Failed to decode token payload:', decodeError);
-        }
-        
-        backendToken = clerkToken;
-        console.log('✅ Generated short-lived Clerk session token');
-      } else {
-        // Long-lived: Call backend endpoint
-        const clerkToken = await getToken(); // Session token for auth
-        const response = await fetch('/api/extension-token/generate', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${clerkToken}`,
-            'Content-Type': 'application/json',
-          },
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'Failed to generate long-lived token');
-        }
-
-        const data = await response.json();
-        if (!data.access_token) {
-          throw new Error('No access token in response');
-        }
-
-        backendToken = data.access_token;
-        console.log('✅ Generated long-lived backend token');
-        setHasActiveLongLivedToken(true);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate long-lived token');
       }
+
+      const data = await response.json();
+      if (!data.access_token) {
+        throw new Error('No access token in response');
+      }
+
+      const backendToken = data.access_token;
+      console.log('✅ Generated long-lived backend token');
+      setHasActiveLongLivedToken(true);
       
       setExtensionToken(backendToken);
       
-      const expiryText = tokenType === 'short' ? '24 hours' : '4 months';
+      const expiryText = '4 months';
       
       toast({
         title: "Token Generated",
-        description: `${tokenType === 'short' ? 'Short-lived' : 'Long-lived'} token generated successfully. Expires in ${expiryText}. Copy and paste this into your VSCode extension settings.`,
+        description: `Long-lived token generated successfully. Expires in ${expiryText}. Copy and paste this into your VSCode extension settings.`,
       });
       
     } catch (error) {
@@ -355,13 +317,13 @@ const Dashboard = () => {
       
       // Fallback mock for dev
       if (import.meta.env.DEV) {
-        const mockToken = `mock_${tokenType}_token_${user.id}_${Date.now()}`;
+        const mockToken = `mock_long_token_${user.id}_${Date.now()}`;
         setExtensionToken(mockToken);
         console.log('🔧 Using mock token for development:', mockToken);
         
         toast({
           title: "Development Mode",
-          description: `Using mock ${tokenType} token for development`,
+          description: `Using mock long-lived token for development`,
         });
       } else {
         toast({
@@ -758,6 +720,96 @@ const Dashboard = () => {
 
           {/* Main Content */}
           <main className="flex-1 p-6">
+{/* VSCode Extension Integration */}
+<Card className="bg-[#2a2a2a] border-white/10 p-6 mb-8 flex flex-col min-h-[200px]">
+  <div className="flex items-center justify-between mb-4">
+    <h3 className="text-lg font-semibold text-white">VSCode Extension</h3>
+    <div className="flex items-center gap-2">
+      <Button
+        size="sm"
+        variant="outline"
+        className="border-white/20 text-white hover:bg-white/10"
+        onClick={refreshToken}
+        disabled={isGenerating}
+      >
+        <RefreshCw className={`w-4 h-4 mr-2 ${isGenerating ? 'animate-spin' : ''}`} />
+        Refresh
+      </Button>
+    </div>
+  </div>
+  
+  <div className="space-y-4 flex-1">
+    <div className="text-sm text-gray-400 mb-3">
+      Generate an authentication token to connect your VSCode extension to your account.
+    </div>
+
+    {/* Warning for Long-Lived */}
+    <div className="p-3 bg-orange-500/10 border border-orange-500/20 rounded-md text-orange-300 text-xs">
+      Long-lived tokens grant extended access. Store securely and revoke if compromised.
+    </div>
+    
+    {!extensionToken ? (
+      <Button
+        onClick={generateToken}
+        disabled={isGenerating}
+        className="w-full bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
+      >
+        {isGenerating ? (
+          <>
+            <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+            Generating Long-Lived Token...
+          </>
+        ) : (
+          <>
+            <Code className="w-4 h-4 mr-2" />
+            Generate Long-Lived (4 months) Token
+          </>
+        )}
+      </Button>
+    ) : (
+      <div className="space-y-3">
+        <div className="text-sm font-medium text-white">
+          Your Long-Lived Extension Token:
+        </div>
+        <div className="flex gap-2">
+          <Input
+            value={extensionToken}
+            readOnly
+            className="bg-[#1a1a1a] border-white/10 text-white font-mono text-sm flex-1"
+          />
+          <Button
+            onClick={copyToken}
+            variant="outline"
+            className="border-white/20 text-white hover:bg-white/10 shrink-0"
+          >
+            {copySuccess ? (
+              <>
+                <span className="text-green-400">✓</span>
+                <span className="ml-1 hidden sm:inline">Copied</span>
+              </>
+            ) : (
+              <>
+                <Copy className="w-4 h-4" />
+                <span className="ml-1 hidden sm:inline">Copy</span>
+              </>
+            )}
+          </Button>
+        </div>
+        <div className="text-xs text-gray-500">
+          Long-lived backend JWT token. Expires in 4 months. Copy now - it won't be shown again. Use in VSCode extension settings.
+        </div>
+        <Button
+          variant="destructive"
+          onClick={revokeLongLivedToken}
+          disabled={isCheckingToken}
+          className="w-full"
+        >
+          {isCheckingToken ? 'Checking...' : 'Revoke Active Long-Lived Token'}
+        </Button>
+      </div>
+    )}
+  </div>
+</Card>
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
 
@@ -883,116 +935,6 @@ const Dashboard = () => {
               </div>
             </Card>
 
-            {/* VSCode Extension Integration */}
-            <Card className="bg-[#2a2a2a] border-white/10 p-6 mb-8 flex flex-col min-h-[200px] max-w-2xl">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-white">VSCode Extension</h3>
-                <div className="flex items-center gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="border-white/20 text-white hover:bg-white/10"
-                    onClick={refreshToken}
-                    disabled={isGenerating}
-                  >
-                    <RefreshCw className={`w-4 h-4 mr-2 ${isGenerating ? 'animate-spin' : ''}`} />
-                    Refresh
-                  </Button>
-                </div>
-              </div>
-              
-              <div className="space-y-4 flex-1">
-                <div className="text-sm text-gray-400 mb-3">
-                  Generate an authentication token to connect your VSCode extension to your account.
-                </div>
-
-                {/* Token Type Toggle */}
-                <div className="flex items-center space-x-2 p-3 bg-[#1a1a1a] rounded-md border border-white/10">
-                  <Switch
-                    id="token-type"
-                    checked={tokenType === 'long'}
-                    onCheckedChange={(checked) => setTokenType(checked ? 'long' : 'short')}
-                    className="data-[state=checked]:bg-blue-600"
-                  />
-                  <Label htmlFor="token-type" className="text-sm font-medium text-white">
-                    Use long-lived token (4 months){tokenType === 'long' && hasActiveLongLivedToken && ' - Active'}
-                  </Label>
-                </div>
-
-                {/* Warning for Long-Lived */}
-                {tokenType === 'long' && (
-                  <div className="p-3 bg-orange-500/10 border border-orange-500/20 rounded-md text-orange-300 text-xs">
-                    Long-lived tokens grant extended access. Store securely and revoke if compromised.
-                  </div>
-                )}
-                
-                {!extensionToken ? (
-                  <Button
-                    onClick={generateToken}
-                    disabled={isGenerating}
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
-                  >
-                    {isGenerating ? (
-                      <>
-                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                        Generating {tokenType === 'short' ? 'Short-Lived' : 'Long-Lived'} Token...
-                      </>
-                    ) : (
-                      <>
-                        <Code className="w-4 h-4 mr-2" />
-                        Generate {tokenType === 'short' ? 'Short-Lived (24h)' : 'Long-Lived (4 months)'} Token
-                      </>
-                    )}
-                  </Button>
-                ) : (
-                  <div className="space-y-3">
-                    <div className="text-sm font-medium text-white">
-                      Your {tokenType === 'short' ? 'Short-Lived' : 'Long-Lived'} Extension Token:
-                    </div>
-                    <div className="flex gap-2">
-                      <Input
-                        value={extensionToken}
-                        readOnly
-                        className="bg-[#1a1a1a] border-white/10 text-white font-mono text-sm flex-1"
-                      />
-                      <Button
-                        onClick={copyToken}
-                        variant="outline"
-                        className="border-white/20 text-white hover:bg-white/10 shrink-0"
-                      >
-                        {copySuccess ? (
-                          <>
-                            <span className="text-green-400">✓</span>
-                            <span className="ml-1 hidden sm:inline">Copied</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="w-4 h-4" />
-                            <span className="ml-1 hidden sm:inline">Copy</span>
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      {tokenType === 'short'
-                        ? 'Short-lived Clerk session token (RS256). Expires in 24 hours. Use in VSCode extension settings.'
-                        : 'Long-lived backend JWT token. Expires in 4 months. Copy now - it won\'t be shown again. Use in VSCode extension settings.'
-                      }
-                    </div>
-                    {tokenType === 'long' && (
-                      <Button
-                        variant="destructive"
-                        onClick={revokeLongLivedToken}
-                        disabled={isCheckingToken}
-                        className="w-full"
-                      >
-                        {isCheckingToken ? 'Checking...' : 'Revoke Active Long-Lived Token'}
-                      </Button>
-                    )}
-                  </div>
-                )}
-              </div>
-            </Card>
           </main>
         </SidebarInset>
       </SidebarProvider>
