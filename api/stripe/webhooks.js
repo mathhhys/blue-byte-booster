@@ -94,6 +94,10 @@ export default async function handler(req, res) {
       case 'customer.subscription.updated':
         await handleSubscriptionUpdated(event.data.object, supabase);
         break;
+    
+      case 'customer.subscription.created':
+        await handleSubscriptionCreated(event.data.object, supabase);
+        break;
 
       case 'customer.subscription.deleted':
         await handleSubscriptionDeleted(event.data.object, supabase);
@@ -117,6 +121,57 @@ export default async function handler(req, res) {
 }
 
 // Handle recurring subscription payments
+async function handleSubscriptionCreated(subscription, supabase) {
+  console.log('📝 Processing subscription created:', subscription.id);
+  
+  try {
+    // Get user from Stripe customer
+    const clerkUserId = await getUserFromStripeCustomer(subscription.customer, supabase);
+    if (!clerkUserId) {
+      console.log('❌ Could not find user for customer:', subscription.customer.id);
+      return;
+    }
+
+    const metadata = subscription.metadata || {};
+    const planType = metadata.plan_type || 'pro';
+
+    if (planType !== 'pro') {
+      console.log('Skipping non-Pro subscription creation');
+      return;
+    }
+
+    // Check if this is a trial subscription
+    const trialEnd = subscription.trial_end;
+    if (trialEnd) {
+      console.log('🎉 Pro trial started - granting 200 trial credits');
+      const { data, error } = await supabase.rpc('grant_credits', {
+        p_clerk_id: clerkUserId,
+        p_amount: 200,
+        p_description: 'Pro 7-day trial credits',
+        p_reference_id: subscription.id,
+        p_transaction_type: 'trial_grant'
+      });
+
+      if (error) {
+        console.error('Failed to grant trial credits:', error);
+      } else {
+        console.log('✅ 200 trial credits granted');
+      }
+    }
+
+    // Record webhook processing
+    await recordWebhookProcessing(subscription.id, 'customer.subscription.created', {
+      clerkUserId,
+      planType,
+      hasTrial: !!trialEnd
+    }, supabase);
+
+  } catch (error) {
+    console.error('❌ Error processing subscription created:', error);
+    throw error;
+  }
+}
+
 async function handleInvoicePaymentSucceeded(invoice, supabase) {
   console.log('🔄 Processing invoice payment succeeded:', invoice.id);
   
@@ -139,117 +194,228 @@ async function handleInvoicePaymentSucceeded(invoice, supabase) {
       return;
     }
 
-    // Determine if this is initial or recurring payment
-    const paymentType = await determinePaymentType(invoice, subscription);
-    console.log('Payment type determined:', paymentType);
-
-    // Skip initial payments as they're handled by checkout.session.completed
-    if (paymentType === 'initial') {
-      console.log('Skipping initial payment - handled by checkout flow');
-      return;
-    }
-
-    // Check for idempotency to prevent duplicate processing
-    const alreadyProcessed = await checkIdempotency(invoice.id, supabase);
-    if (alreadyProcessed) {
-      console.log('Invoice already processed, skipping');
-      return;
-    }
-
-    // Calculate credits to grant
     const metadata = subscription.metadata || {};
-    const planType = metadata.plan_type || 'pro';
-    const billingFrequency = metadata.billing_frequency || (subscription.items.data[0]?.price?.recurring?.interval === 'year' ? 'yearly' : 'monthly');
-    const seats = parseInt(metadata.seats || '1');
+    const planType = metadata.planType || 'pro';
 
-    const creditsToGrant = calculateCreditsToGrant(planType, billingFrequency, seats);
-    
-    console.log('Granting credits:', {
-      clerkUserId,
-      creditsToGrant,
-      planType,
-      billingFrequency,
-      seats,
-      invoiceId: invoice.id
-    });
-
-    // Get user ID first
-    const { data: userData, error: userError } = await supabase
-      .from('users')
-      .select('id')
-      .eq('clerk_id', clerkUserId)
-      .single();
-
-    if (userError || !userData) {
-      throw new Error(`User not found for clerk_id: ${clerkUserId}`);
+    if (planType !== 'pro') {
+      // For non-Pro plans, use existing logic
+      await handleNonProInvoice(invoice, subscription, supabase);
+      return;
     }
 
-    const userId = userData.id;
-
-    // Grant credits by directly updating the users table
-    // First get current credits to calculate new total
-    console.log('Fetching current credits for user ID:', userId);
-    const { data: currentUser, error: fetchError } = await supabase
-      .from('users')
-      .select('credits')
-      .eq('id', userId)
-      .single();
-
-    if (fetchError) {
-      console.error('Failed to fetch current credits:', fetchError);
-      throw new Error(`Failed to fetch current credits: ${fetchError.message}`);
-    }
-
-    console.log('Current credits:', currentUser.credits);
-    const newCredits = (currentUser.credits || 0) + creditsToGrant;
-    console.log('New credits after adding', creditsToGrant, ':', newCredits);
-    
-    const { error: creditError } = await supabase
-      .from('users')
-      .update({
-        credits: newCredits,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', userId);
-
-    if (creditError) {
-      console.error('Failed to update credits:', creditError);
-      throw new Error(`Failed to grant credits: ${creditError.message}`);
-    }
-
-    console.log('✅ Credits updated successfully');
-
-    // Record credit transaction
-    const { error: transactionError } = await supabase
-      .from('credit_transactions')
-      .insert({
-        user_id: userId,
-        amount: creditsToGrant,
-        description: `${planType} plan ${billingFrequency} recurring credits (${seats} seat${seats > 1 ? 's' : ''})`,
-        transaction_type: 'recurring',
-        reference_id: invoice.id
-      });
-
-    if (transactionError) {
-      console.error('Failed to record credit transaction:', transactionError);
-      // Don't fail the webhook if transaction recording fails
-    }
-
-    // Record webhook processing to prevent duplicates
-    await recordWebhookProcessing(invoice.id, 'invoice.payment_succeeded', {
-      clerkUserId,
-      creditsGranted: creditsToGrant,
-      planType,
-      billingFrequency,
-      seats
-    }, supabase);
-
-    console.log('✅ Recurring payment processed successfully');
+    // For Pro plan, handle trial conversion and monthly resets
+    await handleProInvoice(invoice, subscription, clerkUserId, supabase);
 
   } catch (error) {
     console.error('❌ Error processing invoice payment succeeded:', error);
     throw error;
   }
+}
+
+// Handle non-Pro invoice (existing logic)
+async function handleNonProInvoice(invoice, subscription, supabase) {
+  // Determine if this is initial or recurring payment
+  const paymentType = await determinePaymentType(invoice, subscription);
+  console.log('Payment type determined:', paymentType);
+
+  // Skip initial payments as they're handled by checkout.session.completed
+  if (paymentType === 'initial') {
+    console.log('Skipping initial payment - handled by checkout flow');
+    return;
+  }
+
+  // Check for idempotency to prevent duplicate processing
+  const alreadyProcessed = await checkIdempotency(invoice.id, supabase);
+  if (alreadyProcessed) {
+    console.log('Invoice already processed, skipping');
+    return;
+  }
+
+  // Calculate credits to grant
+  const billingFrequency = metadata.billing_frequency || (subscription.items.data[0]?.price?.recurring?.interval === 'year' ? 'yearly' : 'monthly');
+  const seats = parseInt(metadata.seats || '1');
+
+  const creditsToGrant = calculateCreditsToGrant(planType, billingFrequency, seats);
+  
+  console.log('Granting credits for non-Pro plan:', {
+    clerkUserId: await getUserFromStripeCustomer(subscription.customer, supabase),
+    creditsToGrant,
+    planType,
+    billingFrequency,
+    seats,
+    invoiceId: invoice.id
+  });
+
+  // Get user ID first
+  const { data: userData, error: userError } = await supabase
+    .from('users')
+    .select('id')
+    .eq('clerk_id', clerkUserId)
+    .single();
+
+  if (userError || !userData) {
+    throw new Error(`User not found for clerk_id: ${clerkUserId}`);
+  }
+
+  const userId = userData.id;
+
+  // Grant credits by directly updating the users table
+  // First get current credits to calculate new total
+  console.log('Fetching current credits for user ID:', userId);
+  const { data: currentUser, error: fetchError } = await supabase
+    .from('users')
+    .select('credits')
+    .eq('id', userId)
+    .single();
+
+  if (fetchError) {
+    console.error('Failed to fetch current credits:', fetchError);
+    throw new Error(`Failed to fetch current credits: ${fetchError.message}`);
+  }
+
+  console.log('Current credits:', currentUser.credits);
+  const newCredits = (currentUser.credits || 0) + creditsToGrant;
+  console.log('New credits after adding', creditsToGrant, ':', newCredits);
+  
+  const { error: creditError } = await supabase
+    .from('users')
+    .update({
+      credits: newCredits,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', userId);
+
+  if (creditError) {
+    console.error('Failed to update credits:', creditError);
+    throw new Error(`Failed to grant credits: ${creditError.message}`);
+  }
+
+  console.log('✅ Credits updated successfully');
+
+  // Record credit transaction
+  const { error: transactionError } = await supabase
+    .from('credit_transactions')
+    .insert({
+      user_id: userId,
+      amount: creditsToGrant,
+      description: `${planType} plan ${billingFrequency} recurring credits (${seats} seat${seats > 1 ? 's' : ''})`,
+      transaction_type: 'recurring',
+      reference_id: invoice.id
+    });
+
+  if (transactionError) {
+    console.error('Failed to record credit transaction:', transactionError);
+    // Don't fail the webhook if transaction recording fails
+  }
+
+  // Record webhook processing to prevent duplicates
+  await recordWebhookProcessing(invoice.id, 'invoice.payment_succeeded', {
+    clerkUserId,
+    creditsGranted: creditsToGrant,
+    planType,
+    billingFrequency,
+    seats
+  }, supabase);
+
+  console.log('✅ Recurring payment processed successfully for non-Pro plan');
+}
+
+// Handle Pro plan specific logic
+async function handleProInvoice(invoice, subscription, clerkUserId, supabase) {
+  const trialEnd = subscription.trial_end;
+  const periodStart = new Date(invoice.period_start * 1000);
+  const trialEndDate = trialEnd ? new Date(trialEnd * 1000) : null;
+  const isConversion = trialEnd && trialEndDate && Math.abs(periodStart.getTime() - trialEndDate.getTime()) < 86400000; // within 1 day
+
+  console.log('Pro invoice processing:', {
+    invoiceId: invoice.id,
+    trialEnd,
+    periodStart: periodStart.toISOString(),
+    isConversion,
+    subscriptionStatus: subscription.status
+  });
+
+  // Check for idempotency
+  const alreadyProcessed = await checkIdempotency(invoice.id, supabase);
+  if (alreadyProcessed) {
+    console.log('Invoice already processed, skipping');
+    return;
+  }
+
+  // Get current anniversary date
+  const { data: user, error: userError } = await supabase
+    .from('users')
+    .select('subscription_anniversary_date, plan_type')
+    .eq('clerk_id', clerkUserId)
+    .single();
+
+  if (userError || !user) {
+    throw new Error(`User not found for clerk_id: ${clerkUserId}`);
+  }
+
+  const anniversaryDate = user.subscription_anniversary_date;
+  const isAnniversaryPayment = !anniversaryDate || Math.abs(periodStart.getTime() - new Date(anniversaryDate).getTime()) < 86400000; // within 1 day
+
+  if (isConversion) {
+    // First paid invoice after trial - add 300 bonus
+    console.log('🎉 Pro trial conversion - granting 300 bonus credits');
+    const { data, error } = await supabase.rpc('grant_credits', {
+      p_clerk_id: clerkUserId,
+      p_amount: 300,
+      p_description: 'Pro trial conversion bonus (300 to reach 500)',
+      p_reference_id: invoice.id,
+      p_transaction_type: 'conversion_bonus'
+    });
+
+    if (error) {
+      console.error('Failed to grant conversion bonus:', error);
+    } else {
+      console.log('✅ 300 bonus credits granted for trial conversion');
+    }
+
+    // Set anniversary date to trial_end date (paid start)
+    const { error: anniversaryError } = await supabase
+      .from('users')
+      .update({
+        subscription_anniversary_date: invoice.period_start,
+        updated_at: new Date().toISOString()
+      })
+      .eq('clerk_id', clerkUserId);
+
+    if (anniversaryError) {
+      console.error('Failed to set anniversary date:', anniversaryError);
+    }
+
+  } else if (isAnniversaryPayment) {
+    // Regular monthly reset for Pro
+    console.log('📅 Pro monthly reset - resetting to 500 credits');
+    const { data, error } = await supabase.rpc('reset_monthly_credits', {
+      p_clerk_id: clerkUserId,
+      p_plan_credits: 500
+    });
+
+    if (error) {
+      console.error('Failed to reset monthly credits:', error);
+    } else {
+      console.log('✅ Monthly credits reset to 500');
+    }
+
+  } else {
+    console.log('Skipping - not anniversary payment for Pro');
+    return;
+  }
+
+  // Record webhook processing
+  await recordWebhookProcessing(invoice.id, 'invoice.payment_succeeded', {
+    clerkUserId,
+    planType: 'pro',
+    isConversion,
+    isAnniversaryPayment,
+    trialEnd: subscription.trial_end
+  }, supabase);
+
+  console.log('✅ Pro invoice processed successfully');
+
 }
 
 // Handle initial checkout completion (updated to grant correct credits for yearly)
@@ -750,6 +916,10 @@ async function determinePaymentType(invoice, subscription) {
 
 // Helper function to calculate credits based on plan and billing frequency
 function calculateCreditsToGrant(planType, billingFrequency, seats = 1) {
+  if (planType === 'pro') {
+    return 0; // Pro handled separately with monthly resets
+  }
+
   const baseCredits = billingFrequency === 'yearly' ? 6000 : 500;
   return baseCredits * seats;
 }
@@ -768,6 +938,21 @@ async function checkIdempotency(eventId, supabase) {
   } catch (error) {
     // If table doesn't exist or error occurs, assume not processed
     return false;
+  }
+}
+
+// Helper to set anniversary date
+async function setAnniversaryDate(clerkUserId, periodStart, supabase) {
+  const { error } = await supabase
+    .from('users')
+    .update({
+      subscription_anniversary_date: periodStart,
+      updated_at: new Date().toISOString()
+    })
+    .eq('clerk_id', clerkUserId);
+
+  if (error) {
+    console.error('Failed to set anniversary date:', error);
   }
 }
 

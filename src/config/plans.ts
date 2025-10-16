@@ -14,10 +14,15 @@ export const PLAN_CONFIGS: Record<'pro' | 'teams' | 'enterprise', PlanConfig> = 
     features: [
       'Unlimited Agent Requests',
       'Unlimited Tab Completion',
-      '500 requests per month included',
-      'Add more credits at API Price - No extra costs'
+      '500 credits per month included',
+      'Add more credits at API Price - No extra costs',
+      '7-day free trial with 200 credits',
+      '300 bonus credits on paid conversion'
     ],
     credits: 500,
+    trialDays: 7,
+    trialCredits: 200,
+    bonusCredits: 300,
     isPopular: true,
   },
   teams: {
@@ -71,10 +76,15 @@ export const PLAN_CONFIGS_MULTI_CURRENCY: Record<'pro' | 'teams' | 'enterprise',
     features: [
       'Unlimited Agent Requests',
       'Unlimited Tab Completion',
-      '500 requests per month included',
-      'Add more credits at API Price - No extra costs'
+      '500 credits per month included',
+      'Add more credits at API Price - No extra costs',
+      '7-day free trial with 200 credits',
+      '300 bonus credits on paid conversion'
     ],
     credits: 500,
+    trialDays: 7,
+    trialCredits: 200,
+    bonusCredits: 300,
     isPopular: true,
   },
   teams: {
@@ -182,6 +192,7 @@ export const calculateMultiCurrencySavings = (
   currency: CurrencyCode
 ): number => {
   const plan = PLAN_CONFIGS_MULTI_CURRENCY[planId];
+  if (!plan.pricing) return 0;
   const monthlyPrice = plan.pricing[currency].monthly;
   const yearlyPrice = plan.pricing[currency].yearly;
   const monthlyTotal = monthlyPrice * 12;

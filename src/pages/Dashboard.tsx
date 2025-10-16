@@ -1,3 +1,4 @@
+
 import { useUser, UserButton, useAuth, useOrganization, OrganizationSwitcher, OrganizationProfile } from '@clerk/clerk-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -92,6 +93,14 @@ const Dashboard = () => {
   // User data from Supabase
   const [dbUser, setDbUser] = useState<User | null>(null);
   const [isDbUserLoading, setIsDbUserLoading] = useState(true);
+
+  // Subscription and trial state
+  const [subscription, setSubscription] = useState(null);
+  const [isSubscriptionLoading, setIsSubscriptionLoading] = useState(true);
+  const [trialDaysLeft, setTrialDaysLeft] = useState(null);
+  const [isOnTrial, setIsOnTrial] = useState(false);
+  const [creditBreakdown, setCreditBreakdown] = useState(null);
+  const [isUpgrading, setIsUpgrading] = useState(false);
 
   // Extension token state
   const [extensionToken, setExtensionToken] = useState<string>('');
@@ -233,6 +242,56 @@ const Dashboard = () => {
     fetchDbUser();
   }, [userLoaded, user?.id, toast]);
 
+  // Fetch subscription data
+  useEffect(() => {
+    const fetchSubscription = async () => {
+      if (!dbUser?.id) {
+        setIsSubscriptionLoading(false);
+        return;
+      }
+
+      setIsSubscriptionLoading(true);
+      try {
+        const response = await fetch(`/api/user/subscription?userId=${dbUser.id}`);
+        if (response.ok) {
+          const data = await response.json();
+          setSubscription(data.subscription);
+
+          // Calculate trial status
+          if (data.subscription && data.subscription.plan_type === 'pro') {
+            const now = new Date();
+            const trialEnd = data.subscription.current_period_end ? new Date(data.subscription.current_period_end) : null;
+
+            if (trialEnd && now < trialEnd) {
+              setIsOnTrial(true);
+              const daysLeft = Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+              setTrialDaysLeft(daysLeft);
+            } else {
+              setIsOnTrial(false);
+              setTrialDaysLeft(null);
+            }
+
+            // Credit breakdown
+            setCreditBreakdown({
+              trialCredits: isOnTrial ? 200 : 0,
+              monthlyCredits: 500,
+              bonusCredits: isOnTrial ? 0 : 300,
+            });
+          } else {
+            setIsOnTrial(false);
+            setTrialDaysLeft(null);
+            setCreditBreakdown(null);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching subscription:', error);
+      } finally {
+        setIsSubscriptionLoading(false);
+      }
+    };
+
+    fetchSubscription();
+  }, [dbUser?.id]);
 
   // Check for active long-lived token
   const checkActiveLongLivedToken = async () => {
@@ -590,6 +649,105 @@ const Dashboard = () => {
     }
   };
 
+  // Upgrade to Pro function
+  const handleUpgradeToPro = async () => {
+    if (!user?.id) {
+      toast({
+        title: "Authentication Required",
+        description: "Please sign in to upgrade",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsUpgrading(true);
+
+    try {
+      const response = await fetch('/api/stripe/create-pro-subscription', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          clerkUserId: user.id,
+          currency: 'eur',
+          skipTrial: true,
+          billingFrequency: 'monthly',
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.url) {
+        window.location.href = data.url;
+      } else {
+        toast({
+          title: "Upgrade Error",
+          description: data.error || "Failed to create upgrade session",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Upgrade Error",
+        description: "An error occurred while preparing upgrade. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpgrading(false);
+    }
+  };
+
+  // Cancel subscription function
+  const handleCancelSubscription = async () => {
+    if (!subscription?.stripe_subscription_id) {
+      toast({
+        title: "No Active Subscription",
+        description: "You don't have an active subscription to cancel.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!confirm('Are you sure you want to cancel your subscription? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/stripe/cancel-subscription', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          subscriptionId: subscription.stripe_subscription_id,
+        }),
+      });
+
+      if (response.ok) {
+        toast({
+          title: "Cancellation Requested",
+          description: "Your subscription cancellation has been processed. You will be downgraded to Starter plan.",
+        });
+        // Refresh data
+        window.location.reload();
+      } else {
+        const data = await response.json();
+        toast({
+          title: "Cancellation Failed",
+          description: data.error || "Failed to cancel subscription",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Cancellation Error",
+        description: "An error occurred while canceling. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#121212] text-white">
       <SidebarProvider>
@@ -692,16 +850,20 @@ const Dashboard = () => {
               <SidebarMenu>
 
                 <SidebarMenuItem>
-                  <SidebarMenuButton className="text-white/70 hover:text-white hover:bg-white/10">
-                    <FileText className="w-4 h-4" />
-                    <span>Docs</span>
+                  <SidebarMenuButton asChild className="text-white/70 hover:text-white hover:bg-white/10">
+                    <a href="https://docs.softcodes.ai/InstallingSoftcodes" target="_blank" rel="noopener noreferrer">
+                      <FileText className="w-4 h-4" />
+                      <span>Docs</span>
+                    </a>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
 
                 <SidebarMenuItem>
-                  <SidebarMenuButton className="text-white/70 hover:text-white hover:bg-white/10">
-                    <Mail className="w-4 h-4" />
-                    <span>Contact Support</span>
+                  <SidebarMenuButton asChild className="text-white/70 hover:text-white hover:bg-white/10">
+                    <a href="mailto:mathys@softcodes.io">
+                      <Mail className="w-4 h-4" />
+                      <span>Contact Support</span>
+                    </a>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               </SidebarMenu>
@@ -738,8 +900,6 @@ const Dashboard = () => {
               
               <div className="flex items-center gap-4">
 
-
-
                 {/* User */}
                 <UserButton 
                   appearance={{
@@ -770,9 +930,6 @@ const Dashboard = () => {
                     {dbUser ? currentBalance.toLocaleString() : 'Loading...'}
                   </div>
                 )}
-                <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white mt-2">
-                  Top Up
-                </Button>
               </Card>
 
               {/* Current Plan Card */}
@@ -781,19 +938,53 @@ const Dashboard = () => {
                   <span className="text-sm text-gray-400">Current Plan</span>
                   <MoreHorizontal className="w-4 h-4 text-gray-400" />
                 </div>
-                {isDbUserLoading ? (
+                {isDbUserLoading || isSubscriptionLoading ? (
                   <div className="h-8 bg-gray-600 rounded w-24 animate-pulse mb-1"></div>
                 ) : (
-                  <div className="text-2xl font-bold text-white mb-1">
-                    {dbUser?.plan_type ? dbUser.plan_type.charAt(0).toUpperCase() + dbUser.plan_type.slice(1) : 'Loading...'}
-                  </div>
+                  <>
+                    <div className="text-2xl font-bold text-white mb-1">
+                      {dbUser?.plan_type ? dbUser.plan_type.charAt(0).toUpperCase() + dbUser.plan_type.slice(1) : 'Starter'}
+                    </div>
+                    
+                    {isOnTrial && trialDaysLeft !== null && (
+                      <div className="flex items-center gap-2 text-sm text-yellow-400 mb-2">
+                        <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
+                        <span>Trial Active - {trialDaysLeft} days left</span>
+                      </div>
+                    )}
+
+                    {creditBreakdown && (
+                      <div className="text-xs text-gray-400 space-y-1 mb-2">
+                        <div className="flex justify-between">
+                          <span>Trial:</span>
+                          <span>{creditBreakdown.trialCredits}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Monthly:</span>
+                          <span>{creditBreakdown.monthlyCredits}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Bonus:</span>
+                          <span>{creditBreakdown.bonusCredits}</span>
+                        </div>
+                      </div>
+                    )}
+
+
+                    {subscription && subscription.status === 'active' && dbUser?.plan_type === 'pro' && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleCancelSubscription}
+                        className="w-full border-red-500/50 text-red-400 hover:bg-red-500/10 mt-2"
+                      >
+                        Cancel Subscription
+                      </Button>
+                    )}
+                  </>
                 )}
-                <Button size="sm" variant="outline" className="border-white/20 text-white hover:bg-white/10 mt-2">
-                  Upgrade
-                </Button>
               </Card>
             </div>
-
 
             {/* Add Credits Section */}
             <Card className="bg-[#2a2a2a] border-white/10 p-6 mb-8">
@@ -882,20 +1073,6 @@ const Dashboard = () => {
                   )}
                 </Button>
 
-                {/* Promo Code Section (preserved) */}
-                <div className="pt-2 border-t border-white/10">
-                  <Label className="text-sm text-gray-400 mb-2 block">Promo Code</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="Enter code"
-                      className="bg-[#1a1a1a] border-white/10 text-white placeholder-gray-500 flex-1"
-                    />
-                    <Button variant="outline" className="border-white/20 text-white hover:bg-white/10 shrink-0">
-                      <span className="hidden sm:inline">Apply Code</span>
-                      <span className="sm:hidden">Apply</span>
-                    </Button>
-                  </div>
-                </div>
               </div>
             </Card>
 
@@ -903,25 +1080,23 @@ const Dashboard = () => {
             <Card className="bg-[#2a2a2a] border-white/10 p-6 mb-8 flex flex-col min-h-[200px] max-w-2xl">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-white">VSCode Extension</h3>
-                <div className="flex items-center gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="border-white/20 text-white hover:bg-white/10"
-                    onClick={refreshToken}
-                    disabled={isGenerating}
-                  >
-                    <RefreshCw className={`w-4 h-4 mr-2 ${isGenerating ? 'animate-spin' : ''}`} />
-                    Refresh
-                  </Button>
-                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-white/20 text-white hover:bg-white/10"
+                  onClick={refreshToken}
+                  disabled={isGenerating}
+                >
+                  <RefreshCw className={`w-4 h-4 mr-2 ${isGenerating ? 'animate-spin' : ''}`} />
+                  Refresh
+                </Button>
               </div>
               
               <div className="space-y-4 flex-1">
                 <div className="text-sm text-gray-400 mb-3">
                   Generate an authentication token to connect your VSCode extension to your account.
                 </div>
-
+            
                 {/* Token Type Toggle */}
                 <div className="flex items-center space-x-2 p-3 bg-[#1a1a1a] rounded-md border border-white/10">
                   <Switch
@@ -934,7 +1109,7 @@ const Dashboard = () => {
                     Use long-lived token (4 months){tokenType === 'long' && hasActiveLongLivedToken && ' - Active'}
                   </Label>
                 </div>
-
+            
                 {/* Warning for Long-Lived */}
                 {tokenType === 'long' && (
                   <div className="p-3 bg-orange-500/10 border border-orange-500/20 rounded-md text-orange-300 text-xs">
@@ -1015,5 +1190,6 @@ const Dashboard = () => {
     </div>
   );
 };
+
 
 export default Dashboard;

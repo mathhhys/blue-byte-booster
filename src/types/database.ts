@@ -10,7 +10,7 @@ export interface Database {
           first_name: string | null;
           last_name: string | null;
           avatar_url: string | null;
-          plan_type: 'starter' | 'pro' | 'teams' | 'enterprise';
+          plan_type: 'pro' | 'teams' | 'enterprise';
           credits: number;
           stripe_customer_id: string | null;
           vscode_session_id: string | null;
@@ -26,7 +26,7 @@ export interface Database {
           first_name?: string | null;
           last_name?: string | null;
           avatar_url?: string | null;
-          plan_type?: 'starter' | 'pro' | 'teams' | 'enterprise';
+          plan_type?: 'pro' | 'teams' | 'enterprise';
           credits?: number;
           stripe_customer_id?: string | null;
           vscode_session_id?: string | null;
@@ -42,7 +42,7 @@ export interface Database {
           first_name?: string | null;
           last_name?: string | null;
           avatar_url?: string | null;
-          plan_type?: 'starter' | 'pro' | 'teams' | 'enterprise';
+          plan_type?: 'pro' | 'teams' | 'enterprise';
           credits?: number;
           stripe_customer_id?: string | null;
           vscode_session_id?: string | null;
@@ -369,6 +369,9 @@ export interface PlanConfig {
   maxSeats?: number;
   isPopular?: boolean;
   isContactSales?: boolean;
+  trialDays?: number;
+  trialCredits?: number;
+  bonusCredits?: number;
 }
 
 // Stripe-related types
@@ -436,12 +439,15 @@ export interface MultiCurrencyPlanConfig {
   id: 'pro' | 'teams' | 'enterprise';
   name: string;
   description: string;
-  pricing: MultiCurrencyPrice;
+  pricing?: MultiCurrencyPrice;
   features: string[];
   credits?: number;
   maxSeats?: number;
   isPopular?: boolean;
   isContactSales?: boolean;
+  trialDays?: number;
+  trialCredits?: number;
+  bonusCredits?: number;
 }
 
 // Extended checkout data to include currency

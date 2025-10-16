@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState } from 'react';
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Check, ArrowRight, Mail } from "lucide-react";
@@ -14,6 +16,7 @@ import { DEFAULT_CURRENCY } from '@/config/currencies';
 export const PricingSection = () => {
   const [isYearly, setIsYearly] = useState(false);
   const [selectedCurrency, setSelectedCurrency] = useState<CurrencyCode>(DEFAULT_CURRENCY);
+  const [proSkipTrial, setProSkipTrial] = useState(false);
   const navigate = useNavigate();
   const { isLoaded, isSignedIn } = useUser();
 
@@ -33,21 +36,37 @@ export const PricingSection = () => {
     window.history.replaceState({}, '', url.toString());
   };
 
-  const handlePlanClick = (planId: 'pro' | 'teams' | 'enterprise') => {
+  const handlePlanClick = (planId: 'starter' | 'pro' | 'teams' | 'enterprise') => {
     if (planId === 'enterprise') {
       window.location.href = 'mailto:sales@softcodes.ai?subject=Enterprise Plan Inquiry';
       return;
     }
-
+  
+    if (planId === 'starter') {
+      // Redirect to signup or dashboard for starter
+      if (!isLoaded || !isSignedIn) {
+        navigate('/sign-up');
+      } else {
+        navigate('/dashboard');
+      }
+      return;
+    }
+  
+    const params = new URLSearchParams({
+      upgrade: planId,
+      billing: isYearly ? 'yearly' : 'monthly',
+      currency: selectedCurrency,
+    });
+  
+    if (planId === 'pro') {
+      params.append('skipTrial', proSkipTrial.toString());
+    }
+  
     if (!isLoaded || !isSignedIn) {
-      const params = new URLSearchParams({
-        plan: planId,
-        billing: isYearly ? 'yearly' : 'monthly',
-        currency: selectedCurrency,
-      });
+      params.append('plan', planId);
       navigate(`/sign-up?${params.toString()}`);
     } else {
-      navigate('/dashboard');
+      navigate(`/dashboard?${params.toString()}`);
     }
   };
 
@@ -71,7 +90,11 @@ export const PricingSection = () => {
     return Math.round(((monthlyTotal - yearlyPrice) / monthlyTotal) * 100);
   };
 
-  const getButtonText = (planId: 'pro' | 'teams' | 'enterprise') => {
+  const getButtonText = (planId: 'starter' | 'pro' | 'teams' | 'enterprise') => {
+    if (planId === 'starter') {
+      return 'Get Started';
+    }
+    
     if (planId === 'enterprise') {
       return 'Contact Sales';
     }
@@ -80,10 +103,10 @@ export const PricingSection = () => {
       return `Get ${planId === 'pro' ? 'Pro' : 'Teams'}`;
     }
     
-    return 'Go to Dashboard';
+    return 'Upgrade to ' + (planId === 'pro' ? 'Pro' : 'Teams');
   };
 
-  const getButtonIcon = (planId: 'pro' | 'teams' | 'enterprise') => {
+  const getButtonIcon = (planId: 'starter' | 'pro' | 'teams' | 'enterprise') => {
     if (planId === 'enterprise') {
       return Mail;
     }
@@ -144,73 +167,127 @@ export const PricingSection = () => {
 
         {/* Main Cards - Pro, Teams, and Enterprise in a 3-column grid */}
         <div className="grid lg:grid-cols-3 gap-8 mb-8">
-          {plans.map((plan) => (
-            <Card
-              key={`${plan.name}-${selectedCurrency}-${isYearly}`}
-              className={`relative p-8 border transition-all duration-300 hover:scale-105 ${
-                plan.isPopular
-                  ? 'border-transparent'
-                  : 'border-transparent'
-              }`}
-              style={plan.isPopular ? {
-                background: "linear-gradient(135deg, #1e3a8a 0%, #1e40af 25%, #3b82f6 50%, #1e40af 75%, #1e3a8a 100%)"
-              } : {
-                background: "linear-gradient(135deg, #0A0F1C 0%, #0F1929 25%, #1A2332 50%, #0F1929 75%, #0A0F1C 100%)"
-              }}
-            >
-              {plan.isPopular && (
-                <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                  <span className="bg-blue-600 text-white px-3 py-1 rounded-full text-xs font-medium">
-                    Most Popular
-                  </span>
-                </div>
-              )}
-
-              <div className="space-y-6">
-                {/* Header */}
-                <div>
-                  <h3 className="text-xl font-semibold text-white mb-2">
-                    {plan.name}
-                  </h3>
-                  <div className="flex items-baseline gap-1 mb-2">
-                    <span className="text-3xl font-bold text-white">
-                      {getPlanPriceDisplay(plan)}
-                    </span>
-                    <span className="text-gray-300">
-                      {!plan.isContactSales ? (isYearly ? '/yr' : '/mo') : ''}
+          {plans.map((plan) => {
+            const isPro = plan.id === 'pro';
+            return (
+              <Card
+                key={`${plan.name}-${selectedCurrency}-${isYearly}`}
+                className={`relative p-8 border transition-all duration-300 hover:scale-105 ${
+                  plan.isPopular
+                    ? 'border-transparent'
+                    : 'border-transparent'
+                }`}
+                style={plan.isPopular ? {
+                  background: "linear-gradient(135deg, #1e3a8a 0%, #1e40af 25%, #3b82f6 50%, #1e40af 75%, #1e3a8a 100%)"
+                } : {
+                  background: "linear-gradient(135deg, #0A0F1C 0%, #0F1929 25%, #1A2332 50%, #0F1929 75%, #0A0F1C 100%)"
+                }}
+              >
+                {plan.isPopular && (
+                  <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
+                    <span className="bg-blue-600 text-white px-3 py-1 rounded-full text-xs font-medium">
+                      Most Popular
                     </span>
                   </div>
-                  <p className="text-sm text-gray-300">
-                    {plan.description}
-                  </p>
-                </div>
-
-                {/* Features */}
-                <div className="space-y-3">
-                  {plan.features.map((feature, index) => (
-                    <div key={index} className="flex items-start gap-3">
-                      <Check className="w-5 h-5 text-green-400 mt-0.5 flex-shrink-0" />
-                      <span className="text-sm text-gray-200">{feature}</span>
+                )}
+        
+                {isPro && (
+                  <div className="absolute -top-12 left-1/2 transform -translate-x-1/2">
+                    <div className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-4 py-2 rounded-lg shadow-lg">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                        <span className="text-sm font-semibold">7-Day Trial with 200 Credits</span>
+                      </div>
                     </div>
-                  ))}
+                  </div>
+                )}
+          
+                <div className="space-y-6">
+                  {/* Header */}
+                  <div>
+                    <h3 className="text-xl font-semibold text-white mb-2">
+                      {plan.name}
+                    </h3>
+                    <div className="flex items-baseline gap-1 mb-2">
+                      <span className="text-3xl font-bold text-white">
+                        {getPlanPriceDisplay(plan)}
+                      </span>
+                      <span className="text-gray-300">
+                        {!plan.isContactSales ? (isYearly ? '/yr' : '/mo') : ''}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-300">
+                      {plan.description}
+                    </p>
+                  </div>
+          
+                  {/* Features */}
+                  <div className="space-y-3">
+                    {plan.features.map((feature, index) => (
+                      <div key={index} className="flex items-start gap-3">
+                        <Check className="w-5 h-5 text-green-400 mt-0.5 flex-shrink-0" />
+                        <span className="text-sm text-gray-200">{feature}</span>
+                      </div>
+                    ))}
+                  </div>
+          
+                  {/* Pro Trial Toggle */}
+                  {isPro && (
+                    <div className="p-4 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-lg border border-blue-500/20 mb-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 bg-blue-400 rounded-full"></div>
+                          <span className="text-sm font-semibold text-blue-300">Trial Option</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <div className="flex items-center space-x-2 p-2 bg-white/5 rounded-md flex-1">
+                          <Switch
+                            id="pro-trial"
+                            checked={!proSkipTrial}
+                            onCheckedChange={(checked) => setProSkipTrial(!checked)}
+                            className="data-[state=checked]:bg-green-600"
+                          />
+                          <Label htmlFor="pro-trial" className="text-sm text-white cursor-pointer">
+                            Start 7-day trial (200 credits)
+                          </Label>
+                        </div>
+                        <div className="text-sm text-gray-400">or</div>
+                        <div className="flex items-center space-x-2 p-2 bg-white/5 rounded-md flex-1">
+                          <Switch
+                            id="pro-skip-trial"
+                            checked={proSkipTrial}
+                            onCheckedChange={setProSkipTrial}
+                            className="data-[state=checked]:bg-blue-600"
+                          />
+                          <Label htmlFor="pro-skip-trial" className="text-sm text-white cursor-pointer">
+                            Pay now (500 credits/month)
+                          </Label>
+                        </div>
+                      </div>
+                      <div className="text-xs text-gray-300 mt-2 text-center">
+                        After trial: 300 bonus credits + 500 monthly allotment
+                      </div>
+                    </div>
+                  )}
+          
+                  {/* Button */}
+                  <Button
+                    onClick={() => handlePlanClick(plan.id)}
+                    variant={plan.isPopular ? "default" : "outline"}
+                    className={`w-full group ${
+                      plan.isPopular
+                        ? 'bg-white text-black hover:bg-gray-100'
+                        : 'border-gray-600 text-white hover:bg-gray-800'
+                    }`}
+                  >
+                    {React.createElement(getButtonIcon(plan.id), { className: "w-4 h-4 mr-2 group-hover:translate-x-0.5 transition-transform" })}
+                    {getButtonText(plan.id)}
+                  </Button>
                 </div>
-
-                {/* Button */}
-                <Button
-                  onClick={() => handlePlanClick(plan.id)}
-                  variant={plan.isPopular ? "default" : "outline"}
-                  className={`w-full group ${
-                    plan.isPopular
-                      ? 'bg-white text-black hover:bg-gray-100'
-                      : 'border-gray-600 text-white hover:bg-gray-800'
-                  }`}
-                >
-                  {React.createElement(getButtonIcon(plan.id), { className: "w-4 h-4 mr-2 group-hover:translate-x-0.5 transition-transform" })}
-                  {getButtonText(plan.id)}
-                </Button>
-              </div>
-            </Card>
-          ))}
+              </Card>
+            );
+          })}
         </div>
       </div>
     </section>
