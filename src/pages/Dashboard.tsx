@@ -674,18 +674,6 @@ const Dashboard = () => {
             </div>
           </SidebarContent>
 
-          <SidebarFooter className="p-4 border-t border-[#2a2a2a]">
-            <div className="bg-[#2a2a2a] rounded-lg p-4 border border-[#2a2a2a]">
-              <div className="text-sm font-medium text-white mb-1">Upgrade to Pro</div>
-              <div className="text-xs text-white/70 mb-3">
-                Unlock unlimited credits, advanced analytics, and priority support.
-              </div>
-              <div className="text-lg font-bold text-white mb-2">$29<span className="text-sm font-normal text-white/70">/month</span></div>
-              <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white">
-                Upgrade Now
-              </Button>
-            </div>
-          </SidebarFooter>
         </Sidebar>
 
         {/* Main Content */}
