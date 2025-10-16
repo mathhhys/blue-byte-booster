@@ -692,16 +692,20 @@ const Dashboard = () => {
               <SidebarMenu>
 
                 <SidebarMenuItem>
-                  <SidebarMenuButton className="text-white/70 hover:text-white hover:bg-white/10">
-                    <FileText className="w-4 h-4" />
-                    <span>Docs</span>
+                  <SidebarMenuButton asChild className="text-white/70 hover:text-white hover:bg-white/10">
+                    <a href="https://docs.softcodes.ai/InstallingSoftcodes" target="_blank" rel="noopener noreferrer">
+                      <FileText className="w-4 h-4" />
+                      <span>Docs</span>
+                    </a>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
 
                 <SidebarMenuItem>
-                  <SidebarMenuButton className="text-white/70 hover:text-white hover:bg-white/10">
-                    <Mail className="w-4 h-4" />
-                    <span>Contact Support</span>
+                  <SidebarMenuButton asChild className="text-white/70 hover:text-white hover:bg-white/10">
+                    <a href="mailto:mathys@softcodes.io">
+                      <Mail className="w-4 h-4" />
+                      <span>Contact Support</span>
+                    </a>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               </SidebarMenu>
@@ -770,9 +774,6 @@ const Dashboard = () => {
                     {dbUser ? currentBalance.toLocaleString() : 'Loading...'}
                   </div>
                 )}
-                <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white mt-2">
-                  Top Up
-                </Button>
               </Card>
 
               {/* Current Plan Card */}
@@ -788,9 +789,6 @@ const Dashboard = () => {
                     {dbUser?.plan_type ? dbUser.plan_type.charAt(0).toUpperCase() + dbUser.plan_type.slice(1) : 'Loading...'}
                   </div>
                 )}
-                <Button size="sm" variant="outline" className="border-white/20 text-white hover:bg-white/10 mt-2">
-                  Upgrade
-                </Button>
               </Card>
             </div>
 
@@ -882,20 +880,6 @@ const Dashboard = () => {
                   )}
                 </Button>
 
-                {/* Promo Code Section (preserved) */}
-                <div className="pt-2 border-t border-white/10">
-                  <Label className="text-sm text-gray-400 mb-2 block">Promo Code</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="Enter code"
-                      className="bg-[#1a1a1a] border-white/10 text-white placeholder-gray-500 flex-1"
-                    />
-                    <Button variant="outline" className="border-white/20 text-white hover:bg-white/10 shrink-0">
-                      <span className="hidden sm:inline">Apply Code</span>
-                      <span className="sm:hidden">Apply</span>
-                    </Button>
-                  </div>
-                </div>
               </div>
             </Card>
 
