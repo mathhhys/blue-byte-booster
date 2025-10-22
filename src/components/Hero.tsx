@@ -19,9 +19,11 @@ const Hero = () => {
     <GradientBackground>
       <section className="min-h-screen flex items-center justify-center pt-24">
         <div className="container mx-auto px-6 flex items-center justify-center min-h-full mt-8">
-          <div className="text-center max-w-4xl mx-auto">
-            {/* Welcome badge */}
-            <div className="inline-block mb-8">
+          <div className="grid grid-cols-1 lg:grid-cols-[2fr_3fr] gap-8 lg:gap-20 items-center max-w-7xl mx-auto">
+            {/* Left Column: Text Content */}
+            <div className="text-center lg:text-left">
+              {/* Welcome badge */}
+              <div className="inline-block mb-8">
               <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 px-4 py-2 rounded-full">
                 <div className="w-3 h-3 bg-green-400 rounded-full shadow-lg shadow-green-400/50 animate-pulse"></div>
                 <span className="text-white text-sm font-medium">Welcome to the Future of Coding</span>
@@ -29,7 +31,7 @@ const Hero = () => {
             </div>
             
             {/* Main heading */}
-            <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold mb-8 leading-tight text-center">
+              <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold mb-8 leading-tight text-center lg:text-left">
               <span className="text-white">
                 Introducing
               </span>
@@ -40,14 +42,14 @@ const Hero = () => {
             </h1>
             
             {/* Description */}
-            <p className="text-xl md:text-2xl text-gray-300 mb-12 max-w-3xl mx-auto leading-relaxed">
+              <p className="text-xl md:text-2xl text-gray-300 mb-12 max-w-3xl mx-auto lg:mx-0 leading-relaxed">
               Experience the next generation of windsurfing. Book sessions,
               learn from experts, and enjoy premium equipment at stunning
               locations.
             </p>
             
             {/* CTA Buttons */}
-            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16">
+              <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start items-center mb-16">
               {!isLoaded || !isSignedIn ? (
                 <Button
                   onClick={() => navigate('/sign-up')}
@@ -76,7 +78,7 @@ const Hero = () => {
             </div>
 
             {/* VS Code 5-star review */}
-            <div className="flex justify-center mb-8">
+              <div className="flex justify-center lg:justify-start mb-8">
               <div className="flex items-center gap-4 bg-slate-800/80 px-6 py-3 rounded-xl shadow-lg border border-white/10">
                 {/* VS Code Logo from provided SVG URL */}
                 <img
@@ -103,6 +105,31 @@ const Hero = () => {
                     on VS Code Marketplace
                   </span>
                 </div>
+              </div>
+            </div>
+            </div> {/* Closing tag for Left Column: Text Content */}
+
+            {/* Right Column: Demo Video */}
+            <div className="flex justify-center lg:justify-end">
+              <div className="w-full rounded-xl overflow-hidden shadow-2xl border border-white/10">
+                <video
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  preload="metadata"
+                  className="w-full aspect-[1138/720] object-contain bg-slate-700/50"
+                  aria-label="Hero demo video"
+                >
+                  <source
+                    src="https://xraquejellmoyrpqcirs.supabase.co/storage/v1/object/public/softcodes%20demos/SoftcodesHero2.mp4"
+                    type="video/mp4"
+                  />
+                  {/* Fallback for unsupported browsers */}
+                  <div className="bg-slate-700/50 backdrop-blur-sm aspect-[1138/720] flex items-center justify-center text-gray-300 text-sm font-medium">
+                    Your browser does not support the video tag.
+                  </div>
+                </video>
               </div>
             </div>
           </div>

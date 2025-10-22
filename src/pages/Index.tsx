@@ -1,4 +1,4 @@
-import Navigation from "@/components/Navigation";
+ import Navigation from "@/components/Navigation";
 import Hero from "@/components/Hero";
 import TabSection from "@/components/TabSection";
 import Features from "@/components/Features";
