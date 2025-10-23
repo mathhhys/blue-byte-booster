@@ -1,4 +1,5 @@
  import Navigation from "@/components/Navigation";
+ import { PricingSection } from "@/components/PricingSection";
  import Hero from "@/components/Hero";
  import AlternatingFeaturesSection from "@/components/AlternatingFeaturesSection";
  import ProductivitySection from "@/components/ProductivitySection";
@@ -9,6 +10,7 @@
  import CTA from "@/components/CTA";
  import StatsSection from "@/components/StatsSection";
  import Footer from "@/components/Footer";
+ import FAQSection from "@/components/FAQSection";
 
 const Index = () => {
   return (
@@ -17,35 +19,11 @@ const Index = () => {
       <Hero />
       <AlternatingFeaturesSection />
       <ProductivitySection />
-      <section id="features">
-        <TabSection
-          title="Tab Tab Tab…Ship"
-          description="A single keystroke, limitless power, complete flow. The full power of Windsurf Tab is exclusive to the Windsurf Editor. Our IDE plugins include only the autocomplete action."
-          imageSrc="/placeholder.svg"
-          imageAlt="Code editor demo"
-        />
-      </section>
-      <TabSection
-        title="Command Palette: All Actions, One Place"
-        description="Access every feature and setting with a single shortcut. The command palette brings the full power of Windsurf to your fingertips, so you never have to leave your flow."
-        imageSrc="/placeholder.svg"
-        imageAlt="Command palette demo"
-      />
-      <TabSection
-        title="Instant Search: Find Anything, Instantly"
-        description="Lightning-fast search across files, symbols, and documentation. Never lose your place or your focus—just search and go."
-        imageSrc="/placeholder.svg"
-        imageAlt="Instant search demo"
-      />
-      <TabSection
-        title="Instant Search: Find Anything, Instantly"
-        description="Lightning-fast search across files, symbols, and documentation. Never lose your place or your focus—just search and go."
-        imageSrc="/placeholder.svg"
-        imageAlt="Instant search demo"
-      />
       <FeatureShowcase />
       <Features />
       <StatsSection />
+      <PricingSection />
+      <FAQSection />
       <Footer />
     </div>
   );

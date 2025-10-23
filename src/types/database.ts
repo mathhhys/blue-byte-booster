@@ -357,7 +357,7 @@ export interface Database {
 
 // Plan configuration types
 export interface PlanConfig {
-  id: 'pro' | 'teams' | 'enterprise';
+  id: 'pro' | 'teams';
   name: string;
   description: string;
   price: {
@@ -373,7 +373,7 @@ export interface PlanConfig {
 
 // Stripe-related types
 export interface StripeCheckoutData {
-  planType: 'pro' | 'teams' | 'enterprise';
+  planType: 'pro' | 'teams';
   billingFrequency: 'monthly' | 'yearly';
   seats?: number;
   clerkUserId: string;
@@ -384,7 +384,7 @@ export interface StripeCheckoutData {
 // Authentication flow types
 export interface AuthFlowState {
   isOpen: boolean;
-  selectedPlan?: 'pro' | 'teams' | 'enterprise';
+  selectedPlan?: 'pro' | 'teams';
   billingFrequency: 'monthly' | 'yearly';
   seats: number;
   isLoading: boolean;
@@ -427,13 +427,13 @@ export interface CurrencyPrice {
 
 export interface MultiCurrencyPrice {
   EUR: CurrencyPrice;
-  USD: CurrencyPrice;
-  GBP: CurrencyPrice;
+  USD?: CurrencyPrice;
+  GBP?: CurrencyPrice;
 }
 
 // Updated PlanConfig to support multi-currency
 export interface MultiCurrencyPlanConfig {
-  id: 'pro' | 'teams' | 'enterprise';
+  id: 'pro' | 'teams';
   name: string;
   description: string;
   pricing: MultiCurrencyPrice;

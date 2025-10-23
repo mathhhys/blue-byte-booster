@@ -13,29 +13,18 @@ import { DEFAULT_CURRENCY } from '@/config/currencies';
 
 export const PricingSection = () => {
   const [isYearly, setIsYearly] = useState(false);
-  const [selectedCurrency, setSelectedCurrency] = useState<CurrencyCode>(DEFAULT_CURRENCY);
+  const selectedCurrency: CurrencyCode = 'EUR';
   const navigate = useNavigate();
   const { isLoaded, isSignedIn } = useUser();
 
   const plans = [
     PLAN_CONFIGS_MULTI_CURRENCY.pro,
     PLAN_CONFIGS_MULTI_CURRENCY.teams,
-    PLAN_CONFIGS_MULTI_CURRENCY.enterprise,
   ];
 
-  const handleCurrencyChange = (currency: CurrencyCode) => {
-    setSelectedCurrency(currency);
-    localStorage.setItem('selectedCurrency', currency);
-    
-    // Update URL without navigation
-    const url = new URL(window.location.href);
-    url.searchParams.set('currency', currency);
-    window.history.replaceState({}, '', url.toString());
-  };
-
-  const handlePlanClick = (planId: 'pro' | 'teams' | 'enterprise') => {
-    if (planId === 'enterprise') {
-      window.location.href = 'mailto:sales@softcodes.ai?subject=Enterprise Plan Inquiry';
+  const handlePlanClick = (planId: 'pro' | 'teams') => {
+    if (planId === 'teams') {
+      window.location.href = 'mailto:sales@softcodes.ai?subject=Teams Plan Inquiry';
       return;
     }
 
@@ -43,7 +32,7 @@ export const PricingSection = () => {
       const params = new URLSearchParams({
         plan: planId,
         billing: isYearly ? 'yearly' : 'monthly',
-        currency: selectedCurrency,
+        currency: 'EUR',
       });
       navigate(`/sign-up?${params.toString()}`);
     } else {
@@ -52,72 +41,58 @@ export const PricingSection = () => {
   };
 
   const getPlanPriceDisplay = (plan: MultiCurrencyPlanConfig) => {
-    if (plan.isContactSales) return 'Custom';
+    if (plan.isContactSales) return 'Contact us';
     
     // Direct price lookup to ensure reactivity
-    const pricing = plan.pricing[selectedCurrency];
+    const pricing = plan.pricing.EUR;
     const price = isYearly ? pricing.yearly : pricing.monthly;
     
     // Direct formatting to ensure fresh calculation
-    const symbol = selectedCurrency === 'EUR' ? '€' : selectedCurrency === 'GBP' ? '£' : '$';
-    return `${symbol}${price}`;
+    return `€${price}`;
   };
 
-  const getSavingsPercentage = (planId: 'pro' | 'teams') => {
+  const getSavingsPercentage = (planId: 'pro') => {
     const plan = PLAN_CONFIGS_MULTI_CURRENCY[planId];
-    const monthlyPrice = plan.pricing[selectedCurrency].monthly;
-    const yearlyPrice = plan.pricing[selectedCurrency].yearly;
+    const monthlyPrice = plan.pricing.EUR.monthly;
+    const yearlyPrice = plan.pricing.EUR.yearly;
     const monthlyTotal = monthlyPrice * 12;
     return Math.round(((monthlyTotal - yearlyPrice) / monthlyTotal) * 100);
   };
 
-  const getButtonText = (planId: 'pro' | 'teams' | 'enterprise') => {
-    if (planId === 'enterprise') {
-      return 'Contact Sales';
+  const getButtonText = (planId: 'pro' | 'teams') => {
+    if (planId === 'teams') {
+      return 'Contact us';
     }
     
     if (!isLoaded || !isSignedIn) {
-      return `Get ${planId === 'pro' ? 'Pro' : 'Teams'}`;
+      return `Get Pro`;
     }
     
     return 'Go to Dashboard';
   };
 
-  const getButtonIcon = (planId: 'pro' | 'teams' | 'enterprise') => {
-    if (planId === 'enterprise') {
+  const getButtonIcon = (planId: 'pro' | 'teams') => {
+    if (planId === 'teams') {
       return Mail;
     }
     return ArrowRight;
   };
 
   return (
-    <section className="bg-transparent pb-24">
+    <section className="bg-[#0E172A] pb-24">
       <div className="max-w-7xl mx-auto px-6">
-        {/* Currency Selector */}
-        <div className="flex justify-center items-center mb-6">
-          <div className="flex items-center bg-gray-800 rounded-lg p-1 border border-gray-600">
-            {(['EUR', 'USD', 'GBP'] as CurrencyCode[]).map((currency) => (
-              <button
-                key={currency}
-                onClick={() => handleCurrencyChange(currency)}
-                className={`px-3 py-2 text-sm font-medium rounded-md transition-all duration-200 flex items-center gap-2 ${
-                  selectedCurrency === currency
-                    ? "bg-white text-black"
-                    : "text-gray-300 hover:text-white hover:bg-gray-700"
-                }`}
-                aria-label={`Select ${currency} currency`}
-              >
-                <span className="text-base" role="img">
-                  {currency === 'EUR' ? '🇪🇺' : currency === 'USD' ? '🇺🇸' : '🇬🇧'}
-                </span>
-                <span className="font-semibold">{currency}</span>
-              </button>
-            ))}
-          </div>
-        </div>
 
         {/* Billing Toggle */}
-        <div className="flex justify-center items-center -mt-8 md:mt-0 mb-12">
+  {/* Pricing Header */}
+  <div className="text-center pt-20 mb-20">
+    <h2 className="text-4xl md:text-5xl font-bold text-white mb-8">
+      Unlock Your Coding Potential with Softcodes AI
+    </h2>
+    <p className="text-base md:text-lg text-gray-300 max-w-3xl mx-auto leading-loose">
+      Elevate your development workflow with AI-powered tools designed for modern developers and teams. Enjoy unlimited agent requests and tab completion, 500 monthly credits included with flexible scaling, plus privacy mode and centralized billing for seamless team collaboration. Our plans deliver the innovation you need to code faster and smarter. Choose the perfect fit and start transforming your productivity today.
+    </p>
+  </div>
+        <div className="flex justify-center items-center mb-12">
           <div className="flex items-center bg-gray-800 rounded-lg p-1 border border-gray-600">
             <button
               onClick={() => setIsYearly(false)}
@@ -142,29 +117,16 @@ export const PricingSection = () => {
           </div>
         </div>
 
-        {/* Main Cards - Pro, Teams, and Enterprise in a 3-column grid */}
-        <div className="grid lg:grid-cols-3 gap-8 mb-8">
+        {/* Main Cards - Pro and Teams in a 2-column grid */}
+        <div className="grid lg:grid-cols-2 gap-8 mb-8">
           {plans.map((plan) => (
             <Card
-              key={`${plan.name}-${selectedCurrency}-${isYearly}`}
-              className={`relative p-8 border transition-all duration-300 hover:scale-105 ${
-                plan.isPopular
-                  ? 'border-transparent'
-                  : 'border-transparent'
-              }`}
-              style={plan.isPopular ? {
-                background: "linear-gradient(135deg, #1e3a8a 0%, #1e40af 25%, #3b82f6 50%, #1e40af 75%, #1e3a8a 100%)"
-              } : {
-                background: "linear-gradient(135deg, #0A0F1C 0%, #0F1929 25%, #1A2332 50%, #0F1929 75%, #0A0F1C 100%)"
+              key={`${plan.name}-EUR-${isYearly}`}
+              className="relative p-8 border transition-all duration-300 hover:scale-105 border-transparent"
+              style={{
+                background: "#181F33"
               }}
             >
-              {plan.isPopular && (
-                <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                  <span className="bg-blue-600 text-white px-3 py-1 rounded-full text-xs font-medium">
-                    Most Popular
-                  </span>
-                </div>
-              )}
 
               <div className="space-y-6">
                 {/* Header */}
@@ -197,16 +159,12 @@ export const PricingSection = () => {
 
                 {/* Button */}
                 <Button
-                  onClick={() => handlePlanClick(plan.id)}
-                  variant={plan.isPopular ? "default" : "outline"}
-                  className={`w-full group ${
-                    plan.isPopular
-                      ? 'bg-white text-black hover:bg-gray-100'
-                      : 'border-gray-600 text-white hover:bg-gray-800'
-                  }`}
+                  onClick={() => handlePlanClick(plan.id as 'pro' | 'teams')}
+                  variant="outline"
+                  className="w-full group border-gray-600 text-white hover:bg-gray-800"
                 >
-                  {React.createElement(getButtonIcon(plan.id), { className: "w-4 h-4 mr-2 group-hover:translate-x-0.5 transition-transform" })}
-                  {getButtonText(plan.id)}
+                  {React.createElement(getButtonIcon(plan.id as 'pro' | 'teams'), { className: "w-4 h-4 mr-2 group-hover:translate-x-0.5 transition-transform" })}
+                  {getButtonText(plan.id as 'pro' | 'teams')}
                 </Button>
               </div>
             </Card>
