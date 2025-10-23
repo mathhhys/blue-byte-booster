@@ -116,6 +116,12 @@ All colors MUST be HSL.
   color: #0D0E0F !important;
 }
 
+/* Keep dark background for productivity cards when scrolled */
+.scrolled #productivity .card-hover-enhanced {
+  background-color: #181f33 !important;
+  color: white !important;
+}
+
 /* Slightly darker, subtle borders on white cards when scrolled */
 .scrolled .border-card-light {
   border-color: rgba(13, 14, 15, 0.06) !important;

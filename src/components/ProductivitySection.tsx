@@ -1,0 +1,131 @@
+import {
+  EnhancedCard,
+  EnhancedCardHeader,
+  EnhancedCardTitle,
+  EnhancedCardDescription,
+  EnhancedCardContent
+} from "@/components/ui/enhanced-card";
+import { Badge } from "@/components/ui/badge";
+
+const ProductivitySection = () => {
+  return (
+    <section
+      id="productivity"
+      className="w-full bg-[#0E172A] py-24 px-4 md:px-0"
+      aria-labelledby="productivity-heading"
+    >
+      <div className="max-w-6xl mx-auto flex flex-col gap-14">
+        {/* Header */}
+        <div className="text-center mb-12">
+          <h2
+            id="productivity-heading"
+            className="text-4xl md:text-5xl font-bold text-white mb-4"
+          >
+            The AI-powered platform
+          </h2>
+          <p className="text-xl md:text-2xl text-gray-300 max-w-3xl mx-auto">
+            Unlock powerful insights and automate complex processes effortlessly.
+          </p>
+        </div>
+
+        {/* 3 Blocks Side by Side */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {/* Block 1: Adaptive Learning */}
+          <EnhancedCard
+            variant="secondary"
+            className="card-hover rounded-xl shadow-lg shadow-blue-500/10 border-blue-500/20 min-h-[400px]"
+            aria-label="Adaptive Learning"
+          >
+            <EnhancedCardContent className="p-6 flex flex-col gap-6 items-center text-center md:text-left md:items-start">
+              <div className="flex-1 min-w-0 w-full">
+                <div className="w-full h-48 bg-[#181f33] rounded-lg flex flex-col justify-center items-center p-4 relative overflow-hidden border border-blue-500/20">
+                  <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-transparent rounded-lg"></div>
+                  <div className="relative z-10 text-center space-y-2 text-blue-200">
+                    <div className="text-sm font-medium">Training</div>
+                    <div className="w-20 h-1 bg-blue-400 rounded-full"></div>
+                    <div className="text-sm font-medium">Insights</div>
+                  </div>
+                  <div className="absolute bottom-2 right-2 w-4 h-4 bg-blue-400 rounded-full"></div>
+                </div>
+              </div>
+              <div className="flex-1 space-y-3">
+                <h3 className="text-xl font-bold text-white">Adaptive Learning</h3>
+                <p className="text-gray-300 leading-relaxed text-sm">
+                  Adaptive learning continuously improves performance and adapts to new patterns.
+                </p>
+              </div>
+            </EnhancedCardContent>
+          </EnhancedCard>
+
+          {/* Block 2: Smart Automation */}
+          <EnhancedCard
+            variant="secondary"
+            className="card-hover rounded-xl shadow-lg shadow-blue-500/10 border-blue-500/20 min-h-[400px]"
+            aria-label="Smart Automation"
+          >
+            <EnhancedCardContent className="p-6 flex flex-col gap-6 items-center text-center md:text-left md:items-start">
+              <div className="flex-1 min-w-0 w-full">
+                <div className="w-full h-48 bg-[#181f33] rounded-lg flex flex-col justify-center items-start p-4 relative overflow-hidden border border-blue-500/20">
+                  <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-transparent rounded-lg"></div>
+                  <div className="relative z-10 space-y-2 text-blue-200 pl-2">
+                    <div className="flex items-center">
+                      <div className="w-3 h-3 bg-blue-400 rounded mr-2"></div>
+                      <span className="text-xs font-medium">Manage</span>
+                    </div>
+                    <div className="flex items-center">
+                      <div className="w-3 h-3 bg-blue-400 rounded mr-2"></div>
+                      <span className="text-xs font-medium">Generate</span>
+                    </div>
+                  </div>
+                  <div className="absolute bottom-2 left-2 w-16 h-1 bg-blue-400 rounded-full"></div>
+                </div>
+              </div>
+              <div className="flex-1 space-y-3">
+                <h3 className="text-xl font-bold text-white">Smart Automation</h3>
+                <p className="text-gray-300 leading-relaxed text-sm">
+                  Empower automation-driven workflows to simplify operations, enhance productivity.
+                </p>
+              </div>
+            </EnhancedCardContent>
+          </EnhancedCard>
+
+          {/* Block 3: Data Mapping & Predictive Analytics */}
+          <EnhancedCard
+            variant="secondary"
+            className="card-hover rounded-xl shadow-lg shadow-blue-500/10 border-blue-500/20 min-h-[400px]"
+            aria-label="Data Mapping & Predictive Analytics"
+          >
+            <EnhancedCardContent className="p-6 flex flex-col gap-6 items-center text-center md:text-left md:items-start">
+              <div className="flex-1 min-w-0 w-full">
+                <div className="w-full h-48 bg-[#181f33] rounded-lg flex justify-center items-center p-4 relative overflow-hidden border border-blue-500/20">
+                  <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-transparent rounded-lg"></div>
+                  <div className="relative z-10 grid grid-cols-2 gap-2 w-full max-w-xs h-32 p-2">
+                    <div className="space-y-1">
+                      <div className="h-6 bg-blue-300/30 rounded w-full"></div>
+                      <div className="h-6 bg-blue-400/30 rounded w-3/4"></div>
+                      <div className="h-6 bg-blue-300/30 rounded w-full"></div>
+                    </div>
+                    <div className="flex items-end justify-end">
+                      <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center text-white text-xs font-medium">
+                        AI
+                      </div>
+                    </div>
+                  </div>
+                  <div className="absolute bottom-2 right-2 w-4 h-4 bg-blue-400 rounded-full"></div>
+                </div>
+              </div>
+              <div className="flex-1 space-y-3">
+                <h3 className="text-xl font-bold text-white">Data Mapping & Predictive Analytics</h3>
+                <p className="text-gray-300 leading-relaxed text-sm">
+                  Data mapping visualizes complex data structures. Predictive analytics harness advanced models for future trends.
+                </p>
+              </div>
+            </EnhancedCardContent>
+          </EnhancedCard>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+export default ProductivitySection;
