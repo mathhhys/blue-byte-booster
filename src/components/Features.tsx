@@ -10,16 +10,13 @@ import {
 const Features = () => {
   return (
     <>
-      {/* Major Provider Supported section */}
-      <ModelProvidersSection />
       <section
         id="features"
-        className="w-full bg-[#101624] py-24 px-4 md:px-0"
-        style={{ minHeight: "80vh" }}
+        className="w-full bg-[#101624] py-32 px-4 md:px-0"
       >
-        <div className="max-w-6xl mx-auto flex flex-col gap-14">
+        <div className="max-w-6xl mx-auto flex flex-col gap-20">
           {/* Top row: Heading, Subheading, Button */}
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-8 mb-12">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-8 mb-16">
             <div>
               <h2 className="text-5xl md:text-6xl font-bold text-white mb-4 mt-20">
                 Build software faster
@@ -37,7 +34,7 @@ const Features = () => {
           </div>
 
           {/* Feature cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-24">
             {/* Card 1 */}
             <EnhancedCard
               variant="secondary"
@@ -114,6 +111,7 @@ const Features = () => {
             </EnhancedCard>
           </div>
         </div>
+
       </section>
     </>
   );
@@ -147,8 +145,8 @@ const PROVIDER_LOGOS = [
 ];
 
 export const ModelProvidersSection = () => (
-  <section className="w-full bg-white py-16 px-4">
-    <div className="max-w-6xl mx-auto flex flex-col items-center w-full">
+  <section className="w-full bg-white py-8 px-4">
+    <div className="flex flex-col items-center w-full">
       <h3 className="text-lg md:text-xl font-medium text-slate-900 text-center mb-8">
         First-class support for every major model provider
       </h3>

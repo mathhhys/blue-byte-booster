@@ -3,6 +3,15 @@ import Navigation from "../components/Navigation";
 import Footer from "../components/Footer";
 import { ModelProvidersSection } from "../components/Features";
 import { PricingSection } from "@/components/PricingSection";
+import { getFeatureComparison } from '@/config/plans';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 import { Check, X } from "lucide-react";
 import FAQSection from "@/components/FAQSection";
 import GradientBackground from "@/components/GradientBackground";
@@ -45,30 +54,6 @@ const comparisonFeatures = [
 ];
 
 
-// Testimonials data
-const testimonials = [
-  {
-    name: "Sarah Chen",
-    role: "Senior Developer",
-    company: "TechCorp",
-    content: "SoftCodes has transformed how I write code. The AI suggestions are incredibly accurate and save me hours every day.",
-    rating: 5
-  },
-  {
-    name: "Marcus Rodriguez",
-    role: "Engineering Manager",
-    company: "StartupXYZ",
-    content: "Our team's productivity increased by 40% after switching to SoftCodes. The collaboration features are game-changing.",
-    rating: 5
-  },
-  {
-    name: "Emily Johnson",
-    role: "Full Stack Developer",
-    company: "DevStudio",
-    content: "The code quality suggestions and automated reviews have significantly improved our codebase. Highly recommended!",
-    rating: 5
-  }
-];
 
 export default function Pricing() {
   return (
@@ -95,45 +80,72 @@ export default function Pricing() {
 
           {/* Pricing cards directly integrated */}
           <PricingSection />
+
+          {/* Features Comparison Table */}
+          <div className="mt-24 mb-16">
+            <div className="text-center mb-12">
+              <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
+                Compare Plans
+              </h2>
+              <p className="text-xl text-gray-300 max-w-2xl mx-auto">
+                See which plan is right for your needs
+              </p>
+            </div>
+
+            <div className="w-full overflow-x-auto">
+              <Table className="w-full text-sm bg-gray-800/50 border border-gray-700 rounded-lg">
+                <TableHeader className="bg-gray-700/50">
+                  <TableRow>
+                    <TableHead className="w-1/2 text-left font-semibold text-white border-r border-gray-600">Feature</TableHead>
+                    <TableHead className="text-center font-semibold text-white">Pro</TableHead>
+                    <TableHead className="text-center font-semibold text-white">Teams</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {getFeatureComparison().categories.map((category, catIndex) => (
+                    <React.Fragment key={catIndex}>
+                      {/* Category Header Row */}
+                      <TableRow className="bg-gray-700/30">
+                        <TableCell
+                          colSpan={3}
+                          className="text-left font-semibold text-white py-4 border-b border-gray-600"
+                        >
+                          {category.name}
+                        </TableCell>
+                      </TableRow>
+                      {/* Feature Rows */}
+                      {category.features.map((feature, featIndex) => (
+                        <TableRow key={featIndex} className="hover:bg-gray-700/20 transition-colors">
+                          <TableCell className="text-left text-gray-300 py-3 border-r border-gray-600">
+                            {feature.name}
+                          </TableCell>
+                          <TableCell className="text-center py-3">
+                            {typeof feature.pro === 'boolean' ? (
+                              feature.pro ? <Check className="mx-auto h-4 w-4 text-green-500" /> : <X className="mx-auto h-4 w-4 text-red-500" />
+                            ) : (
+                              <span className="text-gray-300">{feature.pro}</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center py-3">
+                            {typeof feature.teams === 'boolean' ? (
+                              feature.teams ? <Check className="mx-auto h-4 w-4 text-green-500" /> : <X className="mx-auto h-4 w-4 text-red-500" />
+                            ) : (
+                              <span className="text-gray-300">{feature.teams}</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </React.Fragment>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
         </div>
       </section>
     </GradientBackground>
 
     <FAQSection />
-
-    {/* Trusted by Developers Section */}
-    <section className="py-20 bg-gray-900">
-      <div className="max-w-6xl mx-auto px-4">
-        <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-            Trusted by Developers Worldwide
-          </h2>
-          <p className="text-xl text-gray-300 max-w-2xl mx-auto">
-            Join thousands of developers who are revolutionizing their coding experience with Softcodes AI.
-          </p>
-        </div>
-
-        <div className="grid md:grid-cols-3 gap-8">
-          {testimonials.map((testimonial, index) => (
-            <div key={index} className="bg-gray-800 p-6 rounded-lg text-center border border-gray-700">
-              <div className="flex justify-center mb-4">
-                {[...Array(testimonial.rating)].map((_, i) => (
-                  <Check key={i} className="w-5 h-5 text-yellow-400 fill-current" />
-                ))}
-              </div>
-              <p className="text-gray-200 mb-6 italic">"{testimonial.content}"</p>
-              <div>
-                <h4 className="font-semibold text-white">{testimonial.name}</h4>
-                <p className="text-gray-400">{testimonial.role} at {testimonial.company}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-
-    {/* Social Proof: Model Providers Section */}
-    <ModelProvidersSection />
 
       <Footer />
     </>

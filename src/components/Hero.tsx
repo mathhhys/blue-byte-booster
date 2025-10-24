@@ -17,7 +17,7 @@ const Hero = () => {
 
   return (
     <GradientBackground>
-      <section className="min-h-screen flex items-center justify-center pt-24">
+      <section className="min-h-screen flex items-center justify-center pt-24 pb-24">
         <div className="container mx-auto px-6 flex items-center justify-center min-h-full mt-8">
           <div className="grid grid-cols-1 lg:grid-cols-[2fr_3fr] gap-8 lg:gap-20 items-center max-w-7xl mx-auto">
             {/* Left Column: Text Content */}

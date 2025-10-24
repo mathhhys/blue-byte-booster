@@ -21,11 +21,10 @@ const pricingPlans = [
       "Custom AI training",
     ],
     cta: "Upgrade to Pro",
-    highlighted: false,
+    highlighted: true,
   },
   {
-    name: "Team",
-    price: "Contact us",
+    name: "Teams",
     period: "",
     description: "For teams collaborating on code with shared AI resources.",
     features: [
@@ -36,9 +35,8 @@ const pricingPlans = [
       "Admin controls",
       "Dedicated support",
     ],
-    cta: "Start Team Plan",
+    cta: "Contact us",
     highlighted: true,
-    badge: "Recommended",
   },
 ]
 
@@ -47,8 +45,8 @@ export function PricingSection() {
   const { isLoaded, isSignedIn } = useUser();
 
   const handlePlanClick = (planName: string) => {
-    if (planName === "Team") {
-      window.location.href = 'mailto:sales@softcodes.ai?subject=Teams Plan Inquiry';
+    if (planName === "Contact us") {
+      window.location.href = 'mailto:mathys@softcodes.ai?subject=Teams Plan Inquiry';
       return;
     }
 
@@ -70,17 +68,16 @@ return (
       {pricingPlans.map((plan) => (
         <div
           key={plan.name}
-          className={`mx-auto max-w-4xl rounded-2xl ring-1 lg:flex ${
-            plan.highlighted ? "ring-blue-500/50 shadow-lg" : "ring-gray-600"
+          className={`mx-auto max-w-4xl rounded-2xl border lg:flex ${
+            plan.highlighted ? "border-blue-500 shadow-lg" : "border-gray-600 shadow-md"
           } bg-gray-800/50`}
         >
           <div className="-mt-1 p-1 lg:mt-0 lg:w-full lg:max-w-sm lg:flex-shrink-0">
-            <div className="rounded-xl bg-gray-800/50 py-8 text-center ring-1 ring-inset ring-gray-600 lg:flex lg:flex-col lg:justify-center lg:py-12">
+            <div className={`rounded-xl bg-gray-800/50 py-8 text-center border ${plan.highlighted ? "border-blue-500" : "border-gray-600"} lg:flex lg:flex-col lg:justify-center lg:py-12`}>
               <div className="mx-auto max-w-xs px-6">
                 <h3 className="text-xl font-bold tracking-tight text-white">{plan.name}</h3>
                 <p className="mt-3 text-sm leading-6 text-gray-300">{plan.description}</p>
 
-                {plan.badge && <p className="text-sm font-semibold text-blue-500 mt-4">{plan.badge}</p>}
                 <p className="mt-4 flex items-baseline justify-center gap-x-2">
                   <span className="text-4xl font-bold tracking-tight text-white">{plan.price}</span>
                   {plan.period && (
@@ -95,9 +92,6 @@ return (
                 >
                   {plan.cta}
                 </Button>
-                <p className="mt-4 text-xs leading-5 text-gray-400">
-                  Invoices and receipts available for easy company reimbursement
-                </p>
               </div>
             </div>
           </div>
