@@ -1,37 +1,62 @@
 "use client";
 
-import React, { useState } from 'react';
+import React from 'react';
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Check, ArrowRight, Mail } from "lucide-react";
+import { Check } from "lucide-react";
 import { SignedIn, SignedOut, useUser } from '@clerk/clerk-react';
 import { useNavigate } from 'react-router-dom';
-import { PLAN_CONFIGS_MULTI_CURRENCY, getPlanPrice, calculateMultiCurrencySavings } from '@/config/plans';
-import { formatPriceOnly } from '@/utils/currency';
-import { MultiCurrencyPlanConfig, CurrencyCode } from '@/types/database';
-import { DEFAULT_CURRENCY } from '@/config/currencies';
 
-export const PricingSection = () => {
-  const [isYearly, setIsYearly] = useState(false);
-  const selectedCurrency: CurrencyCode = 'EUR';
+const pricingPlans = [
+  {
+    name: "Pro",
+    price: "€20",
+    period: "/month",
+    description: "For professional developers building faster with AI assistance.",
+    features: [
+      "Unlimited AI completions",
+      "Advanced code generation",
+      "Multi-project support",
+      "Priority support",
+      "Code refactoring tools",
+      "Custom AI training",
+    ],
+    cta: "Upgrade to Pro",
+    highlighted: false,
+  },
+  {
+    name: "Team",
+    price: "Contact us",
+    period: "",
+    description: "For teams collaborating on code with shared AI resources.",
+    features: [
+      "Everything in Pro",
+      "Team collaboration features",
+      "Shared code snippets",
+      "Usage analytics dashboard",
+      "Admin controls",
+      "Dedicated support",
+    ],
+    cta: "Start Team Plan",
+    highlighted: true,
+    badge: "Recommended",
+  },
+]
+
+export function PricingSection() {
   const navigate = useNavigate();
   const { isLoaded, isSignedIn } = useUser();
 
-  const plans = [
-    PLAN_CONFIGS_MULTI_CURRENCY.pro,
-    PLAN_CONFIGS_MULTI_CURRENCY.teams,
-  ];
-
-  const handlePlanClick = (planId: 'pro' | 'teams') => {
-    if (planId === 'teams') {
+  const handlePlanClick = (planName: string) => {
+    if (planName === "Team") {
       window.location.href = 'mailto:sales@softcodes.ai?subject=Teams Plan Inquiry';
       return;
     }
 
+    // For Pro
     if (!isLoaded || !isSignedIn) {
       const params = new URLSearchParams({
-        plan: planId,
-        billing: isYearly ? 'yearly' : 'monthly',
+        plan: 'pro',
+        billing: 'monthly',
         currency: 'EUR',
       });
       navigate(`/sign-up?${params.toString()}`);
@@ -39,138 +64,62 @@ export const PricingSection = () => {
       navigate('/dashboard');
     }
   };
+return (
+  <div className="mx-auto max-w-7xl px-6 lg:px-8">
+    <div className="space-y-6">
+      {pricingPlans.map((plan) => (
+        <div
+          key={plan.name}
+          className={`mx-auto max-w-4xl rounded-2xl ring-1 lg:flex ${
+            plan.highlighted ? "ring-blue-500/50 shadow-lg" : "ring-gray-600"
+          } bg-gray-800/50`}
+        >
+          <div className="-mt-1 p-1 lg:mt-0 lg:w-full lg:max-w-sm lg:flex-shrink-0">
+            <div className="rounded-xl bg-gray-800/50 py-8 text-center ring-1 ring-inset ring-gray-600 lg:flex lg:flex-col lg:justify-center lg:py-12">
+              <div className="mx-auto max-w-xs px-6">
+                <h3 className="text-xl font-bold tracking-tight text-white">{plan.name}</h3>
+                <p className="mt-3 text-sm leading-6 text-gray-300">{plan.description}</p>
 
-  const getPlanPriceDisplay = (plan: MultiCurrencyPlanConfig) => {
-    if (plan.isContactSales) return 'Contact us';
-    
-    // Direct price lookup to ensure reactivity
-    const pricing = plan.pricing.EUR;
-    const price = isYearly ? pricing.yearly : pricing.monthly;
-    
-    // Direct formatting to ensure fresh calculation
-    return `€${price}`;
-  };
+                {plan.badge && <p className="text-sm font-semibold text-blue-500 mt-4">{plan.badge}</p>}
+                <p className="mt-4 flex items-baseline justify-center gap-x-2">
+                  <span className="text-4xl font-bold tracking-tight text-white">{plan.price}</span>
+                  {plan.period && (
+                    <span className="text-sm font-semibold leading-6 tracking-wide text-gray-400">
+                      {plan.period}
+                    </span>
+                  )}
+                </p>
+                <Button
+                  onClick={() => handlePlanClick(plan.name)}
+                  className="mt-6 w-full bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  {plan.cta}
+                </Button>
+                <p className="mt-4 text-xs leading-5 text-gray-400">
+                  Invoices and receipts available for easy company reimbursement
+                </p>
+              </div>
+            </div>
+          </div>
 
-  const getSavingsPercentage = (planId: 'pro') => {
-    const plan = PLAN_CONFIGS_MULTI_CURRENCY[planId];
-    const monthlyPrice = plan.pricing.EUR.monthly;
-    const yearlyPrice = plan.pricing.EUR.yearly;
-    const monthlyTotal = monthlyPrice * 12;
-    return Math.round(((monthlyTotal - yearlyPrice) / monthlyTotal) * 100);
-  };
+          <div className="p-6 sm:p-8 lg:flex-auto">
+            <div className="flex items-center gap-x-4">
+              <h4 className="flex-none text-sm font-semibold leading-6 text-blue-500">What's included</h4>
+              <div className="h-px flex-auto bg-gray-600"></div>
+            </div>
 
-  const getButtonText = (planId: 'pro' | 'teams') => {
-    if (planId === 'teams') {
-      return 'Contact us';
-    }
-    
-    if (!isLoaded || !isSignedIn) {
-      return `Get Pro`;
-    }
-    
-    return 'Go to Dashboard';
-  };
-
-  const getButtonIcon = (planId: 'pro' | 'teams') => {
-    if (planId === 'teams') {
-      return Mail;
-    }
-    return ArrowRight;
-  };
-
-  return (
-    <section className="bg-[#0E172A] pb-24">
-      <div className="max-w-7xl mx-auto px-6">
-
-        {/* Billing Toggle */}
-  {/* Pricing Header */}
-  <div className="text-center pt-20 mb-20">
-    <h2 className="text-4xl md:text-5xl font-bold text-white mb-8">
-      Unlock Your Coding Potential with Softcodes AI
-    </h2>
-    <p className="text-base md:text-lg text-gray-300 max-w-3xl mx-auto leading-loose">
-      Elevate your development workflow with AI-powered tools designed for modern developers and teams. Enjoy unlimited agent requests and tab completion, 500 monthly credits included with flexible scaling, plus privacy mode and centralized billing for seamless team collaboration. Our plans deliver the innovation you need to code faster and smarter. Choose the perfect fit and start transforming your productivity today.
-    </p>
-  </div>
-        <div className="flex justify-center items-center mb-12">
-          <div className="flex items-center bg-gray-800 rounded-lg p-1 border border-gray-600">
-            <button
-              onClick={() => setIsYearly(false)}
-              className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 ${
-                !isYearly
-                  ? "bg-white text-black"
-                  : "text-gray-300 hover:text-white"
-              }`}
-            >
-              MONTHLY
-            </button>
-            <button
-              onClick={() => setIsYearly(true)}
-              className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 ${
-                isYearly
-                  ? "bg-white text-black"
-                  : "text-gray-300 hover:text-white"
-              }`}
-            >
-              YEARLY <span className="text-gray-400">(SAVE {getSavingsPercentage('pro')}%)</span>
-            </button>
+            <ul role="list" className="mt-6 grid grid-cols-1 gap-3 text-sm leading-6 sm:grid-cols-2 sm:gap-4">
+              {plan.features.map((feature, index) => (
+                <li key={index} className="flex gap-x-3">
+                  <Check className="h-5 w-4 flex-none text-blue-500 mt-0.5" />
+                  <span className="text-gray-300">{feature}</span>
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
-
-        {/* Main Cards - Pro and Teams in a 2-column grid */}
-        <div className="grid lg:grid-cols-2 gap-8 mb-8">
-          {plans.map((plan) => (
-            <Card
-              key={`${plan.name}-EUR-${isYearly}`}
-              className="relative p-8 border transition-all duration-300 hover:scale-105 border-transparent"
-              style={{
-                background: "#181F33"
-              }}
-            >
-
-              <div className="space-y-6">
-                {/* Header */}
-                <div>
-                  <h3 className="text-xl font-semibold text-white mb-2">
-                    {plan.name}
-                  </h3>
-                  <div className="flex items-baseline gap-1 mb-2">
-                    <span className="text-3xl font-bold text-white">
-                      {getPlanPriceDisplay(plan)}
-                    </span>
-                    <span className="text-gray-300">
-                      {!plan.isContactSales ? (isYearly ? '/yr' : '/mo') : ''}
-                    </span>
-                  </div>
-                  <p className="text-sm text-gray-300">
-                    {plan.description}
-                  </p>
-                </div>
-
-                {/* Features */}
-                <div className="space-y-3">
-                  {plan.features.map((feature, index) => (
-                    <div key={index} className="flex items-start gap-3">
-                      <Check className="w-5 h-5 text-green-400 mt-0.5 flex-shrink-0" />
-                      <span className="text-sm text-gray-200">{feature}</span>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Button */}
-                <Button
-                  onClick={() => handlePlanClick(plan.id as 'pro' | 'teams')}
-                  variant="outline"
-                  className="w-full group border-gray-600 text-white hover:bg-gray-800"
-                >
-                  {React.createElement(getButtonIcon(plan.id as 'pro' | 'teams'), { className: "w-4 h-4 mr-2 group-hover:translate-x-0.5 transition-transform" })}
-                  {getButtonText(plan.id as 'pro' | 'teams')}
-                </Button>
-              </div>
-            </Card>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-};
+      ))}
+    </div>
+  </div>
+)
+}

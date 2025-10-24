@@ -1,5 +1,4 @@
  import Navigation from "@/components/Navigation";
- import { PricingSection } from "@/components/PricingSection";
  import Hero from "@/components/Hero";
  import AlternatingFeaturesSection from "@/components/AlternatingFeaturesSection";
  import ProductivitySection from "@/components/ProductivitySection";
@@ -22,7 +21,6 @@ const Index = () => {
       <FeatureShowcase />
       <Features />
       <StatsSection />
-      <PricingSection />
       <FAQSection />
       <Footer />
     </div>

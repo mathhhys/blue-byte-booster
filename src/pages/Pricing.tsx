@@ -76,8 +76,8 @@ export default function Pricing() {
     <GradientBackground className="mt-8">
       <Navigation />
       
-      {/* Hero Section */}
-      <section className="pt-24 pb-16 px-4 bg-transparent">
+      {/* Hero Section with integrated pricing cards */}
+      <section className="pt-24 px-4 bg-transparent">
         <div className="max-w-6xl mx-auto text-center">
           <div className="inline-block mb-6">
             <div className="flex items-center gap-2 bg-primary/10 border border-primary/20 px-4 py-2 rounded-full">
@@ -89,16 +89,14 @@ export default function Pricing() {
           <h1 className="text-4xl md:text-6xl font-bold mb-6 text-white">
             Plans and Pricing
           </h1>
-          <p className="text-xl text-gray-300 mb-12 max-w-3xl mx-auto">
+          <p className="text-xl text-gray-300 mb-8 max-w-3xl mx-auto">
             Choose the perfect plan for your coding journey. All plans include access to our powerful AI coding assistant.
           </p>
 
-          {/* Monthly/Annual Toggle removed here; will use the one from PricingSection */}
+          {/* Pricing cards directly integrated */}
+          <PricingSection />
         </div>
       </section>
-
-      {/* Replaced Pricing Cards Section with new PricingSection */}
-      <PricingSection />
     </GradientBackground>
 
     <FAQSection />
