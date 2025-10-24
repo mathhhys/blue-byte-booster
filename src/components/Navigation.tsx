@@ -159,15 +159,6 @@ const Navigation = () => {
               >
                 FEATURES
               </Link>
-              <Link
-                to="/teams"
-                className={`text-sm font-medium transition-colors hover:text-blue-600 ${
-                  isScrolled ? "text-gray-700" : "text-white"
-                }`}
-                style={{ textDecoration: "none" }}
-              >
-                TEAMS & ENTERPRISE
-              </Link>
               <div className="relative group">
                 <button
                   onClick={() => window.location.href = "https://docs.softcodes.ai/"}
@@ -329,14 +320,6 @@ const Navigation = () => {
                 FEATURES
               </Link>
 
-              <Link
-                to="/teams"
-                className="w-full flex justify-center text-xl font-bold tracking-wide text-gray-200 hover:text-white transition-colors focus:outline-none text-center"
-                style={{ letterSpacing: "0.02em", textDecoration: "none" }}
-                onClick={closeMobileMenu}
-              >
-                TEAMS & ENTERPRISE
-              </Link>
 
               <button
                 onClick={() => window.location.href = "https://docs.softcodes.ai/"}
