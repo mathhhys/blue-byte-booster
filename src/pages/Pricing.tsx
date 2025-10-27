@@ -2,7 +2,7 @@ import React from "react";
 import Navigation from "../components/Navigation";
 import Footer from "../components/Footer";
 import { ModelProvidersSection } from "../components/Features";
-import { PricingSection } from "@/components/PricingSection";
+import PricingSection from "@/components/PricingSection";
 import { getFeatureComparison } from '@/config/plans';
 import {
   Table,
@@ -74,7 +74,7 @@ export default function Pricing() {
           <h1 className="text-4xl md:text-6xl font-bold mb-6 text-white">
             Plans and Pricing
           </h1>
-          <p className="text-xl text-gray-300 mb-8 max-w-3xl mx-auto">
+          <p className="text-xl text-gray-300 mb-2 max-w-3xl mx-auto">
             Choose the perfect plan for your coding journey. All plans include access to our powerful AI coding assistant.
           </p>
 
@@ -82,7 +82,7 @@ export default function Pricing() {
           <PricingSection />
 
           {/* Features Comparison Table */}
-          <div className="mt-24 mb-16">
+          <div className="mt-16 mb-16">
             <div className="text-center mb-12">
               <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
                 Compare Plans

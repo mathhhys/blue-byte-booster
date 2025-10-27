@@ -22,6 +22,19 @@ export default function MCPServerSection() {
     <section className="mt-0">
       <div className="py-32 md:py-40" style={{ backgroundColor: '#0E172A' }}>
         <div className="mx-auto max-w-7xl px-6">
+          <div className="mx-auto mb-16 max-w-lg space-y-6 text-center">
+            <h2 className="text-balance text-4xl font-semibold md:text-5xl text-white">
+              Connect with Model Context Protocol servers and platforms
+            </h2>
+            <p className="text-gray-300">
+              Seamlessly integrate MCP servers with popular platforms and tools to
+              enhance your AI capabilities.
+            </p>
+
+            <Button variant="outline" size="sm" className="border-white/20 text-white hover:bg-white/10">
+              <a href="#">Explore MCP Servers Today</a>
+            </Button>
+          </div>
           <div className="group relative mx-auto max-w-lg items-center justify-between space-y-8 [mask-image:radial-gradient(ellipse_50%_50%_at_50%_50%,#000_70%,transparent_100%)] sm:max-w-xl">
             <div
               role="presentation"
@@ -157,19 +170,6 @@ export default function MCPServerSection() {
                 <Softcodes />
               </IntegrationCard>
             </div>
-          </div>
-          <div className="mx-auto mt-16 max-w-lg space-y-6 text-center">
-            <h2 className="text-balance text-4xl font-semibold md:text-5xl text-white">
-              Connect with Model Context Protocol servers and platforms
-            </h2>
-            <p className="text-gray-300">
-              Seamlessly integrate MCP servers with popular platforms and tools to
-              enhance your AI capabilities.
-            </p>
-
-            <Button variant="outline" size="sm" className="border-white/20 text-white hover:bg-white/10">
-              <a href="#">Explore MCP Servers Today</a>
-            </Button>
           </div>
         </div>
       </div>

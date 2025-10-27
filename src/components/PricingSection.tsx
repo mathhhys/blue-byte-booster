@@ -1,119 +1,105 @@
-"use client";
-
-import React from 'react';
-import { Button } from "@/components/ui/button";
+import { Link } from "react-router-dom";
+import { Button } from "./ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "./ui/card";
 import { Check } from "lucide-react";
-import { SignedIn, SignedOut, useUser } from '@clerk/clerk-react';
-import { useNavigate } from 'react-router-dom';
+import { motion } from "framer-motion";
 
-const pricingPlans = [
-  {
-    name: "Pro",
-    price: "€20",
-    period: "/month",
-    description: "For professional developers building faster with AI assistance.",
-    features: [
-      "Unlimited AI completions",
-      "Advanced code generation",
-      "Multi-project support",
-      "Priority support",
-      "Code refactoring tools",
-      "Custom AI training",
-    ],
-    cta: "Upgrade to Pro",
-    highlighted: true,
-  },
-  {
-    name: "Teams",
-    period: "",
-    description: "For teams collaborating on code with shared AI resources.",
-    features: [
-      "Everything in Pro",
-      "Team collaboration features",
-      "Shared code snippets",
-      "Usage analytics dashboard",
-      "Admin controls",
-      "Dedicated support",
-    ],
-    cta: "Contact us",
-    highlighted: true,
-  },
-]
+export default function PricingSection() {
+  return (
+    <section id="pricing" className="pt-4 md:pt-8 pb-16 md:pb-32" style={{ backgroundColor: '#0E172A' }}>
+      <div className="mx-auto max-w-6xl px-6">
+        <div className="mt-4 grid gap-6 md:mt-8 md:grid-cols-2 max-w-4xl mx-auto">
+        <Card className="relative border-white/10 bg-white/5 backdrop-blur-sm">
+          <span 
+            className="absolute inset-x-0 -top-3 mx-auto flex h-6 w-fit items-center rounded-full px-3 py-1 text-xs font-medium text-white ring-1 ring-inset ring-white/20"
+            style={{ backgroundColor: '#1E4ED8' }}
+          >
+            Popular
+          </span>
 
-export function PricingSection() {
-  const navigate = useNavigate();
-  const { isLoaded, isSignedIn } = useUser();
+          <div className="flex flex-col">
+            <CardHeader>
+              <CardTitle className="font-medium text-white">Pro</CardTitle>
+              <span className="my-3 block text-2xl font-semibold text-white">
+                $19 / mo
+              </span>
+              <CardDescription className="text-sm text-gray-400">Per user</CardDescription>
+            </CardHeader>
 
-  const handlePlanClick = (planName: string) => {
-    if (planName === "Contact us") {
-      window.location.href = 'mailto:mathys@softcodes.ai?subject=Teams Plan Inquiry';
-      return;
-    }
+            <CardContent className="space-y-4">
+              <hr className="border-dashed border-white/20" />
+              <ul className="list-outside space-y-3 mb-6 text-sm text-gray-300">
+                {[
+                  "Advanced MCP Integrations",
+                  "Custom Server Endpoints",
+                  "Multi-Model Orchestration",
+                  "Real-Time Context Sync",
+                  "Enhanced Security Layer",
+                  "Priority Technical Support",
+                  "Advanced API Rate Limits",
+                  "Server Performance Analytics",
+                  "Protocol Version Control",
+                ].map((item, index) => (
+                  <li key={index} className="flex items-center gap-2">
+                    <Check className="size-3 text-white" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
 
-    // For Pro
-    if (!isLoaded || !isSignedIn) {
-      const params = new URLSearchParams({
-        plan: 'pro',
-        billing: 'monthly',
-        currency: 'EUR',
-      });
-      navigate(`/sign-up?${params.toString()}`);
-    } else {
-      navigate('/dashboard');
-    }
-  };
-return (
-  <div className="mx-auto max-w-7xl px-6 lg:px-8">
-    <div className="space-y-6">
-      {pricingPlans.map((plan) => (
-        <div
-          key={plan.name}
-          className={`mx-auto max-w-4xl rounded-2xl border lg:flex ${
-            plan.highlighted ? "border-blue-500 shadow-lg" : "border-gray-600 shadow-md"
-          } bg-gray-800/50`}
-        >
-          <div className="-mt-1 p-1 lg:mt-0 lg:w-full lg:max-w-sm lg:flex-shrink-0">
-            <div className={`rounded-xl bg-gray-800/50 py-8 text-center border ${plan.highlighted ? "border-blue-500" : "border-gray-600"} lg:flex lg:flex-col lg:justify-center lg:py-12`}>
-              <div className="mx-auto max-w-xs px-6">
-                <h3 className="text-xl font-bold tracking-tight text-white">{plan.name}</h3>
-                <p className="mt-3 text-sm leading-6 text-gray-300">{plan.description}</p>
-
-                <p className="mt-4 flex items-baseline justify-center gap-x-2">
-                  <span className="text-4xl font-bold tracking-tight text-white">{plan.price}</span>
-                  {plan.period && (
-                    <span className="text-sm font-semibold leading-6 tracking-wide text-gray-400">
-                      {plan.period}
-                    </span>
-                  )}
-                </p>
-                <Button
-                  onClick={() => handlePlanClick(plan.name)}
-                  className="mt-6 w-full bg-blue-600 hover:bg-blue-700 text-white"
-                >
-                  {plan.cta}
-                </Button>
-              </div>
-            </div>
+            <CardFooter>
+              <Button asChild className="w-full bg-white text-black hover:bg-gray-200">
+                <Link to="/pricing">Get Started</Link>
+              </Button>
+            </CardFooter>
           </div>
+        </Card>
 
-          <div className="p-6 sm:p-8 lg:flex-auto">
-            <div className="flex items-center gap-x-4">
-              <h4 className="flex-none text-sm font-semibold leading-6 text-blue-500">What's included</h4>
-              <div className="h-px flex-auto bg-gray-600"></div>
-            </div>
+        <Card className="flex flex-col border-white/10 bg-white/5 backdrop-blur-sm">
+          <CardHeader>
+            <CardTitle className="font-medium text-white">Teams</CardTitle>
+            <span className="my-3 block text-2xl font-semibold text-white">$49 / mo</span>
+            <CardDescription className="text-sm text-gray-400">Per user</CardDescription>
+          </CardHeader>
 
-            <ul role="list" className="mt-6 grid grid-cols-1 gap-3 text-sm leading-6 sm:grid-cols-2 sm:gap-4">
-              {plan.features.map((feature, index) => (
-                <li key={index} className="flex gap-x-3">
-                  <Check className="h-5 w-4 flex-none text-blue-500 mt-0.5" />
-                  <span className="text-gray-300">{feature}</span>
+          <CardContent className="space-y-4">
+            <hr className="border-dashed border-white/20" />
+
+            <ul className="list-outside space-y-3 text-sm text-gray-300">
+              {[
+                "Everything in Pro Plan",
+                "Dedicated Server Instance",
+                "White-Label MCP Solutions",
+                "Team Collaboration Tools",
+                "Advanced User Management",
+                "Custom Security Policies",
+                "Dedicated Account Manager",
+                "SLA Guarantees",
+              ].map((item, index) => (
+                <li key={index} className="flex items-center gap-2">
+                  <Check className="size-3 text-white" />
+                  {item}
                 </li>
               ))}
             </ul>
-          </div>
-        </div>
-      ))}
+          </CardContent>
+
+          <CardFooter className="mt-auto">
+            <Button asChild variant="outline" className="w-full border-white/30 text-white hover:bg-white/10">
+              <Link to="/pricing">Get Started</Link>
+            </Button>
+          </CardFooter>
+        </Card>
     </div>
-  </div>
-)
+      </div>
+    </section>
+  );
 }
