@@ -20,7 +20,7 @@ import { InfiniteSlider } from "@/components/infinite-slider";
 export default function MCPServerSection() {
   return (
     <section className="mt-0">
-      <div className="py-40 md:py-48" style={{ backgroundColor: '#0E172A' }}>
+      <div className="py-20 md:py-24" style={{ backgroundColor: '#0E172A' }}>
         <div className="mx-auto max-w-7xl px-6">
           <div className="mx-auto mb-20 max-w-lg space-y-6 text-center">
             <h2 className="text-balance text-4xl font-semibold md:text-5xl text-white">
@@ -30,10 +30,6 @@ export default function MCPServerSection() {
               Seamlessly integrate MCP servers with popular platforms and tools to
               enhance your AI capabilities.
             </p>
-
-            <Button variant="outline" size="sm" className="border-white/20 text-white hover:bg-white/10">
-              <a href="#">Explore MCP Servers Today</a>
-            </Button>
           </div>
           <div className="group relative mx-auto max-w-xl items-center justify-between space-y-12 [mask-image:radial-gradient(ellipse_50%_50%_at_50%_50%,#000_70%,transparent_100%)] sm:max-w-2xl">
             <div

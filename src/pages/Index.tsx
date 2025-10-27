@@ -22,7 +22,8 @@ const Index = () => {
       <ProductivitySection />
       <FeatureShowcase />
       <StatsSection />
-      <section className="pt-16 px-4" style={{ backgroundColor: '#0E172A' }}>
+      <MCPServerSection />
+      <section className="pt-8 px-4" style={{ backgroundColor: '#0E172A' }}>
         <div className="max-w-6xl mx-auto text-center">
           <div className="inline-block mb-6">
             <div className="flex items-center gap-2 bg-primary/10 border border-primary/20 px-4 py-2 rounded-full">
@@ -41,7 +42,6 @@ const Index = () => {
           <PricingSection />
         </div>
       </section>
-      <MCPServerSection />
       <Features />
       <FAQSection />
       <Footer />
