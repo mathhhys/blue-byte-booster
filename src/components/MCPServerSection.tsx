@@ -14,15 +14,15 @@ import { InfiniteSlider } from "@/components/infinite-slider";
 export default function MCPServerSection() {
   return (
     <section className="mt-0">
-      <div className="py-24 md:py-32" style={{ backgroundColor: '#0E172A' }}>
+      <div className="py-32 md:py-40" style={{ backgroundColor: '#0E172A' }}>
         <div className="mx-auto max-w-7xl px-6">
-          <div className="group relative mx-auto max-w-[22rem] items-center justify-between space-y-6 [mask-image:radial-gradient(ellipse_50%_50%_at_50%_50%,#000_70%,transparent_100%)] sm:max-w-md">
+          <div className="group relative mx-auto max-w-lg items-center justify-between space-y-8 [mask-image:radial-gradient(ellipse_50%_50%_at_50%_50%,#000_70%,transparent_100%)] sm:max-w-xl">
             <div
               role="presentation"
               className="absolute inset-0 -z-10 bg-[linear-gradient(to_right,rgba(255,255,255,0.1)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.1)_1px,transparent_1px)] bg-[size:32px_32px] opacity-30"
             ></div>
             <div>
-              <InfiniteSlider gap={24} speed={20} speedOnHover={10}>
+              <InfiniteSlider gap={32} speed={20} speedOnHover={10}>
                 <IntegrationCard ariaLabel="VSCodium integration icon">
                   <VSCodium />
                 </IntegrationCard>
@@ -45,7 +45,7 @@ export default function MCPServerSection() {
             </div>
 
             <div>
-              <InfiniteSlider gap={24} speed={20} speedOnHover={10} reverse>
+              <InfiniteSlider gap={32} speed={20} speedOnHover={10} reverse>
                 <IntegrationCard ariaLabel="Gemini integration icon">
                   <Gemini />
                 </IntegrationCard>
@@ -67,7 +67,7 @@ export default function MCPServerSection() {
               </InfiniteSlider>
             </div>
             <div>
-              <InfiniteSlider gap={24} speed={20} speedOnHover={10}>
+              <InfiniteSlider gap={32} speed={20} speedOnHover={10}>
                 <IntegrationCard ariaLabel="Replit integration icon">
                   <Replit />
                 </IntegrationCard>
@@ -90,7 +90,7 @@ export default function MCPServerSection() {
             </div>
             <div className="absolute inset-0 m-auto flex size-fit justify-center gap-2" role="img" aria-label="Central Softcodes logo">
               <IntegrationCard
-                className="size-16 bg-white/10 shadow-xl backdrop-blur-md border-white/20"
+                className="size-20 bg-white/10 shadow-xl backdrop-blur-md border-white/20"
                 isCenter={true}
                 ariaLabel="Central Softcodes logo"
               >
@@ -98,8 +98,8 @@ export default function MCPServerSection() {
               </IntegrationCard>
             </div>
           </div>
-          <div className="mx-auto mt-12 max-w-lg space-y-6 text-center">
-            <h2 className="text-balance text-3xl font-semibold md:text-4xl text-white">
+          <div className="mx-auto mt-16 max-w-lg space-y-6 text-center">
+            <h2 className="text-balance text-4xl font-semibold md:text-5xl text-white">
               Connect with Model Context Protocol servers and platforms
             </h2>
             <p className="text-gray-300">
@@ -138,13 +138,13 @@ const IntegrationCard = ({
   return (
     <div
       className={cn(
-        "bg-white/5 relative z-20 flex size-12 rounded-full border border-white/10",
+        "bg-white/5 relative z-20 flex size-16 rounded-full border border-white/10",
         className
       )}
       role="img"
       aria-label={ariaLabel || `Integration icon ${isCenter ? 'center' : 'peripheral'}`}
     >
-      <div className={cn("m-auto size-fit *:size-5", isCenter && "*:size-8")}>
+      <div className={cn("m-auto size-fit *:size-6", isCenter && "*:size-10")}>
         {children}
       </div>
     </div>
