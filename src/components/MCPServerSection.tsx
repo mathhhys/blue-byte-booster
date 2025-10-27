@@ -1,10 +1,16 @@
 import {
-  Gemini,
-  Replit,
-  MagicUI,
-  VSCodium,
-  MediaWiki,
-  GooglePaLM,
+  Atlassian,
+  GitHub,
+  GitLab,
+  GoogleDrive,
+  Slack,
+  Neon,
+  Stripe,
+  Figma,
+  Firebase,
+  MicrosoftAzure,
+  Notion,
+  Supabase,
   Softcodes,
 } from "@/components/logos";
 import { cn } from "@/lib/utils";
@@ -23,68 +29,122 @@ export default function MCPServerSection() {
             ></div>
             <div>
               <InfiniteSlider gap={32} speed={20} speedOnHover={10}>
-                <IntegrationCard ariaLabel="VSCodium integration icon">
-                  <VSCodium />
+                <IntegrationCard ariaLabel="Atlassian integration icon">
+                  <Atlassian />
                 </IntegrationCard>
-                <IntegrationCard ariaLabel="MediaWiki integration icon">
-                  <MediaWiki />
+                <IntegrationCard ariaLabel="GitHub integration icon">
+                  <GitHub />
                 </IntegrationCard>
-                <IntegrationCard ariaLabel="Google PaLM integration icon">
-                  <GooglePaLM />
+                <IntegrationCard ariaLabel="GitLab integration icon">
+                  <GitLab />
                 </IntegrationCard>
-                <IntegrationCard ariaLabel="Gemini integration icon">
-                  <Gemini />
+                <IntegrationCard ariaLabel="Google Drive integration icon">
+                  <GoogleDrive />
                 </IntegrationCard>
-                <IntegrationCard ariaLabel="Replit integration icon">
-                  <Replit />
+                <IntegrationCard ariaLabel="Slack integration icon">
+                  <Slack />
                 </IntegrationCard>
-                <IntegrationCard ariaLabel="Magic UI integration icon">
-                  <MagicUI />
+                <IntegrationCard ariaLabel="Neon integration icon">
+                  <Neon />
+                </IntegrationCard>
+                <IntegrationCard ariaLabel="Stripe integration icon">
+                  <Stripe />
+                </IntegrationCard>
+                <IntegrationCard ariaLabel="Figma integration icon">
+                  <Figma />
+                </IntegrationCard>
+                <IntegrationCard ariaLabel="Firebase integration icon">
+                  <Firebase />
+                </IntegrationCard>
+                <IntegrationCard ariaLabel="Microsoft Azure integration icon">
+                  <MicrosoftAzure />
+                </IntegrationCard>
+                <IntegrationCard ariaLabel="Notion integration icon">
+                  <Notion />
+                </IntegrationCard>
+                <IntegrationCard ariaLabel="Supabase integration icon">
+                  <Supabase />
                 </IntegrationCard>
               </InfiniteSlider>
             </div>
 
             <div>
               <InfiniteSlider gap={32} speed={20} speedOnHover={10} reverse>
-                <IntegrationCard ariaLabel="Gemini integration icon">
-                  <Gemini />
+                <IntegrationCard ariaLabel="Supabase integration icon">
+                  <Supabase />
                 </IntegrationCard>
-                <IntegrationCard ariaLabel="Replit integration icon">
-                  <Replit />
+                <IntegrationCard ariaLabel="Notion integration icon">
+                  <Notion />
                 </IntegrationCard>
-                <IntegrationCard ariaLabel="MediaWiki integration icon">
-                  <MediaWiki />
+                <IntegrationCard ariaLabel="Microsoft Azure integration icon">
+                  <MicrosoftAzure />
                 </IntegrationCard>
-                <IntegrationCard ariaLabel="Magic UI integration icon">
-                  <MagicUI />
+                <IntegrationCard ariaLabel="Firebase integration icon">
+                  <Firebase />
                 </IntegrationCard>
-                <IntegrationCard ariaLabel="VSCodium integration icon">
-                  <VSCodium />
+                <IntegrationCard ariaLabel="Figma integration icon">
+                  <Figma />
                 </IntegrationCard>
-                <IntegrationCard ariaLabel="Google PaLM integration icon">
-                  <GooglePaLM />
+                <IntegrationCard ariaLabel="Stripe integration icon">
+                  <Stripe />
+                </IntegrationCard>
+                <IntegrationCard ariaLabel="Neon integration icon">
+                  <Neon />
+                </IntegrationCard>
+                <IntegrationCard ariaLabel="Slack integration icon">
+                  <Slack />
+                </IntegrationCard>
+                <IntegrationCard ariaLabel="Google Drive integration icon">
+                  <GoogleDrive />
+                </IntegrationCard>
+                <IntegrationCard ariaLabel="GitLab integration icon">
+                  <GitLab />
+                </IntegrationCard>
+                <IntegrationCard ariaLabel="GitHub integration icon">
+                  <GitHub />
+                </IntegrationCard>
+                <IntegrationCard ariaLabel="Atlassian integration icon">
+                  <Atlassian />
                 </IntegrationCard>
               </InfiniteSlider>
             </div>
             <div>
               <InfiniteSlider gap={32} speed={20} speedOnHover={10}>
-                <IntegrationCard ariaLabel="Replit integration icon">
-                  <Replit />
+                <IntegrationCard ariaLabel="Figma integration icon">
+                  <Figma />
                 </IntegrationCard>
-                <IntegrationCard ariaLabel="Magic UI integration icon">
-                  <MagicUI />
+                <IntegrationCard ariaLabel="Firebase integration icon">
+                  <Firebase />
                 </IntegrationCard>
-                <IntegrationCard ariaLabel="Gemini integration icon">
-                  <Gemini />
+                <IntegrationCard ariaLabel="Microsoft Azure integration icon">
+                  <MicrosoftAzure />
                 </IntegrationCard>
-                <IntegrationCard ariaLabel="VSCodium integration icon">
-                  <VSCodium />
+                <IntegrationCard ariaLabel="Notion integration icon">
+                  <Notion />
                 </IntegrationCard>
-                <IntegrationCard ariaLabel="MediaWiki integration icon">
-                  <MediaWiki />
+                <IntegrationCard ariaLabel="Supabase integration icon">
+                  <Supabase />
                 </IntegrationCard>
-                <IntegrationCard ariaLabel="Google PaLM integration icon">
-                  <GooglePaLM />
+                <IntegrationCard ariaLabel="Atlassian integration icon">
+                  <Atlassian />
+                </IntegrationCard>
+                <IntegrationCard ariaLabel="GitHub integration icon">
+                  <GitHub />
+                </IntegrationCard>
+                <IntegrationCard ariaLabel="GitLab integration icon">
+                  <GitLab />
+                </IntegrationCard>
+                <IntegrationCard ariaLabel="Google Drive integration icon">
+                  <GoogleDrive />
+                </IntegrationCard>
+                <IntegrationCard ariaLabel="Slack integration icon">
+                  <Slack />
+                </IntegrationCard>
+                <IntegrationCard ariaLabel="Neon integration icon">
+                  <Neon />
+                </IntegrationCard>
+                <IntegrationCard ariaLabel="Stripe integration icon">
+                  <Stripe />
                 </IntegrationCard>
               </InfiniteSlider>
             </div>
