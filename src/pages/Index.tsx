@@ -8,6 +8,7 @@
  import CodeDemo from "@/components/CodeDemo";
  import CTA from "@/components/CTA";
  import StatsSection from "@/components/StatsSection";
+ import MCPServerSection from "@/components/MCPServerSection";
  import Footer from "@/components/Footer";
  import FAQSection from "@/components/FAQSection";
 
@@ -20,6 +21,7 @@ const Index = () => {
       <ProductivitySection />
       <FeatureShowcase />
       <StatsSection />
+      <MCPServerSection />
       <Features />
       <FAQSection />
       <Footer />
