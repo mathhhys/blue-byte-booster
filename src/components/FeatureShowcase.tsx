@@ -334,7 +334,7 @@ const EnhancedFeatureShowcase: React.FC<EnhancedFeatureShowcaseProps> = ({ child
 
   return (
     <section
-      className="w-full py-24 px-4 overflow-hidden endless-capabilities-section"
+      className="w-full py-16 px-4 overflow-hidden endless-capabilities-section"
       style={{ backgroundColor: '#0F1629' }}
       aria-labelledby="endless-capabilities-title"
     >
@@ -349,7 +349,7 @@ const EnhancedFeatureShowcase: React.FC<EnhancedFeatureShowcaseProps> = ({ child
           </p>
           <h2
             id="endless-capabilities-title"
-            className="text-4xl md:text-5xl lg:text-6xl font-bold text-white leading-tight"
+            className="text-base md:text-lg lg:text-xl font-bold text-white leading-tight"
           >
             The possibilities are literally endless
           </h2>

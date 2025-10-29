@@ -20,7 +20,7 @@ const StatsSection = () => {
   ];
 
   return (
-    <section className="stats-gradient-bg py-24 px-4 md:px-6 lg:px-8">
+    <section className="py-16 px-4 md:px-6 lg:px-8" style={{ backgroundColor: '#0F1629' }}>
       <div className="max-w-7xl mx-auto">
         {/* Stats Label */}
         <div className="flex items-center justify-center mb-12">
@@ -35,7 +35,7 @@ const StatsSection = () => {
 
         {/* Main Heading */}
         <div className="text-center mb-20">
-          <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white leading-tight">
+          <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white leading-tight">
             Trusted by Developers.
             <br />
             Proven in Enterprises.
@@ -48,18 +48,18 @@ const StatsSection = () => {
             <div key={index} className="text-center lg:text-left">
               {/* Large Number */}
               <div className="mb-4">
-                <span className="text-5xl md:text-6xl lg:text-7xl font-bold text-white">
+                <span className="text-4xl md:text-5xl lg:text-6xl font-bold text-white">
                   {stat.number}
                 </span>
               </div>
               
               {/* Title */}
-              <h3 className="text-lg md:text-xl font-semibold text-white mb-4">
+              <h3 className="text-base md:text-lg font-semibold text-white mb-4">
                 {stat.title}
               </h3>
               
               {/* Description */}
-              <p className="text-white/80 text-base md:text-lg leading-relaxed max-w-sm mx-auto lg:mx-0">
+              <p className="text-white/80 text-sm md:text-base leading-relaxed max-w-sm mx-auto lg:mx-0">
                 {stat.description}
               </p>
             </div>

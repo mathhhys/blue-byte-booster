@@ -17,7 +17,7 @@ const Hero = () => {
 
   return (
     <GradientBackground>
-      <section className="min-h-screen flex items-center justify-center pt-24 pb-24">
+      <section className="min-h-screen flex items-center justify-center pt-16 pb-16">
         <div className="container mx-auto px-6 flex items-center justify-center min-h-full mt-8">
           <div className="grid grid-cols-1 lg:grid-cols-[2fr_3fr] gap-8 lg:gap-20 items-center max-w-7xl mx-auto">
             {/* Left Column: Text Content */}
@@ -31,7 +31,7 @@ const Hero = () => {
             </div>
             
             {/* Main heading */}
-              <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold mb-8 leading-tight text-center lg:text-left">
+              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-8 leading-tight text-center lg:text-left">
               <span className="text-white">
                 Introducing
               </span>
@@ -42,7 +42,7 @@ const Hero = () => {
             </h1>
             
             {/* Description */}
-              <p className="text-xl md:text-2xl text-gray-300 mb-12 max-w-3xl mx-auto lg:mx-0 leading-relaxed">
+              <p className="text-lg md:text-xl text-gray-300 mb-12 max-w-3xl mx-auto lg:mx-0 leading-relaxed">
               Experience the next generation of windsurfing. Book sessions,
               learn from experts, and enjoy premium equipment at stunning
               locations.

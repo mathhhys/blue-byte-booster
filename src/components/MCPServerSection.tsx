@@ -20,13 +20,13 @@ import { InfiniteSlider } from "@/components/infinite-slider";
 export default function MCPServerSection() {
   return (
     <section className="mt-0">
-      <div className="py-20 md:py-24" style={{ backgroundColor: '#0E172A' }}>
+      <div className="py-16 md:py-20" style={{ backgroundColor: '#0F1629' }}>
         <div className="mx-auto max-w-7xl px-6">
           <div className="mx-auto mb-20 max-w-lg space-y-6 text-center">
-            <h2 className="text-balance text-4xl font-semibold md:text-5xl text-white">
+            <h2 className="text-balance text-3xl md:text-4xl lg:text-5xl font-bold text-white">
               Connect with Model Context Protocol servers and platforms
             </h2>
-            <p className="text-gray-300">
+            <p className="text-base md:text-lg text-gray-300">
               Seamlessly integrate MCP servers with popular platforms and tools to
               enhance your AI capabilities.
             </p>

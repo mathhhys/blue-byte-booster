@@ -11,7 +11,8 @@ const ProductivitySection = () => {
   return (
     <section
       id="productivity"
-      className="w-full bg-[#0E172A] py-24 px-4 md:px-0"
+      className="w-full py-16 px-4 md:px-0"
+      style={{ backgroundColor: '#0F1629' }}
       aria-labelledby="productivity-heading"
     >
       <div className="max-w-6xl mx-auto flex flex-col gap-14">
@@ -19,11 +20,11 @@ const ProductivitySection = () => {
         <div className="text-center mb-12">
           <h2
             id="productivity-heading"
-            className="text-4xl md:text-5xl font-bold text-white mb-4"
+            className="text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-4"
           >
             The AI-powered platform
           </h2>
-          <p className="text-xl md:text-2xl text-gray-300 max-w-3xl mx-auto">
+          <p className="text-lg md:text-xl text-gray-300 max-w-3xl mx-auto">
             Unlock powerful insights and automate complex processes effortlessly.
           </p>
         </div>
@@ -33,7 +34,7 @@ const ProductivitySection = () => {
           {/* Block 1: Adaptive Learning */}
           <EnhancedCard
             variant="secondary"
-            className="card-hover rounded-xl shadow-lg shadow-blue-500/10 border-blue-500/20 min-h-[400px]"
+            className="card-hover rounded-xl shadow-lg shadow-blue-500/10 border-blue-500/20 min-h-[320px]"
             aria-label="Adaptive Learning"
           >
             <EnhancedCardContent className="p-6 flex flex-col gap-6 items-center text-center md:text-left md:items-start">
@@ -49,8 +50,8 @@ const ProductivitySection = () => {
                 </div>
               </div>
               <div className="flex-1 space-y-3">
-                <h3 className="text-xl font-bold text-white">Adaptive Learning</h3>
-                <p className="text-gray-300 leading-relaxed text-sm">
+                <h3 className="text-lg md:text-xl font-bold text-white">Adaptive Learning</h3>
+                <p className="text-gray-300 leading-relaxed text-sm md:text-base">
                   Adaptive learning continuously improves performance and adapts to new patterns.
                 </p>
               </div>
@@ -60,7 +61,7 @@ const ProductivitySection = () => {
           {/* Block 2: Smart Automation */}
           <EnhancedCard
             variant="secondary"
-            className="card-hover rounded-xl shadow-lg shadow-blue-500/10 border-blue-500/20 min-h-[400px]"
+            className="card-hover rounded-xl shadow-lg shadow-blue-500/10 border-blue-500/20 min-h-[320px]"
             aria-label="Smart Automation"
           >
             <EnhancedCardContent className="p-6 flex flex-col gap-6 items-center text-center md:text-left md:items-start">
@@ -81,8 +82,8 @@ const ProductivitySection = () => {
                 </div>
               </div>
               <div className="flex-1 space-y-3">
-                <h3 className="text-xl font-bold text-white">Smart Automation</h3>
-                <p className="text-gray-300 leading-relaxed text-sm">
+                <h3 className="text-lg md:text-xl font-bold text-white">Smart Automation</h3>
+                <p className="text-gray-300 leading-relaxed text-sm md:text-base">
                   Empower automation-driven workflows to simplify operations, enhance productivity.
                 </p>
               </div>
@@ -92,7 +93,7 @@ const ProductivitySection = () => {
           {/* Block 3: Data Mapping & Predictive Analytics */}
           <EnhancedCard
             variant="secondary"
-            className="card-hover rounded-xl shadow-lg shadow-blue-500/10 border-blue-500/20 min-h-[400px]"
+            className="card-hover rounded-xl shadow-lg shadow-blue-500/10 border-blue-500/20 min-h-[320px]"
             aria-label="Data Mapping & Predictive Analytics"
           >
             <EnhancedCardContent className="p-6 flex flex-col gap-6 items-center text-center md:text-left md:items-start">
@@ -115,8 +116,8 @@ const ProductivitySection = () => {
                 </div>
               </div>
               <div className="flex-1 space-y-3">
-                <h3 className="text-xl font-bold text-white">Data Mapping & Predictive Analytics</h3>
-                <p className="text-gray-300 leading-relaxed text-sm">
+                <h3 className="text-lg md:text-xl font-bold text-white">Data Mapping & Predictive Analytics</h3>
+                <p className="text-gray-300 leading-relaxed text-sm md:text-base">
                   Data mapping visualizes complex data structures. Predictive analytics harness advanced models for future trends.
                 </p>
               </div>

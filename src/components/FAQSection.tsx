@@ -36,13 +36,13 @@ export default function FAQSection() {
   };
 
   return (
-    <section className="py-24 px-4 bg-slate-900">
+    <section className="py-16 px-4" style={{ backgroundColor: '#0F1629' }}>
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4 text-white">
+          <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold mb-4 text-white">
             Frequently Asked Questions
           </h2>
-          <p className="text-xl text-gray-300">
+          <p className="text-lg md:text-xl text-gray-300">
             Everything you need to know about SoftCodes pricing
           </p>
         </div>

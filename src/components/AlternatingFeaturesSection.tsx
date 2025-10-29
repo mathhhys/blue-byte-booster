@@ -1,15 +1,16 @@
 import { ArrowRight } from "lucide-react";
+import { Button } from "./ui/button";
 
 const AlternatingFeaturesSection = () => {
   return (
-    <section className="w-full bg-[#0E172A] py-24" aria-label="Key Features">
+    <section className="w-full py-16" style={{ backgroundColor: '#0F1629' }} aria-label="Key Features">
       <div className="container mx-auto px-6 max-w-7xl">
         
         {/* Row 1: Terminal Mockup (Left) | Text (Right) */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center mb-24">
           {/* Terminal Mockup Placeholder */}
           <div className="order-1">
-            <div className="bg-[#181f33] rounded-xl border border-blue-500/20 shadow-lg shadow-blue-500/10 min-h-[400px] transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/20 hover:scale-[1.02] overflow-hidden">
+            <div className="bg-[#181f33] rounded-xl border border-blue-500/20 shadow-lg shadow-blue-500/10 min-h-[320px] transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/20 hover:scale-[1.02] overflow-hidden">
               <img
                 src="/placeholder-terminal.svg"
                 alt="Agent terminal interface demo"
@@ -20,19 +21,18 @@ const AlternatingFeaturesSection = () => {
 
           {/* Text Content */}
           <div className="order-2 space-y-6">
-            <h2 className="text-3xl md:text-4xl font-bold text-white">
+            <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white">
               Agent turns ideas into code
             </h2>
-            <p className="text-lg md:text-xl text-gray-300 leading-relaxed max-w-xl">
+            <p className="text-base md:text-lg text-gray-300 leading-relaxed max-w-xl">
               A human-AI programmer, orders of magnitude more effective than any developer alone.
             </p>
-            <a 
-              href="#agent" 
-              className="inline-flex items-center gap-2 text-orange-400 font-semibold text-lg hover:text-orange-300 hover:underline transition-all duration-200 group"
-            >
-              Learn about Agent
-              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-            </a>
+            <Button asChild className="bg-blue-700 hover:bg-blue-600 text-white inline-flex items-center gap-2 font-semibold text-base md:text-lg">
+              <a href="#agent">
+                Try Agent Today
+                <ArrowRight className="w-5 h-5" />
+              </a>
+            </Button>
           </div>
         </div>
 
@@ -40,24 +40,23 @@ const AlternatingFeaturesSection = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center mb-24">
           {/* Text Content */}
           <div className="order-2 lg:order-1 space-y-6">
-            <h2 className="text-3xl md:text-4xl font-bold text-white">
+            <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white">
               Magically accurate autocomplete
             </h2>
-            <p className="text-lg md:text-xl text-gray-300 leading-relaxed max-w-xl">
+            <p className="text-base md:text-lg text-gray-300 leading-relaxed max-w-xl">
               Our custom Tab model predicts your next action with striking speed and precision.
             </p>
-            <a 
-              href="#tab" 
-              className="inline-flex items-center gap-2 text-orange-400 font-semibold text-lg hover:text-orange-300 hover:underline transition-all duration-200 group"
-            >
-              Learn about Tab
-              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-            </a>
+            <Button asChild className="bg-blue-700 hover:bg-blue-600 text-white inline-flex items-center gap-2 font-semibold text-base md:text-lg">
+              <a href="#tab">
+                Discover Tab Autocomplete
+                <ArrowRight className="w-5 h-5" />
+              </a>
+            </Button>
           </div>
 
           {/* Code Editor Mockup */}
           <div className="order-1 lg:order-2">
-            <div className="bg-[#181f33] rounded-xl border border-blue-500/20 shadow-lg shadow-blue-500/10 p-6 min-h-[400px] transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/20 hover:scale-[1.02]">
+            <div className="bg-[#181f33] rounded-xl border border-blue-500/20 shadow-lg shadow-blue-500/10 p-6 min-h-[320px] transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/20 hover:scale-[1.02]">
               {/* Editor Header */}
               <div className="flex items-center justify-between mb-4 pb-3 border-b border-white/10">
                 <div className="flex items-center gap-2">
@@ -153,7 +152,7 @@ const AlternatingFeaturesSection = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
           {/* Chat Interface Mockup Placeholder */}
           <div className="order-1">
-            <div className="bg-[#181f33] rounded-xl border border-blue-500/20 shadow-lg shadow-blue-500/10 min-h-[400px] transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/20 hover:scale-[1.02] overflow-hidden">
+            <div className="bg-[#181f33] rounded-xl border border-blue-500/20 shadow-lg shadow-blue-500/10 min-h-[320px] transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/20 hover:scale-[1.02] overflow-hidden">
               <img
                 src="/placeholder-chat.svg"
                 alt="Everywhere software gets built collaboration demo"
@@ -164,19 +163,18 @@ const AlternatingFeaturesSection = () => {
 
           {/* Text Content */}
           <div className="order-2 space-y-6">
-            <h2 className="text-3xl md:text-4xl font-bold text-white">
+            <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white">
               Everywhere software gets built
             </h2>
-            <p className="text-lg md:text-xl text-gray-300 leading-relaxed max-w-xl">
+            <p className="text-base md:text-lg text-gray-300 leading-relaxed max-w-xl">
               Cursor is in GitHub codebases of a teammate in Slack, and anywhere else you work.
             </p>
-            <a 
-              href="#ecosystem" 
-              className="inline-flex items-center gap-2 text-orange-400 font-semibold text-lg hover:text-orange-300 hover:underline transition-all duration-200 group"
-            >
-              Learn about Cursor's ecosystem
-              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-            </a>
+            <Button asChild className="bg-blue-700 hover:bg-blue-600 text-white inline-flex items-center gap-2 font-semibold text-base md:text-lg">
+              <a href="#ecosystem">
+                Explore Our Ecosystem
+                <ArrowRight className="w-5 h-5" />
+              </a>
+            </Button>
           </div>
         </div>
 

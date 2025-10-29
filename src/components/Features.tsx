@@ -12,21 +12,22 @@ const Features = () => {
     <>
       <section
         id="features"
-        className="w-full bg-[#101624] py-32 px-4 md:px-0"
+        className="w-full py-16 px-4 md:px-0"
+        style={{ backgroundColor: '#0F1629' }}
       >
         <div className="max-w-6xl mx-auto flex flex-col gap-20">
           {/* Top row: Heading, Subheading, Button */}
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-8 mb-16">
             <div>
-              <h2 className="text-5xl md:text-6xl font-bold text-white mb-4 mt-20">
+              <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-4 mt-16">
                 Build software faster
               </h2>
-              <p className="text-xl md:text-2xl text-gray-300">
+              <p className="text-lg md:text-xl text-gray-300">
                 Intelligent, fast, and familiar, Softcodes is the best way to code with AI.
               </p>
             </div>
             <Button
-              className="self-start md:self-center bg-primary hover:bg-primary/90 text-primary-foreground px-10 py-5 text-xl font-semibold rounded-lg transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-xl"
+              className="self-start md:self-center bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-3 text-base md:text-lg font-semibold rounded-lg transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-xl"
               size="lg"
             >
               See more features
@@ -51,10 +52,10 @@ const Features = () => {
                     style={{ filter: "drop-shadow(0 4px 16px rgba(0,0,0,0.10))" }}
                   />
                 </EnhancedCardIcon>
-                <EnhancedCardTitle variant="secondary">
+                <EnhancedCardTitle variant="secondary" className="text-lg md:text-xl">
                   Frontier Intelligence
                 </EnhancedCardTitle>
-                <EnhancedCardDescription variant="secondary">
+                <EnhancedCardDescription variant="secondary" className="text-sm md:text-base">
                   Powered by a mix of purpose-built and frontier models, Softcodes is smart and fast.
                 </EnhancedCardDescription>
               </EnhancedCardHeader>
@@ -76,10 +77,10 @@ const Features = () => {
                     style={{ filter: "drop-shadow(0 4px 16px rgba(0,0,0,0.10))" }}
                   />
                 </EnhancedCardIcon>
-                <EnhancedCardTitle variant="secondary">
+                <EnhancedCardTitle variant="secondary" className="text-lg md:text-xl">
                   Feels Familiar
                 </EnhancedCardTitle>
-                <EnhancedCardDescription variant="secondary">
+                <EnhancedCardDescription variant="secondary" className="text-sm md:text-base">
                   Import all your extensions, themes, and keybindings in one click.
                 </EnhancedCardDescription>
               </EnhancedCardHeader>
@@ -101,10 +102,10 @@ const Features = () => {
                     style={{ filter: "drop-shadow(0 4px 16px rgba(0,0,0,0.10))" }}
                   />
                 </EnhancedCardIcon>
-                <EnhancedCardTitle variant="secondary">
+                <EnhancedCardTitle variant="secondary" className="text-lg md:text-xl">
                   Privacy Options
                 </EnhancedCardTitle>
-                <EnhancedCardDescription variant="secondary">
+                <EnhancedCardDescription variant="secondary" className="text-sm md:text-base">
                   If you enable Privacy Mode, your code is never stored remotely without your consent. Softcodes is SOC 2 certified.
                 </EnhancedCardDescription>
               </EnhancedCardHeader>
@@ -147,7 +148,7 @@ const PROVIDER_LOGOS = [
 export const ModelProvidersSection = () => (
   <section className="w-full bg-white py-8 px-4">
     <div className="flex flex-col items-center w-full">
-      <h3 className="text-lg md:text-xl font-medium text-slate-900 text-center mb-8">
+      <h3 className="text-base md:text-lg font-medium text-slate-900 text-center mb-6">
         First-class support for every major model provider
       </h3>
       <div className="w-full flex flex-wrap justify-center items-center gap-12 md:gap-20 my-8 md:my-12">
@@ -161,7 +162,7 @@ export const ModelProvidersSection = () => (
           />
         ))}
       </div>
-      <p className="text-lg md:text-xl text-slate-900 text-center mt-8 font-medium">
+      <p className="text-base md:text-lg text-slate-900 text-center mt-6 font-medium">
         + 30 additional providers supported
       </p>
     </div>

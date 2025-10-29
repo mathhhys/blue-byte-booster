@@ -13,7 +13,7 @@ import { motion } from "framer-motion";
 
 export default function PricingSection() {
   return (
-    <section id="pricing" className="pt-4 md:pt-8 pb-16 md:pb-32" style={{ backgroundColor: '#0E172A' }}>
+    <section id="pricing" className="pt-4 md:pt-8 pb-16 md:pb-32" style={{ backgroundColor: '#0F1629' }}>
       <div className="mx-auto max-w-6xl px-6">
         <div className="mt-4 grid gap-6 md:mt-8 md:grid-cols-2 max-w-4xl mx-auto">
         <Card className="relative border-white/10 bg-white/5 backdrop-blur-sm">
@@ -28,7 +28,7 @@ export default function PricingSection() {
             <CardHeader>
               <CardTitle className="font-medium text-white">Pro</CardTitle>
               <span className="my-3 block text-2xl font-semibold text-white">
-                $19 / mo
+                $20 / mo
               </span>
               <CardDescription className="text-sm text-gray-400">Per user</CardDescription>
             </CardHeader>
@@ -56,8 +56,8 @@ export default function PricingSection() {
             </CardContent>
 
             <CardFooter>
-              <Button asChild className="w-full bg-white text-black hover:bg-gray-200">
-                <Link to="/pricing">Get Started</Link>
+              <Button asChild className="w-full bg-blue-700 hover:bg-blue-600 text-white">
+                <Link to="/pricing">Start 14-Day Free Trial</Link>
               </Button>
             </CardFooter>
           </div>
@@ -66,8 +66,7 @@ export default function PricingSection() {
         <Card className="flex flex-col border-white/10 bg-white/5 backdrop-blur-sm">
           <CardHeader>
             <CardTitle className="font-medium text-white">Teams</CardTitle>
-            <span className="my-3 block text-2xl font-semibold text-white">$49 / mo</span>
-            <CardDescription className="text-sm text-gray-400">Per user</CardDescription>
+            <CardDescription className="text-sm text-gray-400">Custom pricing for teams</CardDescription>
           </CardHeader>
 
           <CardContent className="space-y-4">
@@ -93,8 +92,8 @@ export default function PricingSection() {
           </CardContent>
 
           <CardFooter className="mt-auto">
-            <Button asChild variant="outline" className="w-full border-white/30 text-white hover:bg-white/10">
-              <Link to="/pricing">Get Started</Link>
+            <Button asChild className="w-full bg-blue-700 hover:bg-blue-600 text-white">
+              <a href="mailto:mathys@softcodes.io">Get Custom Pricing</a>
             </Button>
           </CardFooter>
         </Card>
