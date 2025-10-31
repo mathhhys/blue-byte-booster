@@ -10,12 +10,13 @@ const AlternatingFeaturesSection = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center mb-24">
           {/* Terminal Mockup Placeholder */}
           <div className="order-1">
-            <div className="bg-[#181f33] rounded-xl border border-blue-500/20 shadow-lg shadow-blue-500/10 min-h-[320px] transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/20 hover:scale-[1.02] overflow-hidden">
+            <div className="bg-[#181f33] rounded-xl border border-blue-500/20 shadow-lg shadow-blue-500/10 min-h-[250px] sm:min-h-[320px] transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/20 hover:scale-[1.02] overflow-hidden">
               <video
                 src="https://xraquejellmoyrpqcirs.supabase.co/storage/v1/object/public/softcodes-elements/agents.mp4"
                 autoPlay
                 loop
                 muted
+                playsInline
                 className="w-full h-full object-cover"
                 aria-label="Agent terminal interface demo"
               />
