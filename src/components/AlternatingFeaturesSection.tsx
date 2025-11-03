@@ -7,10 +7,10 @@ const AlternatingFeaturesSection = () => {
       <div className="container mx-auto px-6 max-w-7xl">
         
         {/* Row 1: Terminal Mockup (Left) | Text (Right) */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center mb-24">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-16 items-center mb-12 lg:mb-24">
           {/* Terminal Mockup Placeholder */}
           <div className="order-1">
-            <div className="bg-[#181f33] rounded-xl border border-blue-500/20 shadow-lg shadow-blue-500/10 min-h-[250px] sm:min-h-[320px] transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/20 hover:scale-[1.02] overflow-hidden">
+            <div className="bg-[#181f33] rounded-xl border border-blue-500/20 shadow-lg shadow-blue-500/10 aspect-video transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/20 hover:scale-[1.02] overflow-hidden">
               <video
                 src="https://xraquejellmoyrpqcirs.supabase.co/storage/v1/object/public/softcodes-elements/agents.mp4"
                 autoPlay
@@ -41,7 +41,7 @@ const AlternatingFeaturesSection = () => {
         </div>
 
         {/* Row 2: Text (Left) | Code Editor Mockup (Right) */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center mb-24">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-16 items-center mb-12 lg:mb-24">
           {/* Text Content */}
           <div className="order-2 lg:order-1 space-y-6">
             <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white">
@@ -60,7 +60,7 @@ const AlternatingFeaturesSection = () => {
 
           {/* Code Editor Mockup */}
           <div className="order-1 lg:order-2">
-            <div className="bg-[#181f33] rounded-xl border border-blue-500/20 shadow-lg shadow-blue-500/10 p-6 min-h-[320px] transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/20 hover:scale-[1.02]">
+            <div className="bg-[#181f33] rounded-xl border border-blue-500/20 shadow-lg shadow-blue-500/10 p-6 aspect-[4/3] transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/20 hover:scale-[1.02]">
               {/* Editor Header */}
               <div className="flex items-center justify-between mb-4 pb-3 border-b border-white/10">
                 <div className="flex items-center gap-2">
@@ -153,10 +153,10 @@ const AlternatingFeaturesSection = () => {
         </div>
 
         {/* Row 3: Chat Interface Mockup (Left) | Text (Right) */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-16 items-center">
           {/* Chat Interface Mockup Placeholder */}
           <div className="order-1">
-            <div className="bg-[#181f33] rounded-xl border border-blue-500/20 shadow-lg shadow-blue-500/10 min-h-[320px] transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/20 hover:scale-[1.02] overflow-hidden">
+            <div className="bg-[#181f33] rounded-xl border border-blue-500/20 shadow-lg shadow-blue-500/10 aspect-video transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/20 hover:scale-[1.02] overflow-hidden">
               <video
                 src="https://xraquejellmoyrpqcirs.supabase.co/storage/v1/object/public/softcodes-elements/Softcodes%20Modes.mp4"
                 autoPlay
