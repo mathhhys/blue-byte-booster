@@ -157,10 +157,14 @@ const AlternatingFeaturesSection = () => {
           {/* Chat Interface Mockup Placeholder */}
           <div className="order-1">
             <div className="bg-[#181f33] rounded-xl border border-blue-500/20 shadow-lg shadow-blue-500/10 min-h-[320px] transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/20 hover:scale-[1.02] overflow-hidden">
-              <img
-                src="/placeholder-chat.svg"
-                alt="Everywhere software gets built collaboration demo"
+              <video
+                src="https://xraquejellmoyrpqcirs.supabase.co/storage/v1/object/public/softcodes-elements/Softcodes%20Modes.mp4"
+                autoPlay
+                loop
+                muted
+                playsInline
                 className="w-full h-full object-cover"
+                aria-label="Everywhere software gets built collaboration demo"
               />
             </div>
           </div>
