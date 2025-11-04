@@ -131,37 +131,21 @@ const ProductivitySection = () => {
                 </p>
               </div>
               <div className="flex-1 min-w-0 w-full">
-                <div className="hidden md:block w-full h-64 bg-[#181f33] rounded-lg flex justify-center items-center p-4 relative overflow-hidden border border-blue-500/20">
-                  <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-transparent rounded-lg"></div>
-                  <div className="relative z-10 grid grid-cols-2 gap-2 w-full max-w-xs h-32 p-2">
-                    <div className="space-y-1">
-                      <div className="h-6 bg-blue-300/30 rounded w-full"></div>
-                      <div className="h-6 bg-blue-400/30 rounded w-3/4"></div>
-                      <div className="h-6 bg-blue-300/30 rounded w-full"></div>
-                    </div>
-                    <div className="flex items-end justify-end">
-                      <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center text-white text-xs font-medium">
-                        AI
-                      </div>
-                    </div>
-                  </div>
-                  <div className="absolute bottom-2 right-2 w-4 h-4 bg-blue-400 rounded-full"></div>
+                <div className="hidden md:block w-full h-72 bg-[#181f33] rounded-lg relative overflow-hidden border border-blue-500/20">
+                  <img
+                    src="https://xraquejellmoyrpqcirs.supabase.co/storage/v1/object/public/softcodes-elements/Softcodes%20Browser%20(1).png"
+                    alt="Data Mapping & Predictive Analytics demonstration image"
+                    className="w-full h-full object-contain rounded-lg"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-transparent rounded-lg pointer-events-none"></div>
                 </div>
-                <div className="md:hidden w-full h-48 bg-[#181f33] rounded-lg flex justify-center items-center p-4 relative overflow-hidden border border-blue-500/20">
-                  <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-transparent rounded-lg"></div>
-                  <div className="relative z-10 grid grid-cols-2 gap-2 w-full max-w-xs h-32 p-2">
-                    <div className="space-y-1">
-                      <div className="h-6 bg-blue-300/30 rounded w-full"></div>
-                      <div className="h-6 bg-blue-400/30 rounded w-3/4"></div>
-                      <div className="h-6 bg-blue-300/30 rounded w-full"></div>
-                    </div>
-                    <div className="flex items-end justify-end">
-                      <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center text-white text-xs font-medium">
-                        AI
-                      </div>
-                    </div>
-                  </div>
-                  <div className="absolute bottom-2 right-2 w-4 h-4 bg-blue-400 rounded-full"></div>
+                <div className="md:hidden w-full h-56 bg-[#181f33] rounded-lg relative overflow-hidden border border-blue-500/20">
+                  <img
+                    src="https://xraquejellmoyrpqcirs.supabase.co/storage/v1/object/public/softcodes-elements/Softcodes%20Browser%20(1).png"
+                    alt="Data Mapping & Predictive Analytics demonstration image"
+                    className="w-full h-full object-contain rounded-lg"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-transparent rounded-lg pointer-events-none"></div>
                 </div>
               </div>
             </EnhancedCardContent>
