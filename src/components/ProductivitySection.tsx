@@ -38,8 +38,14 @@ const ProductivitySection = () => {
             aria-label="Adaptive Learning"
           >
             <EnhancedCardContent className="p-6 flex flex-col gap-6 items-center text-center md:text-left md:items-start">
-              <div className="flex-1 min-w-0 w-full hidden md:block">
-                <div className="w-full h-64 bg-[#181f33] rounded-lg relative overflow-hidden border border-blue-500/20">
+              <div className="flex-1 space-y-3">
+                <h3 className="text-lg md:text-xl font-bold text-white">Adaptive Learning</h3>
+                <p className="text-gray-300 leading-relaxed text-sm md:text-base">
+                  Adaptive learning continuously improves performance and adapts to new patterns.
+                </p>
+              </div>
+              <div className="flex-1 min-w-0 w-full">
+                <div className="hidden md:block w-full h-64 bg-[#181f33] rounded-lg relative overflow-hidden border border-blue-500/20">
                   <video
                     autoPlay
                     loop
@@ -56,19 +62,13 @@ const ProductivitySection = () => {
                   </video>
                   <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-transparent rounded-lg pointer-events-none"></div>
                 </div>
-              </div>
-              <div className="flex-1 space-y-3">
-                <h3 className="text-lg md:text-xl font-bold text-white">Adaptive Learning</h3>
-                <p className="text-gray-300 leading-relaxed text-sm md:text-base">
-                  Adaptive learning continuously improves performance and adapts to new patterns.
-                </p>
                 <div className="md:hidden w-full h-48 bg-[#181f33] rounded-lg relative overflow-hidden border border-blue-500/20">
                   <video
                     autoPlay
                     loop
                     muted
                     playsInline
-                    className="w-full h-full object-contain rounded-lg"
+                    className="w-full h-full object-cover rounded-lg"
                     aria-label="Adaptive Learning demonstration video"
                   >
                     <source
@@ -90,40 +90,28 @@ const ProductivitySection = () => {
             aria-label="Smart Automation"
           >
             <EnhancedCardContent className="p-6 flex flex-col gap-6 items-center text-center md:text-left md:items-start">
-              <div className="flex-1 min-w-0 w-full hidden md:block">
-                <div className="w-full h-64 bg-[#181f33] rounded-lg flex flex-col justify-center items-start p-4 relative overflow-hidden border border-blue-500/20">
-                  <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-transparent rounded-lg"></div>
-                  <div className="relative z-10 space-y-2 text-blue-200 pl-2">
-                    <div className="flex items-center">
-                      <div className="w-3 h-3 bg-blue-400 rounded mr-2"></div>
-                      <span className="text-xs font-medium">Manage</span>
-                    </div>
-                    <div className="flex items-center">
-                      <div className="w-3 h-3 bg-blue-400 rounded mr-2"></div>
-                      <span className="text-xs font-medium">Generate</span>
-                    </div>
-                  </div>
-                  <div className="absolute bottom-2 left-2 w-16 h-1 bg-blue-400 rounded-full"></div>
-                </div>
-              </div>
               <div className="flex-1 space-y-3">
                 <h3 className="text-lg md:text-xl font-bold text-white">Smart Automation</h3>
                 <p className="text-gray-300 leading-relaxed text-sm md:text-base">
                   Empower automation-driven workflows to simplify operations, enhance productivity.
                 </p>
-                <div className="md:hidden w-full h-48 bg-[#181f33] rounded-lg flex flex-col justify-center items-start p-4 relative overflow-hidden border border-blue-500/20">
-                  <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-transparent rounded-lg"></div>
-                  <div className="relative z-10 space-y-2 text-blue-200 pl-2">
-                    <div className="flex items-center">
-                      <div className="w-3 h-3 bg-blue-400 rounded mr-2"></div>
-                      <span className="text-xs font-medium">Manage</span>
-                    </div>
-                    <div className="flex items-center">
-                      <div className="w-3 h-3 bg-blue-400 rounded mr-2"></div>
-                      <span className="text-xs font-medium">Generate</span>
-                    </div>
-                  </div>
-                  <div className="absolute bottom-2 left-2 w-16 h-1 bg-blue-400 rounded-full"></div>
+              </div>
+              <div className="flex-1 min-w-0 w-full">
+                <div className="hidden md:block w-full h-64 bg-[#181f33] rounded-lg relative overflow-hidden border border-blue-500/20">
+                  <img
+                    src="https://xraquejellmoyrpqcirs.supabase.co/storage/v1/object/public/softcodes-elements/Softcodes-models.png"
+                    alt="Smart Automation demonstration image"
+                    className="w-full h-full object-cover rounded-lg"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-transparent rounded-lg pointer-events-none"></div>
+                </div>
+                <div className="md:hidden w-full h-48 bg-[#181f33] rounded-lg relative overflow-hidden border border-blue-500/20">
+                  <img
+                    src="https://xraquejellmoyrpqcirs.supabase.co/storage/v1/object/public/softcodes-elements/Softcodes-models.png"
+                    alt="Smart Automation demonstration image"
+                    className="w-full h-full object-cover rounded-lg"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-transparent rounded-lg pointer-events-none"></div>
                 </div>
               </div>
             </EnhancedCardContent>
@@ -136,8 +124,14 @@ const ProductivitySection = () => {
             aria-label="Data Mapping & Predictive Analytics"
           >
             <EnhancedCardContent className="p-6 flex flex-col gap-6 items-center text-center md:text-left md:items-start">
-              <div className="flex-1 min-w-0 w-full hidden md:block">
-                <div className="w-full h-64 bg-[#181f33] rounded-lg flex justify-center items-center p-4 relative overflow-hidden border border-blue-500/20">
+              <div className="flex-1 space-y-3">
+                <h3 className="text-lg md:text-xl font-bold text-white">Data Mapping & Predictive Analytics</h3>
+                <p className="text-gray-300 leading-relaxed text-sm md:text-base">
+                  Data mapping visualizes complex data structures. Predictive analytics harness advanced models for future trends.
+                </p>
+              </div>
+              <div className="flex-1 min-w-0 w-full">
+                <div className="hidden md:block w-full h-64 bg-[#181f33] rounded-lg flex justify-center items-center p-4 relative overflow-hidden border border-blue-500/20">
                   <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-transparent rounded-lg"></div>
                   <div className="relative z-10 grid grid-cols-2 gap-2 w-full max-w-xs h-32 p-2">
                     <div className="space-y-1">
@@ -153,12 +147,6 @@ const ProductivitySection = () => {
                   </div>
                   <div className="absolute bottom-2 right-2 w-4 h-4 bg-blue-400 rounded-full"></div>
                 </div>
-              </div>
-              <div className="flex-1 space-y-3">
-                <h3 className="text-lg md:text-xl font-bold text-white">Data Mapping & Predictive Analytics</h3>
-                <p className="text-gray-300 leading-relaxed text-sm md:text-base">
-                  Data mapping visualizes complex data structures. Predictive analytics harness advanced models for future trends.
-                </p>
                 <div className="md:hidden w-full h-48 bg-[#181f33] rounded-lg flex justify-center items-center p-4 relative overflow-hidden border border-blue-500/20">
                   <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-transparent rounded-lg"></div>
                   <div className="relative z-10 grid grid-cols-2 gap-2 w-full max-w-xs h-32 p-2">
