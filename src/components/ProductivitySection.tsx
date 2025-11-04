@@ -108,8 +108,8 @@ const ProductivitySection = () => {
               <div className="w-full md:w-3/5">
                 <div className="w-full aspect-[4/3] bg-[#181f33] rounded-lg relative overflow-hidden border border-blue-500/20">
                   <img
-                    src="https://xraquejellmoyrpqcirs.supabase.co/storage/v1/object/public/softcodes-elements/Softcodes%20Browser%20(1).png"
-                    alt="Data Mapping & Predictive Analytics demonstration image"
+                    src="https://xraquejellmoyrpqcirs.supabase.co/storage/v1/object/public/softcodes-elements/Softcodes%20Browser.gif"
+                    alt="Data Mapping & Predictive Analytics demonstration GIF"
                     className="w-full h-full object-contain rounded-lg"
                   />
                   <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-transparent rounded-lg pointer-events-none"></div>

@@ -11,14 +11,10 @@ const AlternatingFeaturesSection = () => {
           {/* Terminal Mockup Placeholder */}
           <div className="order-1">
             <div className="bg-[#181f33] rounded-xl border border-blue-500/20 shadow-lg shadow-blue-500/10 aspect-video transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/20 hover:scale-[1.02] overflow-hidden">
-              <video
-                src="https://xraquejellmoyrpqcirs.supabase.co/storage/v1/object/public/softcodes-elements/agents.mp4"
-                autoPlay
-                loop
-                muted
-                playsInline
+              <img
+                src="https://xraquejellmoyrpqcirs.supabase.co/storage/v1/object/public/softcodes-elements/agent-2.png"
+                alt="Agent terminal interface demo"
                 className="w-full h-full object-cover"
-                aria-label="Agent terminal interface demo"
               />
             </div>
           </div>
@@ -157,14 +153,10 @@ const AlternatingFeaturesSection = () => {
           {/* Chat Interface Mockup Placeholder */}
           <div className="order-1">
             <div className="bg-[#181f33] rounded-xl border border-blue-500/20 shadow-lg shadow-blue-500/10 aspect-video transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/20 hover:scale-[1.02] overflow-hidden">
-              <video
-                src="https://xraquejellmoyrpqcirs.supabase.co/storage/v1/object/public/softcodes-elements/Softcodes%20Modes.mp4"
-                autoPlay
-                loop
-                muted
-                playsInline
+              <img
+                src="https://xraquejellmoyrpqcirs.supabase.co/storage/v1/object/public/softcodes-elements/Softcodes%20Modes.png"
+                alt="Everywhere software gets built collaboration demo"
                 className="w-full h-full object-cover"
-                aria-label="Everywhere software gets built collaboration demo"
               />
             </div>
           </div>
