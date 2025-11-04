@@ -59,7 +59,7 @@ const LinterIntegrationCard: React.FC = () => {
           decoding="async"
           data-nimg="1"
           className="-mb-3 h-auto w-full pl-5"
-          src="/linter-integration.png"
+          src="https://xraquejellmoyrpqcirs.supabase.co/storage/v1/object/public/softcodes-elements/Lint%20error%20(1).png"
           style={{ color: 'transparent' }}
         />
       </EnhancedCardDemo>

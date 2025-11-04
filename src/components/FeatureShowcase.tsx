@@ -52,8 +52,8 @@ const baseFeatures: FeatureData[] = [
         width="666"
         height="496"
         decoding="async"
-        className="-mb-3 h-auto w-full pl-5"
-        src="/linter-integration.png"
+        className="w-full h-full object-cover object-center"
+        src="https://xraquejellmoyrpqcirs.supabase.co/storage/v1/object/public/softcodes-elements/Lint%20error%20(1).png"
         style={{ color: 'transparent' }}
       />
     )
@@ -325,7 +325,7 @@ const EnhancedFeatureShowcase: React.FC<EnhancedFeatureShowcaseProps> = ({ child
             {feature.description}
           </EnhancedCardDescription>
         </EnhancedCardHeader>
-        <EnhancedCardDemo className="flex flex-col justify-end">
+        <EnhancedCardDemo className={feature.id === 'linter-integration' ? "rounded-b-lg h-[250px] -mx-6 -mb-6 mt-auto overflow-hidden bg-transparent" : "flex flex-col justify-end"}>
           {feature.codeDemo}
         </EnhancedCardDemo>
       </EnhancedCard>
