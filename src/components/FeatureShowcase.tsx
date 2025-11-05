@@ -1,10 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  AlertTriangle,
   Layers3,
   ArrowRight,
   Sparkles,
-  Edit3,
   ChevronLeft,
   ChevronRight,
   Blend,
@@ -41,91 +39,73 @@ interface EnhancedFeatureShowcaseProps {
  
 const baseFeatures: FeatureData[] = [
   {
-    id: 'linter-integration',
-    icon: AlertTriangle,
-    title: 'Loops on Errors',
-    description: 'If Softcodes produces code that fails a linter check, it will automatically correct the issues',
-    codeDemo: (
-      <img
-        alt="Linter integration preview"
-        loading="lazy"
-        width="666"
-        height="496"
-        decoding="async"
-        className="w-full h-full object-cover object-center"
-        src="https://xraquejellmoyrpqcirs.supabase.co/storage/v1/object/public/softcodes-elements/Lint%20error%20(1).png"
-        style={{ color: 'transparent' }}
-      />
-    )
-  },
-  {
     id: 'mcp-protocol',
     icon: Layers3,
-    title: 'Model Context Protocol (MCP)',
+    title: 'Checkpoints',
     description: 'Supercharge your AI workflows by seamlessly integrating with tailored tools and services',
     codeDemo: (
       <img
-        alt="MCP protocol preview"
+        alt="Checkpoints preview"
         loading="lazy"
         width="666"
         height="496"
         decoding="async"
         className="-mb-3 h-auto w-full pl-5"
-        src="/linter-integration.png"
+        src="https://xraquejellmoyrpqcirs.supabase.co/storage/v1/object/public/softcodes-elements/checkpoint.png"
         style={{ color: 'transparent' }}
       />
     )
   },
-  {
+    {
     id: 'mode-switching',
     icon: Blend,
-    title: 'Mode Switching',
+    title: 'Rules & Memory',
     description: 'Switch between modes like Architect, Code, or Debug to get the right tool for the job.',
     codeDemo: (
       <img
-        alt="Mode switching preview"
+        alt="Rules & Memory preview"
         loading="lazy"
         width="666"
         height="496"
         decoding="async"
         className="-mb-3 h-auto w-full pl-5"
-        src="/linter-integration.png"
+        src="https://xraquejellmoyrpqcirs.supabase.co/storage/v1/object/public/softcodes-elements/rules-memory%20(2).png"
         style={{ color: 'transparent' }}
       />
     )
   },
   {
-    id: 'supercomplete',
+    id: 'local-mode',
+    icon: SquareLibrary,
+    title: 'Local Mode',
+    description: 'Run AI models locally for enhanced privacy, offline access, and faster performance.',
+    codeDemo: (
+      <img
+        alt="Local Mode preview"
+        loading="lazy"
+        width="666"
+        height="496"
+        decoding="async"
+        className="-mb-3 h-auto w-full pl-5"
+        src="https://xraquejellmoyrpqcirs.supabase.co/storage/v1/object/public/softcodes-elements/localmode.png"
+        style={{ color: 'transparent' }}
+      />
+    )
+  },
+  {
+    id: 'Large Context',
     icon: Sparkles,
-    title: 'Supercomplete',
+    title: 'Deep Codebase Knowledge',
     description: 'Anticipates your next action and offers full-featured suggestions beyond plain snippets.',
     codeDemo: (
       <img
-        alt="Supercomplete preview"
+        alt="Deep Codebase Knowledge preview"
         loading="lazy"
         width="666"
         height="496"
         decoding="async"
         className="-mb-3 h-auto w-full pl-5"
-        src="/linter-integration.png"
-        style={{ color: 'transparent' }}
-      />
-    )
-  },
-  {
-    id: 'in-line-edit',
-    icon: Edit3,
-    title: 'In-line Edit',
-    description: 'Precise inline editing capabilities for seamless code modifications inside your editor.',
-    codeDemo: (
-      <img
-        alt="Inline edit preview"
-        loading="lazy"
-        width="666"
-        height="496"
-        decoding="async"
-        className="-mb-3 h-auto w-full pl-5"
-        src="/linter-integration.png"
+        src="https://xraquejellmoyrpqcirs.supabase.co/storage/v1/object/public/softcodes-elements/context.png"
         style={{ color: 'transparent' }}
       />
     )
@@ -133,80 +113,44 @@ const baseFeatures: FeatureData[] = [
   {
     id: 'multi-file-edits',
     icon: GalleryVerticalEnd,
-    title: 'Multi-file Edits',
+    title: 'Model Settings',
     description: 'Context-aware completions that respect your project, dependencies, and coding style.',
     codeDemo: (
       <img
-        alt="Intelligent completions preview"
+        alt="Model Settings preview"
         loading="lazy"
         width="666"
         height="496"
         decoding="async"
         className="-mb-3 h-auto w-full pl-5"
-        src="/linter-integration.png"
+        src="https://xraquejellmoyrpqcirs.supabase.co/storage/v1/object/public/softcodes-elements/modelsettings.png"
         style={{ color: 'transparent' }}
       />
     )
   },
   {
-    id: 'contextual-search',
-    icon: SquareLibrary,
-    title: 'Deep Codebase Knowledge',
-    description: 'Search across your codebase and docs with semantic understanding, returning precise results.',
+    id: 'mode-switching',
+    icon: Blend,
+    title: 'Inline Commands',
+    description: 'Switch between modes like Architect, Code, or Debug to get the right tool for the job.',
     codeDemo: (
       <img
-        alt="Contextual search preview"
+        alt="Inline Commands preview"
         loading="lazy"
         width="666"
         height="496"
         decoding="async"
         className="-mb-3 h-auto w-full pl-5"
-        src="/linter-integration.png"
+        src="https://xraquejellmoyrpqcirs.supabase.co/storage/v1/object/public/softcodes-elements/inlinecommands%20(1).png"
         style={{ color: 'transparent' }}
       />
     )
   },
-  {
-    id: 'terminal-command',
-    icon: SquareTerminal,
-    title: 'Runs Command in the Terminal',
-    description: 'Share suggestions, comments, and AI sessions with teammates for faster reviews and onboarding.',
-    codeDemo: (
-      <img
-        alt="Team collaboration preview"
-        loading="lazy"
-        width="666"
-        height="496"
-        decoding="async"
-        className="-mb-3 h-auto w-full pl-5"
-        src="/linter-integration.png"
-        style={{ color: 'transparent' }}
-      />
-    )
-  },
-  {
-    id: 'security-compliance',
-    icon: Sparkles,
-    title: 'Security & Compliance',
-    description: 'Enterprise-grade security, audit logs, and controls to keep your code and data safe.',
-    codeDemo: (
-      <img
-        alt="Security and compliance preview"
-        loading="lazy"
-        width="666"
-        height="496"
-        decoding="async"
-        className="-mb-3 h-auto w-full pl-5"
-        src="/linter-integration.png"
-        style={{ color: 'transparent' }}
-      />
-    )
-  }
 ];
 
 const enhancedFeatures: FeatureData[] = baseFeatures;
 
-const EnhancedFeatureShowcase: React.FC<EnhancedFeatureShowcaseProps> = ({ children, cardCount = 9 }) => {
+const EnhancedFeatureShowcase: React.FC<EnhancedFeatureShowcaseProps> = ({ children, cardCount = 6 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [visibleCards, setVisibleCards] = useState(5);
 
@@ -325,7 +269,7 @@ const EnhancedFeatureShowcase: React.FC<EnhancedFeatureShowcaseProps> = ({ child
             {feature.description}
           </EnhancedCardDescription>
         </EnhancedCardHeader>
-        <EnhancedCardDemo className={feature.id === 'linter-integration' ? "rounded-b-lg h-[250px] -mx-6 -mb-6 mt-auto overflow-hidden bg-transparent" : "flex flex-col justify-end"}>
+        <EnhancedCardDemo className="flex flex-col justify-end">
           {feature.codeDemo}
         </EnhancedCardDemo>
       </EnhancedCard>
