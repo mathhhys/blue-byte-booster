@@ -20,12 +20,12 @@ const ProductivitySection = () => {
         <div className="text-center mb-6">
           <h2
             id="productivity-heading"
-            className="text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-4"
+            className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-4"
           >
-            The AI-powered platform
+            A Smarter Way to Build Software
           </h2>
-          <p className="text-lg md:text-xl text-gray-300 max-w-3xl mx-auto">
-            Unlock powerful insights and automate complex processes effortlessly.
+          <p className="text-xl md:text-2xl text-gray-300 max-w-3xl mx-auto">
+            Experience a smarter, faster, and more intuitive way to code.
           </p>
         </div>
 
@@ -39,9 +39,9 @@ const ProductivitySection = () => {
           >
             <EnhancedCardContent className="p-4 md:p-5 flex flex-col md:flex-row gap-4 md:gap-5 items-center">
               <div className="w-full md:w-2/5 space-y-1.5">
-                <h3 className="text-base md:text-lg font-bold text-white">Adaptive Learning</h3>
-                <p className="text-gray-300 leading-relaxed text-xs md:text-sm">
-                  Adaptive learning continuously improves performance and adapts to new patterns.
+                <h3 className="text-lg md:text-xl font-bold text-white">Deep Codebase Understanding</h3>
+                <p className="text-gray-300 leading-relaxed text-sm md:text-base">
+                  Get answers and insights from your entire codebase. Our AI digs deep so you don't have to.
                 </p>
               </div>
               <div className="w-full md:w-3/5">
@@ -74,9 +74,9 @@ const ProductivitySection = () => {
           >
             <EnhancedCardContent className="p-4 md:p-5 flex flex-col md:flex-row gap-4 md:gap-5 items-center">
               <div className="w-full md:w-2/5 space-y-1.5">
-                <h3 className="text-base md:text-lg font-bold text-white">Smart Automation</h3>
-                <p className="text-gray-300 leading-relaxed text-xs md:text-sm">
-                  Empower automation-driven workflows to simplify operations, enhance productivity.
+                <h3 className="text-lg md:text-xl font-bold text-white">Flexible AI Model Selection</h3>
+                <p className="text-gray-300 leading-relaxed text-sm md:text-base">
+                  Choose the best AI model for the job. We support a variety of models, including free-to-use options.
                 </p>
               </div>
               <div className="w-full md:w-3/5">
@@ -100,9 +100,9 @@ const ProductivitySection = () => {
           >
             <EnhancedCardContent className="p-4 md:p-5 flex flex-col md:flex-row gap-4 md:gap-5 items-center">
               <div className="w-full md:w-2/5 space-y-1.5">
-                <h3 className="text-base md:text-lg font-bold text-white">Data Mapping & Predictive Analytics</h3>
-                <p className="text-gray-300 leading-relaxed text-xs md:text-sm">
-                  Data mapping visualizes complex data structures. Predictive analytics harness advanced models for future trends.
+                <h3 className="text-lg md:text-xl font-bold text-white">Integrated Browser Access</h3>
+                <p className="text-gray-300 leading-relaxed text-sm md:text-base">
+                  Seamlessly interact with web-based tools and documentation right from your coding environment.
                 </p>
               </div>
               <div className="w-full md:w-3/5">
