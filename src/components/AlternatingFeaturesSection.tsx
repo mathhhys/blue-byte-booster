@@ -22,14 +22,16 @@ const AlternatingFeaturesSection = () => {
           {/* Text Content */}
           <div className="order-2 space-y-6">
             <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white">
-              Agent turns ideas into code
+              Your intelligent coding partner
             </h2>
             <p className="text-base md:text-lg text-gray-300 leading-relaxed max-w-xl">
-              A human-AI programmer, orders of magnitude more effective than any developer alone.
+              Softcodes understands your intent and transforms it into production-ready code.
+              From complex algorithms to entire features, watch your ideas come to life with
+              context-aware intelligence that learns your coding style.
             </p>
             <Button asChild className="bg-blue-700 hover:bg-blue-600 text-white inline-flex items-center gap-2 font-semibold text-base md:text-lg">
               <a href="#agent">
-                Try Agent Today
+                Experience Agent
                 <ArrowRight className="w-5 h-5" />
               </a>
             </Button>
@@ -41,14 +43,14 @@ const AlternatingFeaturesSection = () => {
           {/* Text Content */}
           <div className="order-2 lg:order-1 space-y-6">
             <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white">
-              Magically accurate autocomplete
+              Intelligent code completion
             </h2>
             <p className="text-base md:text-lg text-gray-300 leading-relaxed max-w-xl">
-              Our custom Tab model predicts your next action with striking speed and precision.
+              Experience AI-powered autocomplete that understands your codebase context and suggests complete functions, algorithms, and solutions matching your coding patterns and requirements.
             </p>
             <Button asChild className="bg-blue-700 hover:bg-blue-600 text-white inline-flex items-center gap-2 font-semibold text-base md:text-lg">
               <a href="#tab">
-                Discover Tab Autocomplete
+                Try Smart Completion
                 <ArrowRight className="w-5 h-5" />
               </a>
             </Button>
@@ -162,16 +164,16 @@ const AlternatingFeaturesSection = () => {
           </div>
 
           {/* Text Content */}
-          <div className="order-2 space-y-6">
+          <div className="order-2 space-y-4">
             <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white">
-              Everywhere software gets built
+              Five specialized AI modes
             </h2>
             <p className="text-base md:text-lg text-gray-300 leading-relaxed max-w-xl">
-              Cursor is in GitHub codebases of a teammate in Slack, and anywhere else you work.
+              Supercharge your development workflow with five specialized AI agents that handle everything from architecture planning to complex debugging, giving you superhuman coding capabilities.
             </p>
             <Button asChild className="bg-blue-700 hover:bg-blue-600 text-white inline-flex items-center gap-2 font-semibold text-base md:text-lg">
-              <a href="#ecosystem">
-                Explore Our Ecosystem
+              <a href="#agent-modes">
+                Explore All Modes
                 <ArrowRight className="w-5 h-5" />
               </a>
             </Button>

@@ -42,7 +42,7 @@ const baseFeatures: FeatureData[] = [
     id: 'mcp-protocol',
     icon: Layers3,
     title: 'Checkpoints',
-    description: 'Supercharge your AI workflows by seamlessly integrating with tailored tools and services',
+    description: 'Save and restore your development progress instantly. Never lose your momentum with intelligent code state management that remembers exactly where you left off.',
     codeDemo: (
       <img
         alt="Checkpoints preview"
@@ -56,11 +56,11 @@ const baseFeatures: FeatureData[] = [
       />
     )
   },
-    {
+  {
     id: 'mode-switching',
     icon: Blend,
     title: 'Rules & Memory',
-    description: 'Switch between modes like Architect, Code, or Debug to get the right tool for the job.',
+    description: 'Adapt to your coding style and project conventions. Softcodes learns your preferences and applies them across every interaction for truly personalized assistance.',
     codeDemo: (
       <img
         alt="Rules & Memory preview"
@@ -78,7 +78,7 @@ const baseFeatures: FeatureData[] = [
     id: 'local-mode',
     icon: SquareLibrary,
     title: 'Local Mode',
-    description: 'Run AI models locally for enhanced privacy, offline access, and faster performance.',
+    description: 'Keep your code completely private while enjoying lightning-fast AI assistance. Process everything locally for maximum security without sacrificing performance.',
     codeDemo: (
       <img
         alt="Local Mode preview"
@@ -96,7 +96,7 @@ const baseFeatures: FeatureData[] = [
     id: 'Large Context',
     icon: Sparkles,
     title: 'Deep Codebase Knowledge',
-    description: 'Anticipates your next action and offers full-featured suggestions beyond plain snippets.',
+    description: 'Understand your entire project context, not just the current file. Get suggestions that consider your architecture, dependencies, and business logic for truly intelligent coding.',
     codeDemo: (
       <img
         alt="Deep Codebase Knowledge preview"
@@ -114,7 +114,7 @@ const baseFeatures: FeatureData[] = [
     id: 'multi-file-edits',
     icon: GalleryVerticalEnd,
     title: 'Model Settings',
-    description: 'Context-aware completions that respect your project, dependencies, and coding style.',
+    description: 'Fine-tune your AI copilot to match your project\'s unique requirements. Customize model behavior, response style, and technical preferences for optimal collaboration.',
     codeDemo: (
       <img
         alt="Model Settings preview"
@@ -129,10 +129,10 @@ const baseFeatures: FeatureData[] = [
     )
   },
   {
-    id: 'mode-switching',
-    icon: Blend,
+    id: 'inline-commands',
+    icon: SquareTerminal,
     title: 'Inline Commands',
-    description: 'Switch between modes like Architect, Code, or Debug to get the right tool for the job.',
+    description: 'Execute complex development tasks with simple text commands. From refactoring entire modules to generating test suites, just describe what you need and watch it happen.',
     codeDemo: (
       <img
         alt="Inline Commands preview"

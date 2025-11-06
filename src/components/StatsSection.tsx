@@ -45,7 +45,7 @@ const StatsSection = () => {
         {/* Statistics Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12 lg:gap-16">
           {stats.map((stat, index) => (
-            <div key={index} className="text-center lg:text-left">
+            <div key={index} className="text-center">
               {/* Large Number */}
               <div className="mb-4">
                 <span className="text-4xl md:text-5xl lg:text-6xl font-bold text-white">
@@ -59,7 +59,7 @@ const StatsSection = () => {
               </h3>
               
               {/* Description */}
-              <p className="text-white/80 text-sm md:text-base leading-relaxed max-w-sm mx-auto lg:mx-0">
+              <p className="text-white/80 text-sm md:text-base leading-relaxed max-w-sm mx-auto">
                 {stat.description}
               </p>
             </div>

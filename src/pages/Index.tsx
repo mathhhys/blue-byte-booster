@@ -19,10 +19,10 @@ const Index = () => {
       <Navigation />
       <Hero />
       <AlternatingFeaturesSection />
-      <ProductivitySection />
-      <StatsSection />
       <FeatureShowcase />
+      <ProductivitySection />
       <MCPServerSection />
+      <StatsSection />
       <section className="pt-4 px-4" style={{ backgroundColor: '#0F1629' }}>
         <div className="max-w-6xl mx-auto text-center">
           <div className="inline-block mb-6">

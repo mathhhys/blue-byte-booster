@@ -33,19 +33,14 @@ const Hero = () => {
             {/* Main heading */}
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-8 leading-tight text-center lg:text-left">
               <span className="text-white">
-                Introducing
+                Where developers ship faster than ever.
               </span>
               <br />
-              <span className="text-white mt-0">
-                Softcodes
-              </span>
             </h1>
             
             {/* Description */}
               <p className="text-lg md:text-xl text-gray-300 mb-12 max-w-3xl mx-auto lg:mx-0 leading-relaxed">
-              Experience the next generation of windsurfing. Book sessions,
-              learn from experts, and enjoy premium equipment at stunning
-              locations.
+              Built to turn your thoughts into production-ready code, Softcodes is the best way to code with confidence.
             </p>
             
             {/* CTA Buttons */}
