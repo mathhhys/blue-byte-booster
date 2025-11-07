@@ -36,9 +36,9 @@ const StatsSection = () => {
         {/* Main Heading */}
         <div className="text-center mb-20">
           <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white leading-tight">
-            Trusted by Developers.
+            Ship twice as fast.
             <br />
-            Proven in Enterprises.
+            Love every minute of it.
           </h2>
         </div>
 
