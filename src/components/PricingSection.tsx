@@ -57,7 +57,7 @@ export default function PricingSection() {
 
             <CardFooter>
               <Button asChild className="w-full bg-blue-700 hover:bg-blue-600 text-white">
-                <Link to="/pricing">Start 14-Day Free Trial</Link>
+                <Link to="/sign-up?plan=pro&billing=monthly&currency=EUR">Start 14-Day Free Trial</Link>
               </Button>
             </CardFooter>
           </div>
