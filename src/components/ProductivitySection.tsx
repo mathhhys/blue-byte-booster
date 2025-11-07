@@ -76,7 +76,7 @@ const ProductivitySection = () => {
               <div className="w-full md:w-2/5 space-y-1.5">
                 <h3 className="text-lg md:text-xl font-bold text-white">Flexible AI Model Selection</h3>
                 <p className="text-gray-300 leading-relaxed text-sm md:text-base">
-                  Choose the best AI model for the job. We support a variety of models, including free-to-use options.
+                  Choose the best AI model for the job. We support a variety of models, including <strong>free-to-use options</strong>.
                 </p>
               </div>
               <div className="w-full md:w-3/5">

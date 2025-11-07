@@ -10,7 +10,7 @@ const AlternatingFeaturesSection = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-16 items-center mb-12 lg:mb-24">
           {/* Terminal Mockup Placeholder */}
           <div className="order-1">
-            <div className="bg-[#181f33] rounded-xl border border-blue-500/20 shadow-lg shadow-blue-500/10 aspect-video transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/20 hover:scale-[1.02] overflow-hidden">
+            <div className="bg-[#181f33] rounded-xl border border-blue-500/20 shadow-lg shadow-blue-500/10 aspect-video transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/20 transform hover:scale-105 overflow-hidden">
               <img
                 src="https://xraquejellmoyrpqcirs.supabase.co/storage/v1/object/public/softcodes-elements/agent-2.png"
                 alt="Agent terminal interface demo"
@@ -58,7 +58,7 @@ const AlternatingFeaturesSection = () => {
 
           {/* Code Editor Mockup */}
           <div className="order-1 lg:order-2">
-            <div className="bg-[#181f33] rounded-xl border border-blue-500/20 shadow-lg shadow-blue-500/10 p-6 aspect-[4/3] transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/20 hover:scale-[1.02]">
+            <div className="bg-[#181f33] rounded-xl border border-blue-500/20 shadow-lg shadow-blue-500/10 p-6 aspect-[4/3] transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/20 transform hover:scale-105">
               {/* Editor Header */}
               <div className="flex items-center justify-between mb-4 pb-3 border-b border-white/10">
                 <div className="flex items-center gap-2">
@@ -154,7 +154,7 @@ const AlternatingFeaturesSection = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-16 items-center">
           {/* Chat Interface Mockup Placeholder */}
           <div className="order-1">
-            <div className="bg-[#181f33] rounded-xl border border-blue-500/20 shadow-lg shadow-blue-500/10 aspect-video transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/20 hover:scale-[1.02] overflow-hidden">
+            <div className="bg-[#181f33] rounded-xl border border-blue-500/20 shadow-lg shadow-blue-500/10 aspect-video transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/20 transform hover:scale-105 overflow-hidden">
               <img
                 src="https://xraquejellmoyrpqcirs.supabase.co/storage/v1/object/public/softcodes-elements/Softcodes%20Modes.png"
                 alt="Everywhere software gets built collaboration demo"

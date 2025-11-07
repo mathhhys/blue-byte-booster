@@ -1,21 +1,21 @@
 import React from 'react';
 
 const StatsSection = () => {
-  const stats = [
+    const stats = [
     {
-      number: "1M+",
-      title: "Number of users",
-      description: "Trusted by over a million innovators, creators, and teams worldwide"
+      number: "28%",
+      title: "Faster Coding Speed",
+      description: "Ship features faster than ever. Our coding copilot eliminates bottlenecks and keeps you in the zone, delivering real productivity gains you'll feel from day one."
     },
     {
-      number: "4,000+",
-      title: "Enterprise customers", 
-      description: "Trusted by startups, agencies, and enterprises worldwide."
+      number: "55.8%",
+      title: "Faster Task Completion",
+      description: "Cut development time in half and spend less time on repetitive work, more time building what matters."
     },
     {
-      number: "94%",
-      title: "Percent of code written by AI",
-      description: "Our AI removes the vast amounts of time spent of boilerplate and menial tasks so that you can focus on the fun and creative parts of building."
+      number: "95%",
+      title: "Developer Satisfaction",
+      description: "Developers don't just use Softcodes, they love it. Join the ones who've transformed their workflow and never looked back."
     }
   ];
 
