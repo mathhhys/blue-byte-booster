@@ -3,7 +3,6 @@
  import AlternatingFeaturesSection from "@/components/AlternatingFeaturesSection";
  import ProductivitySection from "@/components/ProductivitySection";
  import TabSection from "@/components/TabSection";
- import Features from "@/components/Features";
  import FeatureShowcase from "@/components/FeatureShowcase";
  import CodeDemo from "@/components/CodeDemo";
  import CTA from "@/components/CTA";
@@ -42,7 +41,6 @@ const Index = () => {
           <PricingSection />
         </div>
       </section>
-      <Features />
       <FAQSection />
       <Footer />
     </div>
