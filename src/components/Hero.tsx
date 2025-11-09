@@ -106,18 +106,18 @@ const Hero = () => {
 
             {/* Right Column: Demo Video */}
             <div className="flex justify-center lg:justify-end">
-              <div className="w-full rounded-xl overflow-hidden shadow-2xl border border-white/10">
+              <div className="w-full rounded-2xl overflow-hidden shadow-2xl shadow-black/40 border border-white/20 backdrop-blur-sm bg-black/10">
                 <video
                   autoPlay
                   loop
                   muted
                   playsInline
                   preload="metadata"
-                  className="w-full aspect-[1138/720] object-contain bg-slate-700/50"
+                  className="w-full aspect-video object-contain"
                   aria-label="Hero demo video"
                 >
                   <source
-                    src="https://xraquejellmoyrpqcirs.supabase.co/storage/v1/object/public/softcodes%20demos/SoftcodesHero2.mp4"
+                    src="https://xraquejellmoyrpqcirs.supabase.co/storage/v1/object/public/softcodes-logo/SoftcodesHero_1.mp4"
                     type="video/mp4"
                   />
                   {/* Fallback for unsupported browsers */}
