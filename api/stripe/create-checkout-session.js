@@ -218,6 +218,7 @@ export default async function handler(req, res) {
           seats: seats.toString(),
           currency: currency || 'USD',
         },
+        ...(planType === 'pro' && { trial_period_days: 7 }),
       },
     };
     

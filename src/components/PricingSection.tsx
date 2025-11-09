@@ -9,15 +9,78 @@ import {
   CardTitle,
 } from "./ui/card";
 import { Check } from "lucide-react";
-import { motion } from "framer-motion";
+import { useAuth, useUser } from '@clerk/clerk-react';
+import { createMultiCurrencyCheckoutSession, prepareMultiCurrencyCheckoutData } from '@/utils/stripe/checkout';
+import { CurrencyCode } from '@/types/database';
 
 export default function PricingSection() {
+  const { getToken } = useAuth();
+  const { user, isSignedIn } = useUser();
+
+  const handleProCheckout = async () => {
+    if (!isSignedIn) {
+      window.location.href = '/sign-up?plan=pro&billing=monthly&currency=EUR';
+      return;
+    }
+
+    if (!user?.id) {
+      console.error('User not available');
+      return;
+    }
+
+    try {
+      // Initialize user if needed
+      const token = await getToken();
+      await fetch('/api/user/initialize', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          planType: 'pro'
+        }),
+      });
+
+      const checkoutData = prepareMultiCurrencyCheckoutData(
+        'pro',
+        'monthly',
+        'EUR' as CurrencyCode,
+        user.id,
+        1
+      );
+
+      const result = await createMultiCurrencyCheckoutSession(checkoutData);
+      if (result.success) {
+        const typedResult = result as { success: boolean; url?: string; sessionId?: string };
+        if (typedResult.url) {
+          window.location.href = typedResult.url;
+        } else if (typedResult.sessionId) {
+          // Fallback for mock or sessionId-only responses
+          const stripeResult = await fetch('/api/stripe/session-status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sessionId: typedResult.sessionId }),
+          });
+          const sessionData = await stripeResult.json();
+          if (sessionData.url) {
+            window.location.href = sessionData.url;
+          }
+        }
+      } else {
+        console.error('Failed to create checkout session');
+      }
+    } catch (error) {
+      console.error('Error initiating checkout:', error);
+    }
+  };
+
   return (
     <section id="pricing" className="pt-4 md:pt-8 pb-16 md:pb-32" style={{ backgroundColor: '#0F1629' }}>
       <div className="mx-auto max-w-6xl px-6">
         <div className="mt-4 grid gap-6 md:mt-8 md:grid-cols-2 max-w-4xl mx-auto">
         <Card className="relative border-white/10 bg-white/5 backdrop-blur-sm">
-          <span 
+          <span
             className="absolute inset-x-0 -top-3 mx-auto flex h-6 w-fit items-center rounded-full px-3 py-1 text-xs font-medium text-white ring-1 ring-inset ring-white/20"
             style={{ backgroundColor: '#1E4ED8' }}
           >
@@ -56,8 +119,8 @@ export default function PricingSection() {
             </CardContent>
 
             <CardFooter>
-              <Button asChild className="w-full bg-blue-700 hover:bg-blue-600 text-white">
-                <Link to="/sign-up?plan=pro&billing=monthly&currency=EUR">Start 14-Day Free Trial</Link>
+              <Button onClick={handleProCheckout} className="w-full bg-blue-700 hover:bg-blue-600 text-white">
+                Start 7-Day Trial
               </Button>
             </CardFooter>
           </div>
