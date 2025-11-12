@@ -167,7 +167,6 @@ export default function PricingSection() {
                   <span>Pooled Credit Base</span>
                 </li>
               </ul>
-              <p className="text-sm text-gray-400 mt-4">And more...</p>
             </div>
           </CardContent>
         </Card>

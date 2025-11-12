@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
   Layers3,
@@ -274,11 +273,6 @@ const EnhancedFeatureShowcase: React.FC<EnhancedFeatureShowcaseProps> = ({ child
         <EnhancedCardDemo className="flex flex-col justify-end">
           {feature.codeDemo}
         </EnhancedCardDemo>
-        <div className="mt-auto pt-4">
-          <Button asChild variant="outline" className="w-full">
-            <Link to="/pricing">Try {feature.title} for Free</Link>
-          </Button>
-        </div>
       </EnhancedCard>
     );
   };
@@ -344,41 +338,6 @@ const EnhancedFeatureShowcase: React.FC<EnhancedFeatureShowcaseProps> = ({ child
             </div>
           </div>
 
-          {/* Navigation Arrows */}
-          <div className="flex justify-center items-center gap-4 mt-12">
-            <button
-              onClick={prevSlide}
-              className="w-12 h-12 rounded-full bg-white shadow-lg flex items-center justify-center hover:shadow-xl transition-shadow duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 carousel-navigation-button"
-              aria-label="Previous feature"
-            >
-              <ChevronLeft size={20} className="text-gray-700" />
-            </button>
-            
-            <button
-              onClick={nextSlide}
-              className="w-12 h-12 rounded-full bg-white shadow-lg flex items-center justify-center hover:shadow-xl transition-shadow duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 carousel-navigation-button"
-              aria-label="Next feature"
-            >
-              <ChevronRight size={20} className="text-gray-700" />
-            </button>
-          </div>
-
-          {/* Slide Indicators */}
-          <div className="flex justify-center gap-2 mt-6">
-            {Array.from({ length: Math.max(1, cardCount - visibleCards + 1) }).map((_, index) => (
-              <button
-                key={index}
-                onClick={() => setCurrentIndex(index)}
-                className={`w-2 h-2 rounded-full transition-colors duration-200 slide-indicator ${
-                  index === currentIndex ? 'active' : 'inactive'
-                }`}
-                style={{
-                  backgroundColor: index === currentIndex ? '#FFFFFF' : 'rgba(255, 255, 255, 0.3)'
-                }}
-                aria-label={`Go to slide ${index + 1}`}
-              />
-            ))}
-          </div>
         </div>
       </div>
     </section>
