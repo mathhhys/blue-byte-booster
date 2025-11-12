@@ -51,13 +51,11 @@ export const PLAN_CONFIGS_MULTI_CURRENCY: Record<'pro' | 'teams', MultiCurrencyP
     pricing: MULTI_CURRENCY_PRICING.pro,
     features: [
       'Unlimited Agent Requests',
-      'Unlimited Tab Completion',
-      '500 requests per month included',
-      'Add more credits at API Price - No extra costs',
-      'Background Agents & Bugbot Access',
+      'Unlimited Tab Completions',
+      '500 Credits Per Month (Billed at API Costs)',
       'Maximum Context Windows',
-      'Basic Usage Analytics',
-      'Standard Support'
+      'Access to +400 Models (Including Free and Local Ones)',
+      'Zero Data Retention'
     ],
     credits: 500,
     isPopular: false,
@@ -71,14 +69,10 @@ export const PLAN_CONFIGS_MULTI_CURRENCY: Record<'pro' | 'teams', MultiCurrencyP
     },
     features: [
       'Everything in Pro +',
-      'Privacy mode',
       'Centralized Billing',
-      'Admin dashboard with analytics',
-      'Priority support',
-      'Advanced Usage Analytics',
-      'Team Collaboration Tools',
-      'Zero Data Retention',
-      'Up to 100 Team Members'
+      'SSO Available (+$10 per user/month)',
+      'User-Role Assignment and User Management',
+      'Pooled Credit Base'
     ],
     credits: 500,
     maxSeats: 100,

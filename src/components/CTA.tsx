@@ -20,39 +20,39 @@ const CTA = () => {
               Ready to Transform Your Coding?
             </h2>
             <p className="text-xl text-white/80 mb-8 max-w-3xl mx-auto">
-              Join thousands of developers who are already coding faster and smarter with our AI copilot. 
-              Start your free trial today and experience the future of development.
+              Join 10,000+ developers who are already 10x faster with our AI copilot.
+              Start your 14-day free trial and see why Softcodes is the #1 AI coding assistant.
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              {!isLoaded || !isSignedIn ? (
-                <Button
-                  onClick={() => navigate('/sign-up')}
-                  variant="glass"
-                  size="lg"
-                  className="text-lg px-8 py-6 bg-white/20 hover:bg-white/30 text-white border-white/30"
-                >
-                  🚀 Start Free Trial
-                </Button>
-              ) : (
-                <Button
-                  onClick={() => navigate('/dashboard')}
-                  variant="glass"
-                  size="lg"
-                  className="text-lg px-8 py-6 bg-white/20 hover:bg-white/30 text-white border-white/30"
-                >
-                  🚀 Go to Dashboard
-                </Button>
-              )}
+            {!isLoaded || !isSignedIn ? (
               <Button
                 onClick={() => navigate('/pricing')}
-                variant="outline"
+                variant="glass"
                 size="lg"
-                className="text-lg px-8 py-6 border-white/30 text-white hover:bg-white/10"
+                className="text-lg px-8 py-6 bg-white/20 hover:bg-white/30 text-white border-white/30"
               >
-                View Pricing
+                Try Now for Free
               </Button>
-            </div>
+            ) : (
+              <Button
+                onClick={() => navigate('/pricing')}
+                variant="glass"
+                size="lg"
+                className="text-lg px-8 py-6 bg-white/20 hover:bg-white/30 text-white border-white/30"
+              >
+                Upgrade to Pro
+              </Button>
+            )}
+            <Button
+              onClick={() => navigate('/pricing')}
+              variant="outline"
+              size="lg"
+              className="text-lg px-8 py-6 border-white/30 text-white hover:bg-white/10"
+            >
+              Compare Plans
+            </Button>
+          </div>
             
             <div className="mt-8 text-sm text-white/60">
               No credit card required • 14-day free trial • Cancel anytime

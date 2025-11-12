@@ -47,19 +47,19 @@ const Hero = () => {
               <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start items-center mb-16">
               {!isLoaded || !isSignedIn ? (
                 <Button
-                  onClick={() => navigate('/sign-up')}
+                  onClick={() => navigate('/pricing')}
                   className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-4 text-lg font-medium rounded-lg transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-xl"
                   size="lg"
                 >
-                  Get Started
+                  Try now for Free
                 </Button>
               ) : (
                 <Button
-                  onClick={() => navigate('/dashboard')}
+                  onClick={() => navigate('/pricing')}
                   className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-4 text-lg font-medium rounded-lg transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-xl"
                   size="lg"
                 >
-                  Go to Dashboard
+                  💎 View Pricing Plans
                 </Button>
               )}
               <Button
@@ -68,7 +68,7 @@ const Hero = () => {
                 className="border-white/30 text-white hover:bg-white/10 px-8 py-4 text-lg font-medium rounded-lg transition-all duration-300 hover:scale-105 backdrop-blur-sm"
                 size="lg"
               >
-                Explore Features
+                Explore features
               </Button>
             </div>
 

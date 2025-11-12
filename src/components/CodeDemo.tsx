@@ -30,7 +30,7 @@ const CodeDemo = () => {
                   <span className="text-sm text-muted-foreground">AI Copilot Demo</span>
                 </div>
                 <Button variant="ghost" size="sm">
-                  <span className="text-xs">⏯️ Play Demo</span>
+                  <span className="text-xs">Play Demo</span>
                 </Button>
               </div>
             </div>

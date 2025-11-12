@@ -1,7 +1,6 @@
 import React from "react";
 import Navigation from "../components/Navigation";
 import Footer from "../components/Footer";
-import { ModelProvidersSection } from "../components/Features";
 import PricingSection from "@/components/PricingSection";
 import { getFeatureComparison } from '@/config/plans';
 import {
@@ -81,66 +80,6 @@ export default function Pricing() {
           {/* Pricing cards directly integrated */}
           <PricingSection />
 
-          {/* Features Comparison Table */}
-          <div className="mt-16 mb-16">
-            <div className="text-center mb-12">
-              <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-                Compare Plans
-              </h2>
-              <p className="text-xl text-gray-300 max-w-2xl mx-auto">
-                See which plan is right for your needs
-              </p>
-            </div>
-
-            <div className="w-full overflow-x-auto">
-              <Table className="w-full text-sm bg-gray-800/50 border border-gray-700 rounded-lg">
-                <TableHeader className="bg-gray-700/50">
-                  <TableRow>
-                    <TableHead className="w-1/2 text-left font-semibold text-white border-r border-gray-600">Feature</TableHead>
-                    <TableHead className="text-center font-semibold text-white">Pro</TableHead>
-                    <TableHead className="text-center font-semibold text-white">Teams</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {getFeatureComparison().categories.map((category, catIndex) => (
-                    <React.Fragment key={catIndex}>
-                      {/* Category Header Row */}
-                      <TableRow className="bg-gray-700/30">
-                        <TableCell
-                          colSpan={3}
-                          className="text-left font-semibold text-white py-4 border-b border-gray-600"
-                        >
-                          {category.name}
-                        </TableCell>
-                      </TableRow>
-                      {/* Feature Rows */}
-                      {category.features.map((feature, featIndex) => (
-                        <TableRow key={featIndex} className="hover:bg-gray-700/20 transition-colors">
-                          <TableCell className="text-left text-gray-300 py-3 border-r border-gray-600">
-                            {feature.name}
-                          </TableCell>
-                          <TableCell className="text-center py-3">
-                            {typeof feature.pro === 'boolean' ? (
-                              feature.pro ? <Check className="mx-auto h-4 w-4 text-green-500" /> : <X className="mx-auto h-4 w-4 text-red-500" />
-                            ) : (
-                              <span className="text-gray-300">{feature.pro}</span>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-center py-3">
-                            {typeof feature.teams === 'boolean' ? (
-                              feature.teams ? <Check className="mx-auto h-4 w-4 text-green-500" /> : <X className="mx-auto h-4 w-4 text-red-500" />
-                            ) : (
-                              <span className="text-gray-300">{feature.teams}</span>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </React.Fragment>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </div>
         </div>
       </section>
     </GradientBackground>

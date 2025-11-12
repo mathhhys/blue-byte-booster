@@ -3,7 +3,7 @@ import { Button } from "./ui/button";
 
 const AlternatingFeaturesSection = () => {
   return (
-    <section className="w-full py-16" style={{ backgroundColor: '#0F1629' }} aria-label="Key Features">
+    <section id="features" className="w-full py-16" style={{ backgroundColor: '#0F1629' }} aria-label="Key Features">
       <div className="container mx-auto px-6 max-w-7xl">
         
         {/* Row 1: Terminal Mockup (Left) | Text (Right) */}
@@ -30,8 +30,8 @@ const AlternatingFeaturesSection = () => {
               context-aware intelligence that learns your coding style.
             </p>
             <Button asChild className="bg-blue-700 hover:bg-blue-600 text-white inline-flex items-center gap-2 font-semibold text-base md:text-lg">
-              <a href="#agent">
-                Experience Agent
+              <a href="/pricing">
+                Try Now for Free
                 <ArrowRight className="w-5 h-5" />
               </a>
             </Button>
@@ -49,8 +49,8 @@ const AlternatingFeaturesSection = () => {
               Experience AI-powered autocomplete that understands your codebase context and suggests complete functions, algorithms, and solutions matching your coding patterns and requirements.
             </p>
             <Button asChild className="bg-blue-700 hover:bg-blue-600 text-white inline-flex items-center gap-2 font-semibold text-base md:text-lg">
-              <a href="#tab">
-                Try Smart Completion
+              <a href="/pricing">
+                Start Free Trial
                 <ArrowRight className="w-5 h-5" />
               </a>
             </Button>
@@ -90,8 +90,8 @@ const AlternatingFeaturesSection = () => {
               Supercharge your development workflow with five specialized AI agents that handle everything from architecture planning to complex debugging, giving you superhuman coding capabilities.
             </p>
             <Button asChild className="bg-blue-700 hover:bg-blue-600 text-white inline-flex items-center gap-2 font-semibold text-base md:text-lg">
-              <a href="#agent-modes">
-                Explore All Modes
+              <a href="/pricing">
+                Get Started Free
                 <ArrowRight className="w-5 h-5" />
               </a>
             </Button>

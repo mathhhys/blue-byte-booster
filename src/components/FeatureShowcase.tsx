@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Link } from "react-router-dom";
+import { Button } from "@/components/ui/button";
 import {
   Layers3,
   ArrowRight,
@@ -272,6 +274,11 @@ const EnhancedFeatureShowcase: React.FC<EnhancedFeatureShowcaseProps> = ({ child
         <EnhancedCardDemo className="flex flex-col justify-end">
           {feature.codeDemo}
         </EnhancedCardDemo>
+        <div className="mt-auto pt-4">
+          <Button asChild variant="outline" className="w-full">
+            <Link to="/pricing">Try {feature.title} for Free</Link>
+          </Button>
+        </div>
       </EnhancedCard>
     );
   };
