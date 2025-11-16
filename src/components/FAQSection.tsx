@@ -3,28 +3,28 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 
 const faqData = [
   {
-    question: "What are AI prompts and how are they consumed?",
-    answer: "AI prompts are requests sent to our AI models for code generation, completion, or assistance. Each interaction with the AI (like generating a function, explaining code, or getting suggestions) counts as one prompt. The count resets monthly."
+    question: "How many models are supported and are they free?",
+    answer: "We support more than 500 models and some of them are free to use and/or local. We recommend you to integrate your own Openrouter API Key for faster answers with the free models."
   },
   {
-    question: "Can I switch between plans anytime?",
-    answer: "Yes, you can upgrade or downgrade your plan at any time. When upgrading, you'll be charged the prorated difference immediately. When downgrading, the change takes effect at your next billing cycle."
+    question: "Is there a free trial available?",
+    answer: "Yes, we offer a free trial so you can explore Softcodes before committing. Visit our pricing page or sign up to get started."
   },
   {
-    question: "Do you offer student discounts?",
-    answer: "Yes! We offer 50% off all plans for verified students and educators. Contact our support team with your educational email address to get started."
+    question: "What are my payment options?",
+    answer: "Self-serve plans support all major credit and debit cards. For custom demands and invoice based billing, please contact us at mathys@softcodes.io"
   },
   {
-    question: "What happens if I exceed my prompt limit?",
-    answer: "If you exceed your monthly prompt limit, you can either upgrade your plan or purchase additional prompts at $0.01 per prompt. We'll notify you when you're approaching your limit."
+    question: "What if I need to cancel my subscription?",
+    answer: "You can cancel your subscription at any time from your account settings. For self-serve plans, cancellation is immediate."
   },
   {
-    question: "Is my code data secure and private?",
-    answer: "Absolutely. We're SOC 2 certified and follow industry best practices for data security. Your code is encrypted in transit and at rest. For Enterprise customers, we offer on-premise deployment options."
+    question: "How does Softcodes use my data?",
+    answer: "We guarantee that code data is never stored by our model providers or used for training. You can learn more on our Privacy page."
   },
   {
-    question: "Which IDEs and editors do you support?",
-    answer: "We support VS Code, JetBrains IDEs (IntelliJ, PyCharm, WebStorm, etc.), Vim, Neovim, and Emacs. We're continuously adding support for more editors based on user demand."
+    question: "Where can I ask more questions?",
+    answer: "Feel free to email us directly at mathys@softcodes.io"
   }
 ];
 

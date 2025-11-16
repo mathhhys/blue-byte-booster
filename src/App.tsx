@@ -23,6 +23,9 @@ import BillingSuccess from "./pages/BillingSuccess";
 import { VscodeInitiateAuth } from "./pages/VscodeInitiateAuth";
 import { VscodeAuthCallback } from "./pages/VscodeAuthCallback";
 import ExtensionSignIn from "./pages/ExtensionSignIn";
+import Terms from "./pages/Terms";
+import Privacy from "./pages/Privacy";
+import Security from "./pages/Security";
 
 const queryClient = new QueryClient();
 
@@ -44,6 +47,9 @@ const App = () => (
           <Route path="/auth/vscode-initiate" element={<VscodeInitiateAuth />} />
           <Route path="/auth/vscode-callback" element={<VscodeAuthCallback />} />
           <Route path="/extension-signin" element={<ExtensionSignIn />} />
+          <Route path="/terms" element={<Terms />} />
+          <Route path="/privacy" element={<Privacy />} />
+          <Route path="/security" element={<Security />} />
           
           {/* Payment Routes */}
           <Route path="/payment/success" element={<PaymentSuccess />} />
