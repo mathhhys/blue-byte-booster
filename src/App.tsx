@@ -36,7 +36,9 @@ const App = () => {
 
     useEffect(() => {
       if ((window as any).rdt) {
-        (window as any).rdt('track', 'PageVisit');
+        (window as any).rdt('track', 'PageVisit', {
+          conversionId: `page-visit-${location.pathname}-${Date.now()}`
+        });
       }
     }, [location.pathname]);
 
