@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Menu, X, ChevronDown, User } from "lucide-react";
 import { SignedIn, SignedOut, UserButton, useUser } from '@clerk/clerk-react';
 import { dark } from '@clerk/themes';
+import Banner from "@/components/Banner";
 
 const Navigation = () => {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -16,8 +17,9 @@ const Navigation = () => {
   useEffect(() => {
     const handleScroll = () => {
       const scrollPosition = window.scrollY;
-      const scrolled = scrollPosition > 50;
+      const scrolled = scrollPosition > 40;
       setIsScrolled(scrolled);
+
       if (scrolled) {
         document.body.classList.add('scrolled');
       } else {
@@ -103,14 +105,16 @@ const Navigation = () => {
 
   return (
     <>
-      <nav
-        className={`fixed top-0 w-full z-50 transition-all duration-300 ${
-          isScrolled
-            ? "navbar-scrolled-bg backdrop-blur-md border-b border-gray-200/50 shadow-sm"
-            : "bg-slate-900"
-        }`}
-      >
-        <div className="container mx-auto px-6 py-4">
+      <div className="w-full z-50 flex flex-col">
+        <Banner />
+        <nav
+          className={`fixed top-10 left-0 right-0 w-full z-40 transition-colors duration-300 ${
+            isScrolled
+              ? "navbar-scrolled-bg backdrop-blur-md border-b border-gray-200/50 shadow-sm"
+              : "bg-slate-900"
+          }`}
+        >
+          <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             {/* Logo */}
             <div className="flex items-center">
@@ -256,8 +260,12 @@ const Navigation = () => {
               </div>
             </button>
           </div>
-        </div>
-      </nav>
+          </div>
+        </nav>
+      </div>
+
+      {/* Spacer so main content starts below fixed banner + navbar */}
+      <div className="h-24"></div>
 
       {/* Mobile Menu Overlay */}
       {isMobileMenuOpen && (

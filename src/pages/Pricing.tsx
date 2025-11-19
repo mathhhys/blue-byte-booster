@@ -56,7 +56,6 @@ const comparisonFeatures = [
 
 export default function Pricing() {
   return (
-    <>
     <GradientBackground className="mt-8">
       <Navigation />
       
@@ -82,11 +81,10 @@ export default function Pricing() {
 
         </div>
       </section>
-    </GradientBackground>
 
-    <FAQSection />
+      <FAQSection />
 
       <Footer />
-    </>
+    </GradientBackground>
   );
 }

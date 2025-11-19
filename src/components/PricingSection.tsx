@@ -76,7 +76,7 @@ export default function PricingSection() {
   };
 
   return (
-    <section id="pricing" className="pt-4 md:pt-8 pb-16 md:pb-32" style={{ backgroundColor: '#0F1629' }}>
+    <section id="pricing" className="pt-4 md:pt-8 pb-16 md:pb-32">
       <div className="mx-auto max-w-6xl px-6">
         <div className="mt-4 grid gap-6 md:mt-8 md:grid-cols-2 max-w-4xl mx-auto">
         <Card className="relative border-white/10 bg-white/5 backdrop-blur-sm shadow-lg">

@@ -11,12 +11,12 @@
  import MCPServerSection from "@/components/MCPServerSection";
  import Footer from "@/components/Footer";
  import FAQSection from "@/components/FAQSection";
-
-const Index = () => {
-  return (
-    <div className="min-h-screen" style={{ backgroundColor: '#0F1629' }}>
-      <Navigation />
-      <Hero />
+ 
+ const Index = () => {
+   return (
+     <div className="min-h-screen" style={{ backgroundColor: '#0F1629' }}>
+       <Navigation />
+       <Hero />
       <AlternatingFeaturesSection />
       <FeatureShowcase />
       <ProductivitySection />

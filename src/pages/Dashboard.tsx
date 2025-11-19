@@ -645,14 +645,23 @@ const Dashboard = () => {
             </SidebarMenu>
 
             <SidebarSeparator className="my-6 bg-[#2a2a2a]" />
-
+            
             {/* Support Section */}
             <div className="mb-6">
               <div className="text-xs font-medium text-white/50 uppercase tracking-wider mb-3">
                 SUPPORT
               </div>
               <SidebarMenu>
-
+            
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild className="text-white/70 hover:text-white hover:bg-white/10">
+                    <a href="https://docs.softcodes.ai/InstallingSoftcodes" target="_blank" rel="noopener noreferrer">
+                      <FileText className="w-4 h-4" />
+                      <span>Get Started</span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+            
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild className="text-white/70 hover:text-white hover:bg-white/10">
                     <a href="https://docs.softcodes.ai/InstallingSoftcodes" target="_blank" rel="noopener noreferrer">
@@ -661,7 +670,7 @@ const Dashboard = () => {
                     </a>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
-
+            
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild className="text-white/70 hover:text-white hover:bg-white/10">
                     <a href="mailto:mathys@softcodes.io">
