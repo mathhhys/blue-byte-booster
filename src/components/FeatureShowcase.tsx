@@ -176,7 +176,9 @@ const EnhancedFeatureShowcase: React.FC<EnhancedFeatureShowcaseProps> = ({ child
   }, []);
 
   const totalItems = Math.max(cardCount, enhancedFeatures.length);
-
+  const maxIndex = Math.max(totalItems - visibleCards, 0);
+  const totalPages = maxIndex + 1;
+ 
   const nextSlide = useCallback(() => {
     setCurrentIndex((prev) => {
       const maxIndex = totalItems - visibleCards;
@@ -337,6 +339,44 @@ const EnhancedFeatureShowcase: React.FC<EnhancedFeatureShowcaseProps> = ({ child
               })}
             </div>
           </div>
+
+          {/* Navigation Arrows */}
+          <div className="flex justify-center items-center gap-4 mt-10">
+            <button
+              type="button"
+              onClick={prevSlide}
+              className="w-10 h-10 rounded-full bg-white shadow-lg flex items-center justify-center hover:shadow-xl transition-shadow duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              aria-label="Previous features"
+            >
+              <ChevronLeft size={20} className="text-gray-700" />
+            </button>
+
+            <button
+              type="button"
+              onClick={nextSlide}
+              className="w-10 h-10 rounded-full bg-white shadow-lg flex items-center justify-center hover:shadow-xl transition-shadow duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              aria-label="Next features"
+            >
+              <ChevronRight size={20} className="text-gray-700" />
+            </button>
+          </div>
+
+          {/* Slide Indicators */}
+          {totalPages > 1 && (
+            <div className="flex justify-center gap-2 mt-4">
+              {Array.from({ length: totalPages }).map((_, index) => (
+                <button
+                  key={index}
+                  type="button"
+                  onClick={() => setCurrentIndex(index)}
+                  className={`w-2 h-2 rounded-full transition-colors duration-200 ${
+                    index === currentIndex ? 'bg-white' : 'bg-white/30'
+                  }`}
+                  aria-label={`Go to slide ${index + 1}`}
+                />
+              ))}
+            </div>
+          )}
 
         </div>
       </div>
