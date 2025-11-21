@@ -18,9 +18,10 @@ export default function PricingSection() {
   const { user, isSignedIn } = useUser();
 
   const handleProCheckout = async () => {
-    // Track Reddit Pixel Event
+    // Track Reddit Pixel SignUp Event (trial intent)
     if (window.rdt) {
-      window.rdt('track', 'AddToCart', { itemCount: 1 });
+      window.rdt('track', 'SignUp');
+      console.log('Reddit Pixel: SignUp event tracked (trial start intent)');
     }
 
     if (!isSignedIn) {
