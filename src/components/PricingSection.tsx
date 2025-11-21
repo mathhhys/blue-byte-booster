@@ -18,6 +18,11 @@ export default function PricingSection() {
   const { user, isSignedIn } = useUser();
 
   const handleProCheckout = async () => {
+    // Track Reddit Pixel Event
+    if (window.rdt) {
+      window.rdt('track', 'AddToCart', { itemCount: 1 });
+    }
+
     if (!isSignedIn) {
       window.location.href = '/sign-up?plan=pro&billing=monthly&currency=EUR';
       return;
