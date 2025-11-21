@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { useEffect } from "react";
 import { SignedIn, SignedOut, RedirectToSignIn } from '@clerk/clerk-react';
+import RedditPixelTracker from "./components/RedditPixelTracker";
 
 import Index from "./pages/Index";
 import Pricing from "./pages/Pricing";
@@ -32,18 +33,10 @@ const queryClient = new QueryClient();
 
 const App = () => {
   const RouterContent = () => {
-    const location = useLocation();
-
-    useEffect(() => {
-      if ((window as any).rdt) {
-        (window as any).rdt('track', 'PageVisit', {
-          conversionId: `page-visit-${location.pathname}-${Date.now()}`
-        });
-      }
-    }, [location.pathname]);
-
     return (
-      <Routes>
+      <>
+        <RedditPixelTracker />
+        <Routes>
         {/* Public Routes */}
         <Route path="/" element={<Index />} />
         <Route path="/pricing" element={<Pricing />} />
@@ -120,6 +113,7 @@ const App = () => {
         
         <Route path="*" element={<NotFound />} />
       </Routes>
+      </>
     );
   };
 
