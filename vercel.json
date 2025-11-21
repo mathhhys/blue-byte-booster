@@ -168,6 +168,15 @@
           "value": "application/javascript; charset=utf-8"
         }
       ]
+    },
+    {
+      "source": "/",
+      "headers": [
+        {
+          "key": "Cross-Origin-Opener-Policy",
+          "value": "unsafe-none"
+        }
+      ]
     }
   ]
 }
