@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import Navigation from "../components/Navigation";
 import Footer from "../components/Footer";
 import PricingSection from "@/components/PricingSection";
@@ -55,6 +55,15 @@ const comparisonFeatures = [
 
 
 export default function Pricing() {
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.rdt) {
+      const conversionId = crypto.randomUUID();
+      window.rdt('track', 'PageVisit', {
+        conversionId: conversionId
+      });
+    }
+  }, []);
+
   return (
     <GradientBackground className="mt-8">
       <Navigation />
