@@ -59,6 +59,13 @@ const PostSignup = () => {
         }
 
         setStatus('success');
+        
+        // Track Reddit SignUp event
+        if (window.rdt) {
+          window.rdt('track', 'SignUp');
+          console.log('Reddit Pixel: SignUp event tracked');
+        }
+        
         setTimeout(() => {
           navigate('/dashboard');
         }, 2000);
@@ -103,6 +110,13 @@ const PostSignup = () => {
       }
 
       setStatus('success');
+      
+      // Track Reddit SignUp event (signup complete, payment next)
+      if (window.rdt) {
+        window.rdt('track', 'SignUp');
+        console.log('Reddit Pixel: SignUp event tracked');
+      }
+      
       // The createCheckoutSession function will handle the redirect to Stripe
     } catch (error) {
       console.error('Error processing plan selection:', error);

@@ -12,49 +12,67 @@ const RedditPixelTracker = () => {
   const { user, isLoaded } = useUser();
   const location = useLocation();
   const initialized = useRef(false);
+  const scriptLoaded = useRef(false);
 
+  // Load script once
   useEffect(() => {
-    if (!isLoaded) return;
+    if (scriptLoaded.current) return;
 
-    // Check if rdt is available
-    if (!window.rdt) {
-      console.warn('Reddit Pixel script not loaded');
-      return;
+    const script = document.createElement('script');
+    script.src = 'https://www.redditstatic.com/ads/pixel.js';
+    script.async = true;
+    document.head.appendChild(script);
+
+    script.onload = () => {
+      scriptLoaded.current = true;
+      // Initialize after script loads
+      initializePixel();
+    };
+
+    script.onerror = () => {
+      console.error('Failed to load Reddit Pixel script');
+    };
+  }, []);
+
+  const initializePixel = () => {
+    if (initialized.current || !window.rdt) return;
+
+    const pixelId = 'a2_i17xl31pbg9k';
+
+    if (isLoaded && user) {
+      const email = user.primaryEmailAddress?.emailAddress;
+      const advancedMatching = {
+        email: email,
+        externalId: user.id,
+      };
+      window.rdt('init', pixelId, advancedMatching);
+      console.log('Reddit Pixel initialized with advanced matching');
+    } else {
+      window.rdt('init', pixelId);
+      console.log('Reddit Pixel initialized (basic)');
     }
 
-    // Initialize Pixel
-    // We only want to init once per session ideally, but if user logs in, we might want to re-init or identify.
-    // However, standard practice for SPA is to init on load. 
-    // Since we delayed init until here, we can do it now.
-    
-    if (!initialized.current) {
-      const pixelId = 'a2_i17xl31pbg9k';
-      
-      if (user) {
-        const email = user.primaryEmailAddress?.emailAddress;
-        // Add other fields if available in user object or metadata
-        const advancedMatching = {
-          email: email,
-          // externalId: user.id, // Optional: use Clerk ID as external ID
-        };
-        
-        window.rdt('init', pixelId, advancedMatching);
-        console.log('Reddit Pixel initialized with Advanced Matching');
-      } else {
-        window.rdt('init', pixelId);
-        console.log('Reddit Pixel initialized (Standard)');
-      }
-      
-      initialized.current = true;
-    }
+    initialized.current = true;
 
-    // Track PageVisit on route change
-    // Note: The App.tsx already has a tracker for PageVisit, but it was using a generic one.
-    // We should consolidate. Since we are moving logic here, we should handle tracking here.
-    
-    window.rdt('track', 'PageVisit');
-    
-  }, [isLoaded, user, location.pathname]);
+    // Track initial PageVisit
+    if (window.rdt) {
+      window.rdt('track', 'PageVisit');
+    }
+  };
+
+  // Re-init or identify if user becomes available after initial load
+  useEffect(() => {
+    if (scriptLoaded.current && isLoaded && user && !initialized.current) {
+      initializePixel();
+    }
+  }, [isLoaded, user]);
+
+  // Track PageVisit on route changes
+  useEffect(() => {
+    if (window.rdt && initialized.current && location.pathname) {
+      window.rdt('track', 'PageVisit');
+    }
+  }, [location.pathname]);
 
   return null;
 };
