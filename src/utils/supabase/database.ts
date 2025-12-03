@@ -637,7 +637,7 @@ export const organizationSeatOperations = {
         .insert({
           organization_subscription_id: subscription.id,
           clerk_org_id: clerkOrgId,
-          clerk_user_id: '', // Will be filled by Clerk lookup in API
+          clerk_user_id: null, // Will be filled by Clerk lookup in API or when user accepts invite
           user_email: userEmail,
           role: role,
           status: 'active',
