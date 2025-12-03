@@ -59,6 +59,8 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
     status: string;
     billing_frequency: string;
     stripe_subscription_id: string | null;
+    trial_end?: number | null;
+    trial_start?: number | null;
   } | null>(null);
   const [seatsData, setSeatsData] = useState<{
     seats_used: number;
@@ -119,7 +121,9 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
           plan_type: result.subscription.plan_type,
           status: result.subscription.status,
           billing_frequency: result.subscription.billing_frequency,
-          stripe_subscription_id: result.subscription.id
+          stripe_subscription_id: result.subscription.id,
+          trial_end: result.subscription.trial_end,
+          trial_start: result.subscription.trial_start,
         });
       } else {
         // No subscription found
@@ -380,6 +384,8 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
     switch (status) {
       case 'active':
         return <Badge className="bg-green-600 text-white"><CheckCircle className="w-3 h-3 mr-1" />Active</Badge>;
+      case 'trialing':
+        return <Badge className="bg-blue-600 text-white"><Clock className="w-3 h-3 mr-1" />Trialing</Badge>;
       case 'past_due':
         return <Badge className="bg-yellow-600 text-white"><AlertTriangle className="w-3 h-3 mr-1" />Past Due</Badge>;
       case 'canceled':
@@ -506,7 +512,7 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
       <Card className="bg-[#2a2a2a] border-white/10 p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-white">Subscription Overview</h3>
-          {getStatusBadge('active')}
+          {getStatusBadge(subscriptionData?.status)}
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -543,6 +549,21 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
             </div>
             <div className="text-sm text-gray-400">monthly billing</div>
           </div>
+  
+          {/* Trial Status */}
+          {subscriptionData?.status === 'trialing' && subscriptionData.trial_end && (
+            <div className="mt-4 p-3 bg-blue-600/10 border border-blue-600/20 rounded-lg">
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-blue-400" />
+                <div>
+                  <div className="text-blue-300 font-medium">14-Day Trial Active</div>
+                  <div className="text-sm text-blue-200">
+                    Trial ends on {new Date(subscriptionData.trial_end).toLocaleDateString()}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Organization Credit Pool */}

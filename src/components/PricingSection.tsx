@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { Button } from "./ui/button";
-import { KindeAuthProviderWrapper, useKindeAuthContext } from "@/contexts/KindeAuthContext";
+import { useAuth, useUser, useOrganization } from '@clerk/clerk-react';
+import { createOrganizationSubscription } from '@/utils/organization/billing';
 import {
   Card,
   CardContent,
@@ -10,21 +11,9 @@ import {
   CardTitle,
 } from "./ui/card";
 import { Check } from "lucide-react";
-import { useAuth, useUser } from '@clerk/clerk-react';
 import { createMultiCurrencyCheckoutSession, prepareMultiCurrencyCheckoutData } from '@/utils/stripe/checkout';
 import { CurrencyCode } from '@/types/database';
 
-const TeamsAuthButton = () => {
-  const { register } = useKindeAuthContext();
-  return (
-    <Button
-      onClick={() => register()}
-      className="w-full bg-blue-700 hover:bg-blue-600 text-white font-medium py-6"
-    >
-      Start with Teams
-    </Button>
-  );
-};
 
 export default function PricingSection() {
   const { getToken } = useAuth();
@@ -101,6 +90,77 @@ export default function PricingSection() {
       console.error('Error initiating checkout:', error);
     }
   };
+  
+  const handleTeamsCheckout = async () => {
+    // Track Reddit Pixel SignUp Event (trial intent)
+    if (window.rdt) {
+      window.rdt('track', 'SignUp');
+      console.log('Reddit Pixel: SignUp event tracked (teams trial start intent)');
+    }
+  
+    if (!isSignedIn) {
+      // Small delay to ensure pixel event fires before navigation
+      setTimeout(() => {
+        window.location.href = '/sign-up?plan=teams&billing=monthly&seats=3&currency=EUR';
+      }, 300);
+      return;
+    }
+  
+    const { organization } = useOrganization();
+    if (!organization) {
+      // Redirect to create organization
+      setTimeout(() => {
+        window.location.href = '/organization/new?plan=teams&billing=monthly&seats=3&currency=EUR';
+      }, 300);
+      return;
+    }
+  
+    // Check if user is admin
+    const { memberships } = useOrganization();
+    const currentMembership = memberships?.data?.find(m => m.publicUserData?.userId === user.id);
+    if (currentMembership?.role !== 'org:admin') {
+      alert('Only organization admins can manage subscriptions. Please contact your admin.');
+      return;
+    }
+  
+    if (!user?.id || !organization.id) {
+      console.error('User or organization not available');
+      return;
+    }
+  
+    try {
+      // Initialize user/org if needed (optional for teams)
+      const token = await getToken();
+      await fetch('/api/user/initialize', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          planType: 'teams'
+        }),
+      });
+  
+      const result = await createOrganizationSubscription({
+        clerk_org_id: organization.id,
+        plan_type: 'teams',
+        billing_frequency: 'monthly',
+        seats_total: 3, // Minimum seats for teams
+      }, token);
+  
+      if (result.success && result.checkout_url) {
+        // Small delay to ensure pixel event fires before navigation
+        setTimeout(() => {
+          window.location.href = result.checkout_url!;
+        }, 300);
+      } else {
+        console.error('Failed to create teams checkout session');
+      }
+    } catch (error) {
+      console.error('Error initiating teams checkout:', error);
+    }
+  };
 
   return (
     <section id="pricing" className="pt-4 md:pt-8 pb-16 md:pb-32">
@@ -164,15 +224,15 @@ export default function PricingSection() {
           <CardHeader>
             <CardTitle className="text-2xl font-semibold text-white">TEAMS</CardTitle>
             <div className="mt-4 space-y-1">
-              <span className="text-3xl font-bold text-white block">€30</span>
+              <span className="text-3xl font-bold text-white block">€40</span>
               <span className="text-sm text-gray-400">per user/month</span>
             </div>
           </CardHeader>
 
           <CardContent className="space-y-4 flex-grow">
-            <KindeAuthProviderWrapper>
-              <TeamsAuthButton />
-            </KindeAuthProviderWrapper>
+            <Button onClick={handleTeamsCheckout} className="w-full bg-blue-700 hover:bg-blue-600 text-white font-medium py-6">
+              Start 14-day free trial
+            </Button>
 
             <div className="pt-2">
               <p className="text-sm text-gray-400 mb-4">Everything in Pro, plus:</p>

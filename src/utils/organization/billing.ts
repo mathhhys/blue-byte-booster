@@ -45,7 +45,7 @@ export const createOrganizationSubscription = async (
     
     const payload = {
       ...request,
-      priceId: 'price_1RwNazH6gWxKcaTXi3OmXp4u', // Use the real Stripe price ID
+      priceId: 'price_1SaINqH6gWxKcaTXAKZ5CoWW', // Use the real Stripe price ID
     };
     
     console.log('Sending payload to API:', payload);
@@ -274,7 +274,7 @@ export const calculateSeatCost = (
   billingFrequency: 'monthly' | 'yearly',
   seats: number
 ): number => {
-  const basePrice = billingFrequency === 'monthly' ? 30 : 24;
+  const basePrice = billingFrequency === 'monthly' ? 40 : 32;
   return basePrice * seats;
 };
 

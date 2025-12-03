@@ -42,8 +42,8 @@ export const STRIPE_PRODUCTS = {
   },
   teams: {
     monthly: {
-      priceId: 'price_1RwN7VH6gWxKcaTXHVkwwT60',
-      amount: 3000,
+      priceId: 'price_1SaINqH6gWxKcaTXAKZ5CoWW',
+      amount: 4000,
     },
     yearly: {
       priceId: 'price_1RwN8hH6gWxKcaTXEaGbVvhz',

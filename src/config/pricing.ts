@@ -13,7 +13,7 @@ export const MULTI_CURRENCY_PRICING: Record<'pro' | 'teams', MultiCurrencyPrice>
   },
   teams: {
     EUR: {
-      monthly: 30,
+      monthly: 40,
       yearly: 288,
       priceIds: {
         monthly: 'price_1RwN6oH6gWxKcaTXgmKllDYt',

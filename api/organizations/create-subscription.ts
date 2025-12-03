@@ -58,7 +58,7 @@ export default async function handler(req: any, res: any) {
     const currency = 'EUR';
     const priceIds = {
       teams: {
-        monthly: 'price_1RwN7VH6gWxKcaTXHVkwwT60', // EUR monthly
+        monthly: 'price_1SaINqH6gWxKcaTXAKZ5CoWW', // EUR monthly 40€
         yearly: 'price_1RwN8hH6gWxKcaTXEaGbVvhz'   // EUR yearly
       }
     };
@@ -145,6 +145,7 @@ export default async function handler(req: any, res: any) {
         created_by: authResult.userId,
       },
       subscription_data: {
+        trial_period_days: 14,
         metadata: {
           clerk_org_id: clerk_org_id,
           plan_type: plan_type,
