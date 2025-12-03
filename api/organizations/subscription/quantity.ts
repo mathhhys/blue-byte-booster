@@ -1,5 +1,9 @@
 import { organizationSubscriptionOperations } from '../../../src/utils/supabase/database.js';
 import { orgAdminMiddleware } from '../../../src/utils/clerk/token-verification.js';
+import Stripe from 'stripe';
+import { createClient } from '@supabase/supabase-js';
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'PUT') {
@@ -21,6 +25,35 @@ export default async function handler(req: any, res: any) {
     const authResult = await orgAdminMiddleware(req, orgId);
     console.log('🔍 API: Updating subscription quantity for organization:', orgId, 'by user:', authResult.userId, 'to:', newQuantity);
 
+    // Initialize Supabase client
+    const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const supabase = createClient(supabaseUrl!, supabaseKey!);
+
+    // Get current subscription
+    const { data: currentSub, error: fetchError } = await supabase
+      .from('organization_subscriptions')
+      .select('stripe_subscription_id, stripe_customer_id')
+      .eq('clerk_org_id', orgId)
+      .eq('status', 'active')
+      .single();
+
+    if (fetchError || !currentSub) {
+      return res.status(404).json({ error: 'Active subscription not found' });
+    }
+
+    // Update Stripe Subscription
+    console.log('Updating Stripe subscription:', currentSub.stripe_subscription_id, 'to quantity:', newQuantity);
+    
+    // Get subscription items to find the main item
+    const stripeSub = await stripe.subscriptions.retrieve(currentSub.stripe_subscription_id);
+    const itemId = stripeSub.items.data[0].id;
+
+    await stripe.subscriptions.update(currentSub.stripe_subscription_id, {
+      items: [{ id: itemId, quantity: newQuantity }],
+      proration_behavior: 'always_invoice', // Charge immediately for upgrade
+    });
+
     // Update the database
     const { data: subscription, error: dbError } = await organizationSubscriptionOperations.updateSubscriptionQuantity(orgId, newQuantity);
 
@@ -30,8 +63,8 @@ export default async function handler(req: any, res: any) {
     }
 
     console.log('✅ API: Subscription quantity updated successfully');
-    return res.status(200).json({ 
-      data: subscription, 
+    return res.status(200).json({
+      data: subscription,
       error: null,
       message: 'Subscription quantity updated successfully'
     });

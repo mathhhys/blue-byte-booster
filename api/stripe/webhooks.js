@@ -257,11 +257,43 @@ async function handleCheckoutSessionCompleted(session, supabase) {
   console.log('🛒 Processing checkout session completed:', session.id);
   
   try {
+    const metadata = session.metadata || {};
+    
+    // Handle Organization Subscription
+    if (metadata.clerk_org_id && session.subscription) {
+      console.log('🏢 Processing Organization Subscription for:', metadata.clerk_org_id);
+      
+      // Retrieve full subscription details to get current period end
+      const subscription = await stripe.subscriptions.retrieve(session.subscription);
+      
+      const { error: subError } = await supabase
+        .from('organization_subscriptions')
+        .upsert({
+          clerk_org_id: metadata.clerk_org_id,
+          stripe_subscription_id: session.subscription,
+          stripe_customer_id: session.customer,
+          plan_type: metadata.plan_type || 'teams',
+          billing_frequency: metadata.billing_frequency || 'monthly',
+          seats_total: parseInt(metadata.seats || '1'),
+          status: 'active',
+          current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
+          current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'stripe_subscription_id'
+        });
+
+      if (subError) {
+        console.error('Error creating organization subscription:', subError);
+        throw subError;
+      }
+      console.log('✅ Organization subscription created/updated');
+    }
+
     // This handles initial subscription setup
     // Credits are granted by the existing process-payment-success.js
     // We just need to record the webhook for completeness
     
-    const metadata = session.metadata || {};
     if (session.subscription && session.subscription.metadata) {
       Object.assign(metadata, session.subscription.metadata);
     }

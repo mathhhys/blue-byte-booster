@@ -14,18 +14,19 @@ export default async function handler(req, res) {
     }
 
     console.log('Step 1: Parsing request body...');
-    const { planType, billingFrequency, seats = 1, clerkUserId, successUrl, cancelUrl, currency, priceId } = req.body;
+    const { planType, billingFrequency, seats = 1, clerkUserId, clerkOrgId, successUrl, cancelUrl, currency, priceId } = req.body;
     console.log('Request body:', req.body);
 
     console.log('Step 2: Validating input...');
     console.log('planType:', planType);
     console.log('billingFrequency:', billingFrequency);
     console.log('clerkUserId:', clerkUserId);
+    console.log('clerkOrgId:', clerkOrgId);
     
     // Validate input
-    if (!planType || !billingFrequency || !clerkUserId) {
+    if (!planType || !billingFrequency || (!clerkUserId && !clerkOrgId)) {
       console.log('❌ Missing required parameters');
-      return res.status(400).json({ error: 'Missing required parameters' });
+      return res.status(400).json({ error: 'Missing required parameters (clerkUserId or clerkOrgId required)' });
     }
 
     console.log('Step 3: Checking environment variables...');
@@ -126,62 +127,118 @@ export default async function handler(req, res) {
     // Create or get Stripe customer
     let customer;
     try {
-      console.log('6a: Listing existing customers...');
-      // Try to find existing customer by Clerk user ID
-      const customers = await stripe.customers.list({
-        limit: 100,
-      });
-      console.log('Found', customers.data.length, 'existing customers');
-
-      // Find customer with matching clerk_user_id in metadata
-      customer = customers.data.find((c) => c.metadata?.clerk_user_id === clerkUserId);
-      console.log('Existing customer found:', !!customer);
-
-      if (!customer) {
-        console.log('6b: Creating new customer...');
-        // Optionally fetch email from Supabase
-        let customerEmail;
-        console.log('6b1: Fetching user email from Supabase...');
-        const { data: userData, error: fetchError } = await supabase
-          .from('users')
-          .select('email')
-          .eq('clerk_id', clerkUserId)
+      if (clerkOrgId) {
+        console.log('6a: Handling Organization Customer for:', clerkOrgId);
+        
+        // Check if organization exists in Supabase and has a stripe_customer_id
+        const { data: orgData, error: orgError } = await supabase
+          .from('organizations')
+          .select('stripe_customer_id, name')
+          .eq('clerk_org_id', clerkOrgId)
           .single();
-        
-        console.log('User data fetch result:', { userData, fetchError });
-        
-        if (!fetchError && userData?.email) {
-          customerEmail = userData.email;
-          console.log('Using email from Supabase:', customerEmail);
-        } else {
-          console.log('No email found in Supabase or error occurred');
+
+        if (orgError && orgError.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+           console.error('Error fetching organization:', orgError);
+           // Proceed to try creating/finding anyway, or fail? Let's try to find by metadata
         }
 
-        console.log('6b2: Creating Stripe customer...');
-        const customerData = {
-          email: customerEmail || undefined,
-          description: `Customer for Clerk user ${clerkUserId}`,
-          metadata: {
-            clerk_user_id: clerkUserId
-          }
-        };
-        console.log('Customer creation data:', customerData);
-        
-        try {
-          customer = await stripe.customers.create(customerData);
-          console.log('✅ New customer created:', customer.id);
-        } catch (customerError) {
-          console.error('❌ Error creating Stripe customer:', customerError);
-          console.error('Customer error details:', {
-            name: customerError.name,
-            message: customerError.message,
-            type: customerError.type,
-            code: customerError.code
+        if (orgData?.stripe_customer_id) {
+          console.log('Found existing Stripe Customer ID in organizations table:', orgData.stripe_customer_id);
+          customer = await stripe.customers.retrieve(orgData.stripe_customer_id);
+        } else {
+          // Try to find by metadata in Stripe
+          console.log('Searching Stripe for customer with metadata.clerk_org_id:', clerkOrgId);
+          const customers = await stripe.customers.search({
+            query: `metadata['clerk_org_id']:'${clerkOrgId}'`,
+            limit: 1
           });
-          throw customerError;
+          
+          if (customers.data.length > 0) {
+            customer = customers.data[0];
+            console.log('Found existing Stripe customer by metadata:', customer.id);
+            
+            // Update Supabase with this ID
+            await supabase.from('organizations').update({ stripe_customer_id: customer.id }).eq('clerk_org_id', clerkOrgId);
+          } else {
+            // Create new customer for Organization
+            console.log('Creating new Stripe Customer for Organization');
+            const customerData = {
+              description: orgData?.name ? `Organization: ${orgData.name}` : `Organization ${clerkOrgId}`,
+              metadata: {
+                clerk_org_id: clerkOrgId
+              }
+            };
+            customer = await stripe.customers.create(customerData);
+            console.log('✅ New Organization Customer created:', customer.id);
+
+            // Update Supabase
+            await supabase.from('organizations').upsert({
+              clerk_org_id: clerkOrgId,
+              stripe_customer_id: customer.id,
+              name: orgData?.name
+            }, { onConflict: 'clerk_org_id' });
+          }
         }
+
       } else {
-        console.log('✅ Using existing customer:', customer.id);
+        // Existing logic for Individual User
+        console.log('6a: Listing existing customers...');
+        // Try to find existing customer by Clerk user ID
+        const customers = await stripe.customers.list({
+          limit: 100,
+        });
+        console.log('Found', customers.data.length, 'existing customers');
+
+        // Find customer with matching clerk_user_id in metadata
+        customer = customers.data.find((c) => c.metadata?.clerk_user_id === clerkUserId);
+        console.log('Existing customer found:', !!customer);
+
+        if (!customer) {
+          console.log('6b: Creating new customer...');
+          // Optionally fetch email from Supabase
+          let customerEmail;
+          console.log('6b1: Fetching user email from Supabase...');
+          const { data: userData, error: fetchError } = await supabase
+            .from('users')
+            .select('email')
+            .eq('clerk_id', clerkUserId)
+            .single();
+          
+          console.log('User data fetch result:', { userData, fetchError });
+          
+          if (!fetchError && userData?.email) {
+            customerEmail = userData.email;
+            console.log('Using email from Supabase:', customerEmail);
+          } else {
+            console.log('No email found in Supabase or error occurred');
+          }
+
+          console.log('6b2: Creating Stripe customer...');
+          const customerData = {
+            email: customerEmail || undefined,
+            description: `Customer for Clerk user ${clerkUserId}`,
+            metadata: {
+              clerk_user_id: clerkUserId
+            }
+          };
+          console.log('Customer creation data:', customerData);
+          
+          try {
+            customer = await stripe.customers.create(customerData);
+            console.log('✅ New customer created:', customer.id);
+          } catch (customerError) {
+            console.error('❌ Error creating Stripe customer:', customerError);
+            console.error('Customer error details:', {
+              name: customerError.name,
+              message: customerError.message,
+              type: customerError.type,
+              code: customerError.code
+            });
+            throw customerError;
+          }
+        } else {
+          console.log('✅ Using existing customer:', customer.id);
+        }
       }
     } catch (error) {
       console.error('❌ Error creating/finding customer:', error);
@@ -204,6 +261,7 @@ export default async function handler(req, res) {
       cancel_url: cancelUrl || `${req.headers.origin || 'https://www.softcodes.ai'}/payment-cancelled`,
       metadata: {
         clerk_user_id: clerkUserId,
+        clerk_org_id: clerkOrgId, // Add org ID to metadata
         plan_type: planType,
         billing_frequency: billingFrequency,
         seats: seats.toString(),
@@ -213,12 +271,13 @@ export default async function handler(req, res) {
       subscription_data: {
         metadata: {
           clerk_user_id: clerkUserId,
+          clerk_org_id: clerkOrgId, // Add org ID to subscription metadata
           plan_type: planType,
           billing_frequency: billingFrequency,
           seats: seats.toString(),
           currency: currency || 'USD',
         },
-        ...(planType === 'pro' && { trial_period_days: 7 }),
+        ...(planType === 'pro' && !clerkOrgId && { trial_period_days: 7 }), // Only trial for individual pro? Or maybe teams too? Assuming individual for now.
       },
     };
     

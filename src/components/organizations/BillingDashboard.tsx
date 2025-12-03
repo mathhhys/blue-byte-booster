@@ -31,7 +31,18 @@ import {
   getOrgCredits,
   createOrgCreditTopup,
   formatOrgCreditUsage,
+  updateSubscriptionQuantity,
+  removeSeatFromMember,
 } from '@/utils/organization/billing';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 interface BillingDashboardProps {
   className?: string;
@@ -69,6 +80,9 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
   const [orgCredits, setOrgCredits] = useState(null);
   const [isLoadingCredits, setIsLoadingCredits] = useState(false);
   const [isToppingUp, setIsToppingUp] = useState(false);
+  const [isUpdatingSeats, setIsUpdatingSeats] = useState(false);
+  const [newSeatCount, setNewSeatCount] = useState(0);
+  const [isSeatDialogOpen, setIsSeatDialogOpen] = useState(false);
 
   const isAdmin = membership?.role === 'org:admin';
   const memberCount = memberships?.count || 0;
@@ -270,6 +284,34 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
       });
     } finally {
       setIsOpeningPortal(false);
+    }
+  };
+
+  const handleUpdateSeats = async () => {
+    if (!organization?.id || newSeatCount < 1) return;
+
+    try {
+      setIsUpdatingSeats(true);
+      const result = await updateSubscriptionQuantity(organization.id, newSeatCount);
+
+      if (result.success) {
+        toast({
+          title: "Seats Updated",
+          description: `Successfully updated to ${newSeatCount} seats.`,
+        });
+        setIsSeatDialogOpen(false);
+        await loadBillingInfo();
+      } else {
+        throw new Error(result.error || 'Failed to update seats');
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : 'Failed to update seats',
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpdatingSeats(false);
     }
   };
 
@@ -629,6 +671,40 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
                 <Badge variant="outline" className="text-xs border-green-500/50 text-green-400">
                   Active
                 </Badge>
+                {isAdmin && membershipData.role !== 'org:admin' && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-gray-400 hover:text-red-400 p-1 ml-2"
+                    onClick={async () => {
+                      if (!confirm(`Are you sure you want to remove ${membershipData.publicUserData?.identifier} from the organization?`)) return;
+                      
+                      try {
+                        // Remove from our DB seat tracking
+                        await removeSeatFromMember(organization.id, membershipData.publicUserData?.userId || '');
+                        
+                        // Also remove from Clerk (using Clerk's hook if available, or just let the webhook handle it)
+                        // membership.destroy() is available on the membership object
+                        await membershipData.destroy();
+
+                        toast({
+                          title: "Member Removed",
+                          description: "The member has been removed from the organization.",
+                        });
+                        await loadBillingInfo();
+                      } catch (error) {
+                        console.error('Error removing member:', error);
+                        toast({
+                          title: "Error",
+                          description: "Failed to remove member",
+                          variant: "destructive",
+                        });
+                      }
+                    }}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                )}
               </div>
             </div>
           )) || []}
@@ -659,12 +735,29 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
                     size="sm"
                     variant="ghost"
                     className="text-gray-400 hover:text-red-400 p-1"
-                    onClick={() => {
-                      // Handle invitation revocation
-                      toast({
-                        title: "Feature Coming Soon",
-                        description: "Invitation management will be available soon",
-                      });
+                    onClick={async () => {
+                      if (!confirm('Are you sure you want to revoke this invitation?')) return;
+                      
+                      try {
+                        // For invitations, we might need a different API or just revoke via Clerk
+                        // But if it's a pending seat in our DB, we can remove it
+                        // Assuming invitation.id maps to something we can use, or we use email
+                        // Actually, for Clerk invitations, we should use Clerk's useOrganization hook
+                        // But here we are just removing the seat reservation if any
+                        
+                        // If it's just a visual thing from Clerk, we use Clerk's revokeInvitation
+                        await invitation.revoke();
+                        toast({
+                          title: "Invitation Revoked",
+                          description: "The invitation has been revoked.",
+                        });
+                      } catch (error) {
+                        toast({
+                          title: "Error",
+                          description: "Failed to revoke invitation",
+                          variant: "destructive",
+                        });
+                      }
                     }}
                   >
                     <X className="w-4 h-4" />
@@ -785,14 +878,66 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
               )}
             </Button>
             
-            <Button
-              variant="outline"
-              className="border-white/20 text-white hover:bg-white/10"
-              disabled
-            >
-              <Settings className="w-4 h-4 mr-2" />
-              Upgrade Plan
-            </Button>
+            <Dialog open={isSeatDialogOpen} onOpenChange={setIsSeatDialogOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="border-white/20 text-white hover:bg-white/10"
+                  onClick={() => setNewSeatCount(maxSeats)}
+                >
+                  <Users className="w-4 h-4 mr-2" />
+                  Update Seats
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="bg-[#2a2a2a] border-white/10 text-white">
+                <DialogHeader>
+                  <DialogTitle>Update Seat Count</DialogTitle>
+                  <DialogDescription className="text-gray-400">
+                    Change the number of seats in your subscription.
+                    Current seats: {maxSeats}. Used: {totalUsedSeats}.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="py-4">
+                  <div className="flex items-center gap-4">
+                    <Input
+                      type="number"
+                      min={Math.max(1, totalUsedSeats)}
+                      max="100"
+                      value={newSeatCount}
+                      onChange={(e) => setNewSeatCount(parseInt(e.target.value) || 0)}
+                      className="bg-[#1a1a1a] border-white/10 text-white"
+                    />
+                    <span className="text-sm text-gray-400">seats</span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    New cost: {formatSeatCost('teams', 'monthly', newSeatCount)}
+                  </p>
+                </div>
+                <DialogFooter>
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsSeatDialogOpen(false)}
+                    className="border-white/10 text-white hover:bg-white/10"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleUpdateSeats}
+                    disabled={isUpdatingSeats || newSeatCount < Math.max(1, totalUsedSeats)}
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                  >
+                    {isUpdatingSeats ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Updating...
+                      </>
+                    ) : (
+                      'Confirm Update'
+                    )}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </div>
           
           <div className="text-xs text-gray-500">

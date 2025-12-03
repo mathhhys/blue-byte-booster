@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { useEffect } from "react";
 import { SignedIn, SignedOut, RedirectToSignIn } from '@clerk/clerk-react';
 import RedditPixelTracker from "./components/RedditPixelTracker";
+import { KindeAuthProviderWrapper } from "./contexts/KindeAuthContext";
 
 import Index from "./pages/Index";
 import Pricing from "./pages/Pricing";
@@ -28,6 +29,12 @@ import ExtensionSignIn from "./pages/ExtensionSignIn";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import Security from "./pages/Security";
+
+// Kinde Teams Pages
+import TeamsLogin from "./pages/teams/TeamsLogin";
+import TeamsCallback from "./pages/teams/TeamsCallback";
+import TeamsDashboard from "./pages/teams/TeamsDashboard";
+import TeamsSubscribe from "./pages/teams/TeamsSubscribe";
 
 const queryClient = new QueryClient();
 
@@ -57,7 +64,41 @@ const App = () => {
         <Route path="/payment/cancelled" element={<PaymentCancelled />} />
         <Route path="/billing/success" element={<BillingSuccess />} />
         
-        {/* Protected Routes */}
+        {/* Kinde Teams Routes (B2B) */}
+        <Route
+          path="/teams/login"
+          element={
+            <KindeAuthProviderWrapper>
+              <TeamsLogin />
+            </KindeAuthProviderWrapper>
+          }
+        />
+        <Route
+          path="/teams/callback"
+          element={
+            <KindeAuthProviderWrapper>
+              <TeamsCallback />
+            </KindeAuthProviderWrapper>
+          }
+        />
+        <Route
+          path="/teams/dashboard"
+          element={
+            <KindeAuthProviderWrapper>
+              <TeamsDashboard />
+            </KindeAuthProviderWrapper>
+          }
+        />
+        <Route
+          path="/teams/subscribe"
+          element={
+            <KindeAuthProviderWrapper>
+              <TeamsSubscribe />
+            </KindeAuthProviderWrapper>
+          }
+        />
+        
+        {/* Protected Routes (Clerk) */}
         <Route
           path="/dashboard"
           element={

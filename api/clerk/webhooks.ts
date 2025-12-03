@@ -234,6 +234,67 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           console.log(`Revoked VSCode sessions for Clerk session ${session.id} due to ${eventType}`);
         }
 
+      } else if (eventType === 'organization.created' || eventType === 'organization.updated') {
+        const org = evt.data;
+        console.log(`Processing organization event: ${eventType} for org ${org.id}`);
+
+        const { data, error } = await supabase.rpc('upsert_organization', {
+          p_clerk_org_id: org.id,
+          p_name: org.name,
+          p_stripe_customer_id: null // Will be updated by Stripe webhook later
+        });
+
+        if (error) {
+          console.error('Error upserting organization:', error);
+          return res.status(500).json({ error: 'Failed to upsert organization.' });
+        }
+        console.log(`Successfully upserted organization ${org.id}`);
+
+      } else if (eventType === 'organizationMembership.created') {
+        const membership = evt.data;
+        const orgId = membership.organization.id;
+        const userId = membership.public_user_data.user_id;
+        const email = membership.public_user_data.identifier;
+        const name = `${membership.public_user_data.first_name || ''} ${membership.public_user_data.last_name || ''}`.trim();
+        
+        console.log(`Processing organization membership created for user ${userId} in org ${orgId}`);
+
+        // Use the assign_organization_seat function which checks limits
+        const { data: success, error } = await supabase.rpc('assign_organization_seat', {
+          p_clerk_org_id: orgId,
+          p_clerk_user_id: userId,
+          p_user_email: email,
+          p_user_name: name,
+          p_assigned_by: 'system_webhook'
+        });
+
+        if (error) {
+          console.error('Error assigning organization seat:', error);
+          // Don't fail the webhook, just log error (might be seat limit reached)
+        } else if (success === false) {
+          console.warn(`Failed to assign seat to user ${userId} in org ${orgId} - likely seat limit reached or no active subscription`);
+        } else {
+          console.log(`Successfully assigned seat to user ${userId} in org ${orgId}`);
+        }
+
+      } else if (eventType === 'organizationMembership.deleted') {
+        const membership = evt.data;
+        const orgId = membership.organization.id;
+        const userId = membership.public_user_data.user_id;
+
+        console.log(`Processing organization membership deleted for user ${userId} in org ${orgId}`);
+
+        const { data: success, error } = await supabase.rpc('remove_organization_seat', {
+          p_clerk_org_id: orgId,
+          p_clerk_user_id: userId
+        });
+
+        if (error) {
+          console.error('Error removing organization seat:', error);
+        } else {
+          console.log(`Successfully removed seat for user ${userId} in org ${orgId}`);
+        }
+
       } else {
         console.log(`Unhandled Clerk webhook event type: ${eventType}`);
       }

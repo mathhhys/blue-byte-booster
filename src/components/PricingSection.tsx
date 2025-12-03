@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { Button } from "./ui/button";
+import { KindeAuthProviderWrapper, useKindeAuthContext } from "@/contexts/KindeAuthContext";
 import {
   Card,
   CardContent,
@@ -13,6 +14,18 @@ import { useAuth, useUser } from '@clerk/clerk-react';
 import { createMultiCurrencyCheckoutSession, prepareMultiCurrencyCheckoutData } from '@/utils/stripe/checkout';
 import { CurrencyCode } from '@/types/database';
 
+const TeamsAuthButton = () => {
+  const { register } = useKindeAuthContext();
+  return (
+    <Button
+      onClick={() => register()}
+      className="w-full bg-blue-700 hover:bg-blue-600 text-white font-medium py-6"
+    >
+      Start with Teams
+    </Button>
+  );
+};
+
 export default function PricingSection() {
   const { getToken } = useAuth();
   const { user, isSignedIn } = useUser();
@@ -25,7 +38,10 @@ export default function PricingSection() {
     }
 
     if (!isSignedIn) {
-      window.location.href = '/sign-up?plan=pro&billing=monthly&currency=EUR';
+      // Small delay to ensure pixel event fires before navigation
+      setTimeout(() => {
+        window.location.href = '/sign-up?plan=pro&billing=monthly&currency=EUR';
+      }, 300);
       return;
     }
 
@@ -60,7 +76,10 @@ export default function PricingSection() {
       if (result.success) {
         const typedResult = result as { success: boolean; url?: string; sessionId?: string };
         if (typedResult.url) {
-          window.location.href = typedResult.url;
+          // Small delay to ensure pixel event fires before navigation
+          setTimeout(() => {
+            window.location.href = typedResult.url!;
+          }, 300);
         } else if (typedResult.sessionId) {
           // Fallback for mock or sessionId-only responses
           const stripeResult = await fetch('/api/stripe/session-status', {
@@ -70,7 +89,9 @@ export default function PricingSection() {
           });
           const sessionData = await stripeResult.json();
           if (sessionData.url) {
-            window.location.href = sessionData.url;
+            setTimeout(() => {
+              window.location.href = sessionData.url;
+            }, 300);
           }
         }
       } else {
@@ -149,9 +170,9 @@ export default function PricingSection() {
           </CardHeader>
 
           <CardContent className="space-y-4 flex-grow">
-            <Button onClick={() => window.location.href = 'mailto:mathys@softcodes.io'} className="w-full bg-blue-700 hover:bg-blue-600 text-white font-medium py-6">
-              Contact Us
-            </Button>
+            <KindeAuthProviderWrapper>
+              <TeamsAuthButton />
+            </KindeAuthProviderWrapper>
 
             <div className="pt-2">
               <p className="text-sm text-gray-400 mb-4">Everything in Pro, plus:</p>
@@ -162,15 +183,19 @@ export default function PricingSection() {
                 </li>
                 <li className="flex items-start gap-2">
                   <Check className="size-4 mt-0.5 text-blue-500 flex-shrink-0" />
-                  <span>SSO Available (+$10 per user/month)</span>
+                  <span>Seat-Based Pricing (min. 3 seats)</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <Check className="size-4 mt-0.5 text-blue-500 flex-shrink-0" />
-                  <span>User-Role Assignment and User Management</span>
+                  <span>Admin Dashboard & User Management</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <Check className="size-4 mt-0.5 text-blue-500 flex-shrink-0" />
-                  <span>Pooled Credit Base</span>
+                  <span>Role-Based Access Control</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Check className="size-4 mt-0.5 text-blue-500 flex-shrink-0" />
+                  <span>Priority Support</span>
                 </li>
               </ul>
             </div>
