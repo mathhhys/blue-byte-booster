@@ -70,13 +70,13 @@ export default async function handler(req: any, res: any) {
       const subscriptionInfo = {
         id: subscription.id,
         status: subscription.status,
-        trial_end: subscription.trial_end ? subscription.trial_end * 1000 : null, // Convert to ms for ISO
-        trial_start: subscription.trial_start ? subscription.trial_start * 1000 : null,
+        trial_end: (subscription as any).trial_end ? (subscription as any).trial_end * 1000 : null, // Convert to ms for ISO
+        trial_start: (subscription as any).trial_start ? (subscription as any).trial_start * 1000 : null,
         seats_total,
         plan_type,
         billing_frequency,
         stripe_customer_id: customer.id,
-        current_period_end: subscription.current_period_end * 1000,
+        current_period_end: (subscription as any).current_period_end ? (subscription as any).current_period_end * 1000 : null,
       };
   
       // Optionally store/update in Supabase if needed
