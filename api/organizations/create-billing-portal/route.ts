@@ -8,6 +8,7 @@ const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 export async function POST(req: Request) {
+  console.log('🟢 BILLING PORTAL ROUTE HIT');
   try {
     const body = await req.json();
     const { clerk_org_id: orgId } = body;
@@ -17,7 +18,9 @@ export async function POST(req: Request) {
     }
 
     // Authenticate org admin
+    console.log('🔍 Calling orgAdminMiddleware for org:', orgId);
     const authResult = await orgAdminMiddleware({ headers: Object.fromEntries(req.headers.entries()) } as any, orgId);
+    console.log('✅ Middleware passed for user:', authResult.userId, 'in org:', orgId);
     console.log('🔍 API: Creating billing portal for organization:', orgId, 'by user:', authResult.userId);
 
     // Determine origin for return_url

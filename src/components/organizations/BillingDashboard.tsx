@@ -268,10 +268,13 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
 
     try {
       setIsOpeningPortal(true);
-      const result = await createOrganizationBillingPortal(organization.id);
+      const token = await getToken();
+      console.log('🔍 Dashboard: Got token for billing portal:', !!token);
+      const result = await createOrganizationBillingPortal(organization.id, token);
 
       if (result.success) {
         if (result.url) {
+          console.log('🔍 Dashboard: Redirecting to billing portal:', result.url);
           window.location.href = result.url;
         } else {
           // Development mode

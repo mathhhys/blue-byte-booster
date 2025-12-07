@@ -113,17 +113,26 @@ export const createOrganizationSubscription = async (
 };
 
 export const createOrganizationBillingPortal = async (
-  orgId: string
+  orgId: string,
+  token?: string
 ): Promise<{ success: boolean; url?: string; error?: string }> => {
   try {
-    console.log('Creating billing portal for organization:', orgId);
+    console.log('🔍 Frontend: Creating billing portal for org:', orgId, 'token present:', !!token);
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
 
     const API_BASE = import.meta.env.VITE_API_URL || '';
-    const response = await fetch(`${API_BASE}/api/organizations/create-billing-portal`, {
+    const url = `${API_BASE}/api/organizations/create-billing-portal`;
+    console.log('🔍 Frontend request:', { url, hasAuth: !!token });
+
+    const response = await fetch(url, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify({
         clerk_org_id: orgId
       }),
@@ -132,9 +141,11 @@ export const createOrganizationBillingPortal = async (
     const data = await response.json();
 
     if (!response.ok) {
+      console.error('❌ Billing portal response error:', response.status, data);
       throw new Error(data.error || 'Failed to create billing portal');
     }
 
+    console.log('✅ Billing portal success:', data.url);
     return {
       success: true,
       url: data.url
