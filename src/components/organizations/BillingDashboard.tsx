@@ -333,6 +333,13 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
   
     try {
       setIsInviting(true);
+
+      // Invite via Clerk
+      await organization.inviteMember({
+        emailAddress: newMemberEmail,
+        role: 'basic_member'
+      });
+
       const token = await getToken();
       console.log('🔍 DEBUG: Got auth token for assign seat:', token ? 'Present' : 'Missing');
       
@@ -542,13 +549,6 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
             </div>
           </div>
           
-          <div>
-            <div className="text-sm text-gray-400 mb-1">Next Payment</div>
-            <div className="text-xl font-semibold text-white">
-              {new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString()}
-            </div>
-            <div className="text-sm text-gray-400">monthly billing</div>
-          </div>
   
           {/* Trial Status */}
           {subscriptionData?.status === 'trialing' && subscriptionData.trial_end && (
@@ -869,103 +869,6 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
         )}
       </Card>
 
-      {/* Billing Actions */}
-      <Card className="bg-[#2a2a2a] border-white/10 p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-white">Billing Management</h3>
-        </div>
-        
-        <div className="space-y-4">
-          <div className="text-sm text-gray-400">
-            Manage your organization's subscription, billing information, and payment methods.
-          </div>
-          
-          <div className="flex gap-3">
-            <Button
-              onClick={handleOpenBillingPortal}
-              disabled={isOpeningPortal}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
-            >
-              {isOpeningPortal ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Opening Portal...
-                </>
-              ) : (
-                <>
-                  <ExternalLink className="w-4 h-4 mr-2" />
-                  Open Billing Portal
-                </>
-              )}
-            </Button>
-            
-            <Dialog open={isSeatDialogOpen} onOpenChange={setIsSeatDialogOpen}>
-              <DialogTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="border-white/20 text-white hover:bg-white/10"
-                  onClick={() => setNewSeatCount(maxSeats)}
-                >
-                  <Users className="w-4 h-4 mr-2" />
-                  Update Seats
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="bg-[#2a2a2a] border-white/10 text-white">
-                <DialogHeader>
-                  <DialogTitle>Update Seat Count</DialogTitle>
-                  <DialogDescription className="text-gray-400">
-                    Change the number of seats in your subscription.
-                    Current seats: {maxSeats}. Used: {totalUsedSeats}.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="py-4">
-                  <div className="flex items-center gap-4">
-                    <Input
-                      type="number"
-                      min={Math.max(1, totalUsedSeats)}
-                      max="100"
-                      value={newSeatCount}
-                      onChange={(e) => setNewSeatCount(parseInt(e.target.value) || 0)}
-                      className="bg-[#1a1a1a] border-white/10 text-white"
-                    />
-                    <span className="text-sm text-gray-400">seats</span>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-2">
-                    New cost: {formatSeatCost('teams', 'monthly', newSeatCount)}
-                  </p>
-                </div>
-                <DialogFooter>
-                  <Button
-                    variant="outline"
-                    onClick={() => setIsSeatDialogOpen(false)}
-                    className="border-white/10 text-white hover:bg-white/10"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={handleUpdateSeats}
-                    disabled={isUpdatingSeats || newSeatCount < Math.max(1, totalUsedSeats)}
-                    className="bg-blue-600 hover:bg-blue-700 text-white"
-                  >
-                    {isUpdatingSeats ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Updating...
-                      </>
-                    ) : (
-                      'Confirm Update'
-                    )}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          </div>
-          
-          <div className="text-xs text-gray-500">
-            Use the billing portal to update payment methods, view invoices, and manage your subscription.
-          </div>
-        </div>
-      </Card>
     </div>
   );
 };
