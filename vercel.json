@@ -40,6 +40,9 @@
     "api/stripe/create-customer-portal-session.js": {
       "maxDuration": 10
     },
+    "api/organizations/create-billing-portal.ts": {
+      "maxDuration": 10
+    },
     "api/starter/process-signup.js": {
       "maxDuration": 30,
       "memory": 512
