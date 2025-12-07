@@ -1,4 +1,4 @@
-import { useOrganization, useOrganizationList } from '@clerk/clerk-react';
+import { useOrganization, useOrganizationList, useAuth } from '@clerk/clerk-react';
 import { teamInvitationOperations } from '@/utils/supabase/database';
 import { InvitationData, InvitationResult } from '@/types/database';
 
@@ -71,7 +71,7 @@ export class ClerkInvitationManager {
   }
 
   // Send invitation using Clerk's native invitation system
-  async sendInvitation(invitationData: InvitationData): Promise<InvitationResult> {
+  async sendInvitation(invitationData: InvitationData, token?: string | null): Promise<InvitationResult> {
     try {
       if (!this.organizationId) {
         throw new Error('Organization not initialized');
@@ -80,7 +80,8 @@ export class ClerkInvitationManager {
       // Create invitation using Clerk's API
       const clerkInvitation = await this.createClerkInvitation(
         this.organizationId,
-        invitationData.email
+        invitationData.email,
+        token
       );
 
       // Store invitation in our database
@@ -110,29 +111,37 @@ export class ClerkInvitationManager {
   }
 
   // Create Clerk invitation
-  private async createClerkInvitation(organizationId: string, email: string) {
+  private async createClerkInvitation(organizationId: string, email: string, token?: string | null) {
     try {
-      // This would use Clerk's API to create an invitation
-      // const invitation = await clerk.organizations.createInvitation({
-      //   organizationId,
-      //   emailAddress: email,
-      //   role: 'basic_member', // or whatever role you want
-      // });
-
-      // Mock invitation for development
-      const mockInvitation = {
-        id: `inv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        organizationId,
-        emailAddress: email,
-        status: 'pending',
-        createdAt: new Date().toISOString(),
+      const API_BASE = import.meta.env.VITE_API_URL || '';
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
       };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
 
-      console.log(`Created Clerk invitation for ${email}:`, mockInvitation.id);
-      return mockInvitation;
+      const response = await fetch(`${API_BASE}/api/organizations/invite`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          orgId: organizationId,
+          email,
+          role: 'basic_member'
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create invitation');
+      }
+
+      const data = await response.json();
+      console.log(`Created Clerk invitation for ${email}:`, data.invitation.id);
+      return data.invitation;
     } catch (error) {
       console.error('Error creating Clerk invitation:', error);
-      throw new Error('Failed to create Clerk invitation');
+      throw error;
     }
   }
 
@@ -218,14 +227,16 @@ export class ClerkInvitationManager {
 
 // React hooks for invitation management
 export const useTeamInvitations = (organizationId?: string) => {
+  const { getToken } = useAuth();
   const invitationManager = new ClerkInvitationManager(organizationId);
 
   const sendInvitation = async (email: string, subscriptionId: string, inviterId: string) => {
+    const token = await getToken();
     return await invitationManager.sendInvitation({
       email,
       subscriptionId,
       inviterId,
-    });
+    }, token);
   };
 
   const revokeInvitation = async (clerkInvitationId: string, dbInvitationId: string) => {

@@ -47,6 +47,9 @@ export const SeatManager: React.FC = () => {
   const [assignRole, setAssignRole] = useState('member');
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showBuySeatsModal, setShowBuySeatsModal] = useState(false);
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState('basic_member');
   const [buySeatsQuantity, setBuySeatsQuantity] = useState(1);
 
   useEffect(() => {
@@ -92,6 +95,54 @@ export const SeatManager: React.FC = () => {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleInvite = async () => {
+    if (!organization?.id || !inviteEmail.trim()) return;
+
+    setIsAssigning(true);
+    try {
+      const token = await getToken();
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const API_BASE = import.meta.env.VITE_API_URL || '';
+      const response = await fetch(`${API_BASE}/api/organizations/invite`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          orgId: organization.id,
+          email: inviteEmail,
+          role: inviteRole,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to send invitation');
+      }
+
+      toast({
+        title: "Success",
+        description: `Invitation sent to ${inviteEmail}`,
+      });
+
+      setInviteEmail('');
+      setShowInviteModal(false);
+    } catch (error) {
+      console.error('Error sending invitation:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : 'Failed to send invitation',
+        variant: "destructive",
+      });
+    } finally {
+      setIsAssigning(false);
     }
   };
 
@@ -294,69 +345,135 @@ export const SeatManager: React.FC = () => {
           )}
         </div>
         
-        <Dialog open={showAssignModal} onOpenChange={setShowAssignModal}>
-          <DialogTrigger asChild>
-            <Button className="bg-blue-600 hover:bg-blue-700 text-white">
-              <UserPlus className="w-4 h-4 mr-2" />
-              Assign Seat
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="bg-[#2a2a2a] border-white/10 text-white">
-            <DialogHeader>
-              <DialogTitle>Assign New Seat</DialogTitle>
-              <DialogDescription>Assign a new seat to a team member by entering their email address and role.</DialogDescription>
-            </DialogHeader>
-            
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="email" className="text-white">Email Address</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="Enter user's email address"
-                  value={assignEmail}
-                  onChange={(e) => setAssignEmail(e.target.value)}
-                  className="bg-[#1a1a1a] border-white/10 text-white mt-1"
-                />
+        <div className="flex gap-2">
+          <Dialog open={showInviteModal} onOpenChange={setShowInviteModal}>
+            <DialogTrigger asChild>
+              <Button variant="outline" className="border-white/20 text-white hover:bg-white/10">
+                <Mail className="w-4 h-4 mr-2" />
+                Invite Member
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="bg-[#2a2a2a] border-white/10 text-white">
+              <DialogHeader>
+                <DialogTitle>Invite New Member</DialogTitle>
+                <DialogDescription>Send an invitation to join the organization.</DialogDescription>
+              </DialogHeader>
+              
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="invite-email" className="text-white">Email Address</Label>
+                  <Input
+                    id="invite-email"
+                    type="email"
+                    placeholder="Enter email address"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    className="bg-[#1a1a1a] border-white/10 text-white mt-1"
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="invite-role" className="text-white">Role</Label>
+                  <Select value={inviteRole} onValueChange={setInviteRole}>
+                    <SelectTrigger className="bg-[#1a1a1a] border-white/10 text-white mt-1">
+                      <SelectValue placeholder="Select role" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-[#2a2a2a] border-white/10 text-white">
+                      <SelectItem value="basic_member">Member</SelectItem>
+                      <SelectItem value="admin">Admin</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
               
-              <div>
-                <Label htmlFor="role" className="text-white">Role</Label>
-                <Select value={assignRole} onValueChange={setAssignRole}>
-                  <SelectTrigger className="bg-[#1a1a1a] border-white/10 text-white mt-1">
-                    <SelectValue placeholder="Select role" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-[#2a2a2a] border-white/10 text-white">
-                    <SelectItem value="member">Member</SelectItem>
-                    <SelectItem value="admin">Admin</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setShowAssignModal(false)}
-                className="border-white/20 text-white hover:bg-white/10"
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleAssignSeat}
-                disabled={isAssigning || !assignEmail.trim()}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
-              >
-                {isAssigning ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <UserPlus className="w-4 h-4 mr-2" />
-                )}
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowInviteModal(false)}
+                  className="border-white/20 text-white hover:bg-white/10"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleInvite}
+                  disabled={isAssigning || !inviteEmail.trim()}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  {isAssigning ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Mail className="w-4 h-4 mr-2" />
+                  )}
+                  Send Invitation
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={showAssignModal} onOpenChange={setShowAssignModal}>
+            <DialogTrigger asChild>
+              <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+                <UserPlus className="w-4 h-4 mr-2" />
                 Assign Seat
               </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+            </DialogTrigger>
+            <DialogContent className="bg-[#2a2a2a] border-white/10 text-white">
+              <DialogHeader>
+                <DialogTitle>Assign New Seat</DialogTitle>
+                <DialogDescription>Assign a new seat to a team member by entering their email address and role.</DialogDescription>
+              </DialogHeader>
+              
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="email" className="text-white">Email Address</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="Enter user's email address"
+                    value={assignEmail}
+                    onChange={(e) => setAssignEmail(e.target.value)}
+                    className="bg-[#1a1a1a] border-white/10 text-white mt-1"
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="role" className="text-white">Role</Label>
+                  <Select value={assignRole} onValueChange={setAssignRole}>
+                    <SelectTrigger className="bg-[#1a1a1a] border-white/10 text-white mt-1">
+                      <SelectValue placeholder="Select role" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-[#2a2a2a] border-white/10 text-white">
+                      <SelectItem value="member">Member</SelectItem>
+                      <SelectItem value="admin">Admin</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowAssignModal(false)}
+                  className="border-white/20 text-white hover:bg-white/10"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleAssignSeat}
+                  disabled={isAssigning || !assignEmail.trim()}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  {isAssigning ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <UserPlus className="w-4 h-4 mr-2" />
+                  )}
+                  Assign Seat
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
 
         <Dialog open={showBuySeatsModal} onOpenChange={setShowBuySeatsModal}>
           <DialogContent className="bg-[#2a2a2a] border-white/10 text-white">

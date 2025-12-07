@@ -36,7 +36,7 @@ export const InvitationManager: React.FC<InvitationManagerProps> = ({
   onClose
 }) => {
   const { user } = useUser();
-  const { sendInvitation, revokeInvitation } = useTeamInvitations();
+  const { sendInvitation, revokeInvitation } = useTeamInvitations(organizationId);
   const { toast } = useToast();
 
   const [emailInput, setEmailInput] = useState('');
