@@ -1,5 +1,93 @@
-import { organizationSeatOperations } from '../../../src/utils/supabase/database.js';
-import { orgAdminMiddleware } from '../../../src/utils/clerk/token-verification.js';
+import { organizationSeatOperations } from '../../../src/utils/supabase/database';
+import { orgAdminMiddleware } from '../../../src/utils/clerk/token-verification';
+import Stripe from 'stripe';
+import { createClient } from '@supabase/supabase-js';
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
+const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabase = createClient(supabaseUrl!, supabaseKey!);
+
+async function syncSubscriptionFromStripe(clerkOrgId: string) {
+  console.log('🔄 Syncing subscription from Stripe for org:', clerkOrgId);
+  try {
+    // 1. Find Stripe Customer by metadata
+    const customers = await stripe.customers.search({
+      query: `metadata['clerk_org_id']:'${clerkOrgId}'`,
+      limit: 1
+    });
+
+    if (customers.data.length === 0) {
+      console.log('❌ No Stripe customer found for org:', clerkOrgId);
+      return false;
+    }
+
+    const customer = customers.data[0];
+    console.log('✅ Found Stripe customer:', customer.id);
+
+    // 2. Get active subscriptions
+    const subscriptions = await stripe.subscriptions.list({
+      customer: customer.id,
+      status: 'active',
+      limit: 1,
+      expand: ['data.items']
+    });
+
+    if (subscriptions.data.length === 0) {
+      console.log('❌ No active subscription found for customer:', customer.id);
+      return false;
+    }
+
+    const subscription: any = subscriptions.data[0];
+    console.log('✅ Found active subscription:', subscription.id);
+
+    // 3. Calculate seats
+    const metadata = subscription.metadata || {};
+    let seatsTotal = 1;
+    
+    // Try to get seats from metadata first
+    if (metadata.seats) {
+      seatsTotal = parseInt(metadata.seats);
+    } else {
+      // Or sum up quantity of items
+      seatsTotal = subscription.items.data.reduce((sum: number, item: any) => sum + item.quantity, 0);
+    }
+
+    const planType = metadata.plan_type || 'teams';
+    const billingFrequency = metadata.billing_frequency || 'monthly';
+
+    // 4. Create/Update organization_subscriptions record
+    const { error } = await supabase
+      .from('organization_subscriptions')
+      .upsert({
+        clerk_org_id: clerkOrgId,
+        stripe_subscription_id: subscription.id,
+        stripe_customer_id: customer.id,
+        plan_type: planType,
+        billing_frequency: billingFrequency,
+        seats_total: seatsTotal,
+        seats_used: 0,
+        status: 'active',
+        current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
+        current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+        updated_at: new Date().toISOString()
+      }, {
+        onConflict: 'clerk_org_id' // Assuming clerk_org_id is unique or we want to update by it
+      });
+
+    if (error) {
+      console.error('❌ Error creating organization subscription:', error);
+      return false;
+    }
+
+    console.log('✅ Organization subscription synced successfully');
+    return true;
+
+  } catch (error) {
+    console.error('❌ Error syncing subscription:', error);
+    return false;
+  }
+}
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
@@ -25,7 +113,22 @@ export default async function handler(req: any, res: any) {
     const authResult = await orgAdminMiddleware(req, finalOrgId);
     console.log('🔍 API: Assigning seat for organization:', finalOrgId, 'by user:', authResult.userId, 'to email:', finalEmail);
 
-    const { data, error } = await organizationSeatOperations.assignSeat(finalOrgId, finalEmail, role || 'member');
+    let result = await organizationSeatOperations.assignSeat(finalOrgId, finalEmail, role || 'member');
+
+    // If subscription not found, try to sync from Stripe and retry
+    if (result.error === 'Organization subscription not found') {
+      console.log('⚠️ Subscription not found, attempting to sync from Stripe...');
+      const synced = await syncSubscriptionFromStripe(finalOrgId);
+      
+      if (synced) {
+        console.log('🔄 Retry assigning seat after sync...');
+        result = await organizationSeatOperations.assignSeat(finalOrgId, finalEmail, role || 'member');
+      } else {
+        console.log('❌ Sync failed or no subscription found in Stripe');
+      }
+    }
+
+    const { data, error } = result;
 
     if (error) {
       console.error('❌ API: Database error:', error);
@@ -41,6 +144,13 @@ export default async function handler(req: any, res: any) {
         return res.status(400).json({ error: 'User already has an active seat' });
       }
       
+      if (error === 'Organization subscription not found') {
+         return res.status(404).json({ 
+           error: 'Subscription not found', 
+           message: 'No active subscription found for this organization. Please ensure you have purchased a plan.' 
+         });
+      }
+
       return res.status(500).json({ error: 'Database error', details: error });
     }
 

@@ -337,14 +337,8 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
     try {
       setIsInviting(true);
 
-      // Invite via Clerk
-      await organization.inviteMember({
-        emailAddress: newMemberEmail,
-        role: 'basic_member'
-      });
-
       const token = await getToken();
-      console.log('🔍 DEBUG: Got auth token for assign seat:', token ? 'Present' : 'Missing');
+      console.log('🔍 DEBUG: Got auth token for invite:', token ? 'Present' : 'Missing');
       
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
@@ -355,34 +349,37 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
       }
       
       const API_BASE = import.meta.env.VITE_API_URL || '';
-      const response = await fetch(`${API_BASE}/api/organizations/seats/assign`, {
+      
+      // Use backend API for invitation + seat assignment
+      const response = await fetch(`${API_BASE}/api/organizations/invite`, {
         method: 'POST',
         headers,
         body: JSON.stringify({
-          org_id: organization.id,
+          orgId: organization.id,
           email: newMemberEmail,
-          role: 'member',
+          role: 'basic_member',
         }),
       });
   
       const result = await response.json();
       
       if (!response.ok) {
-        throw new Error(result.error || 'Failed to assign seat');
+        throw new Error(result.error || 'Failed to send invitation');
       }
   
       toast({
-        title: "Seat Assigned!",
-        description: `Seat assigned to ${newMemberEmail}. They can now access the organization.`,
+        title: "Invitation Sent!",
+        description: `Invitation sent to ${newMemberEmail}. A seat has been reserved.`,
       });
       
       setNewMemberEmail('');
       // Refresh data to show updated seat count
       await loadBillingInfo();
     } catch (error) {
+      console.error('Error sending invitation:', error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : 'Failed to assign seat',
+        description: error instanceof Error ? error.message : 'Failed to send invitation',
         variant: "destructive",
       });
     } finally {
