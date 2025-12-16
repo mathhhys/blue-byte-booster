@@ -623,7 +623,7 @@ export const organizationSeatOperations = {
       }
 
       // Get latest seat-eligible subscription (active OR trialing)
-      const { data: subscription, error: subError } = await client
+      let { data: subscription, error: subError } = await client
         .from('organization_subscriptions')
         .select('id, seats_used, seats_total, overage_seats, status, updated_at')
         .eq('clerk_org_id', clerkOrgId)
@@ -632,8 +632,47 @@ export const organizationSeatOperations = {
         .limit(1)
         .maybeSingle();
 
-      if (subError || !subscription) {
-        return { data: null, error: 'Organization subscription not found' };
+      if (subError) {
+        return { data: null, error: subError };
+      }
+
+      // If no subscription found, try to create a default one (auto-provisioning)
+      if (!subscription) {
+        console.log('⚠️ No active subscription found, attempting to auto-provision default subscription...');
+        
+        // First get the organization ID
+        const { data: org, error: orgError } = await client
+          .from('organizations')
+          .select('id')
+          .eq('clerk_org_id', clerkOrgId)
+          .single();
+          
+        if (orgError || !org) {
+          console.error('Organization not found for auto-provisioning:', orgError);
+          return { data: null, error: 'Organization subscription not found' };
+        }
+
+        // Create default subscription
+        const { data: newSub, error: createError } = await client
+          .from('organization_subscriptions')
+          .insert({
+            organization_id: org.id,
+            clerk_org_id: clerkOrgId,
+            plan_type: 'teams',
+            status: 'trialing',
+            seats_total: 5, // Give 5 seats by default for trial
+            seats_used: 0
+          })
+          .select('id, seats_used, seats_total, overage_seats, status, updated_at')
+          .single();
+
+        if (createError) {
+          console.error('Failed to auto-provision subscription:', createError);
+          return { data: null, error: 'Organization subscription not found' };
+        }
+
+        subscription = newSub;
+        console.log('✅ Auto-provisioned default subscription:', subscription.id);
       }
 
       // Check seat availability

@@ -263,6 +263,36 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
         console.log(`Successfully upserted organization ${org.id}`);
 
+        // Create default subscription if it doesn't exist (for new organizations)
+        // We use insert with ignore duplicates logic (via onConflict if we had it, but here we rely on error code)
+        // Actually, since we don't have onConflict support for partial unique index in simple insert, we'll just try insert
+        // and ignore unique violation.
+        try {
+          const { error: subError } = await supabase
+            .from('organization_subscriptions')
+            .insert({
+              organization_id: data, // data is the UUID returned by upsert_organization
+              clerk_org_id: org.id,
+              plan_type: 'teams',
+              status: 'trialing',
+              seats_total: 5, // Default trial seats
+              seats_used: 0
+            });
+            
+          if (subError) {
+            // Ignore unique constraint violation (code 23505)
+            if (subError.code !== '23505') {
+              console.error('Error creating default subscription:', subError);
+            } else {
+              console.log('Default subscription already exists for org:', org.id);
+            }
+          } else {
+            console.log('✅ Created default subscription for org:', org.id);
+          }
+        } catch (subErr) {
+          console.error('Exception creating default subscription:', subErr);
+        }
+
       } else if (eventType === 'organizationMembership.created') {
         const membership = evt.data;
         const orgId = membership.organization.id;
