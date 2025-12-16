@@ -45,12 +45,31 @@ function getSupabaseAdminClient() {
   return createClient(supabaseUrl, supabaseKey);
 }
 
+// Helper function to calculate credits based on plan and billing frequency
+function calculateCreditsToGrant(planType: string, billingFrequency: string, seats: number = 1) {
+  const baseCredits = billingFrequency === 'yearly' ? 6000 : 500;
+  return baseCredits * seats;
+}
+
 async function syncSubscriptionFromStripe(clerkOrgId: string) {
   console.log('🔄 Syncing subscription from Stripe for org (invite):', clerkOrgId);
 
   try {
     const stripe = getStripeClient();
     const supabase = getSupabaseAdminClient();
+
+    // 1. Get Organization ID from Supabase
+    const { data: org, error: orgError } = await supabase
+      .from('organizations')
+      .select('id')
+      .eq('clerk_org_id', clerkOrgId)
+      .single();
+
+    if (orgError || !org) {
+      console.log('⚠️ Organization not found in Supabase, cannot link subscription yet.');
+      // We continue, but organization_id will be null/missing in upsert if we don't have it.
+      // Ideally we should have it because we call syncOrganizationFromClerk before this.
+    }
 
     const customers = await stripe.customers.search({
       query: `metadata['clerk_org_id']:'${clerkOrgId}'`,
@@ -97,21 +116,33 @@ async function syncSubscriptionFromStripe(clerkOrgId: string) {
 
     const planType = metadata.plan_type || 'teams';
     const billingFrequency = metadata.billing_frequency || 'monthly';
+    
+    // Calculate credits
+    const totalCredits = calculateCreditsToGrant(planType, billingFrequency, seatsTotal);
+
+    const subscriptionData: any = {
+      clerk_org_id: clerkOrgId,
+      stripe_subscription_id: subscription.id,
+      stripe_customer_id: customer.id,
+      plan_type: planType,
+      billing_frequency: billingFrequency,
+      seats_total: seatsTotal,
+      status: subscription.status,
+      current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
+      current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+      updated_at: new Date().toISOString(),
+      // Initialize credits if creating new record
+      total_credits: totalCredits,
+      // used_credits: 0 // Default is 0 in DB
+    };
+
+    if (org) {
+      subscriptionData.organization_id = org.id;
+    }
 
     const { error } = await supabase
       .from('organization_subscriptions')
-      .upsert({
-        clerk_org_id: clerkOrgId,
-        stripe_subscription_id: subscription.id,
-        stripe_customer_id: customer.id,
-        plan_type: planType,
-        billing_frequency: billingFrequency,
-        seats_total: seatsTotal,
-        status: subscription.status,
-        current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
-        current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
-        updated_at: new Date().toISOString()
-      }, {
+      .upsert(subscriptionData, {
         onConflict: 'clerk_org_id'
       });
 
@@ -124,6 +155,32 @@ async function syncSubscriptionFromStripe(clerkOrgId: string) {
     return true;
   } catch (error) {
     console.error('❌ Error syncing subscription (invite):', error);
+    return false;
+  }
+}
+
+async function syncOrganizationFromClerk(clerkOrgId: string) {
+  console.log('🔄 Syncing organization from Clerk (invite):', clerkOrgId);
+  try {
+    const clerk = getClerkClient();
+    const supabase = getSupabaseAdminClient();
+
+    const org = await clerk.organizations.getOrganization({ organizationId: clerkOrgId });
+    
+    const { error } = await supabase.rpc('upsert_organization', {
+      p_clerk_org_id: org.id,
+      p_name: org.name
+    });
+
+    if (error) {
+      console.error('❌ Error upserting organization:', error);
+      return false;
+    }
+
+    console.log('✅ Organization synced successfully from Clerk');
+    return true;
+  } catch (error) {
+    console.error('❌ Error syncing organization from Clerk:', error);
     return false;
   }
 }
@@ -151,16 +208,21 @@ export default async function handler(req: any, res: any) {
     console.log(`🔍 Attempting to reserve seat for ${email} in org ${orgId}`);
     let seatResult = await organizationSeatOperations.assignSeat(orgId, email, role || 'member');
 
-    // If subscription not found, try to sync from Stripe and retry
+    // If subscription not found, try to sync from Clerk then Stripe and retry
     if (seatResult.error === 'Organization subscription not found') {
-      console.log('⚠️ Subscription not found, attempting to sync from Stripe...');
-      const synced = await syncSubscriptionFromStripe(orgId);
+      console.log('⚠️ Subscription not found, attempting full sync...');
+      
+      // 1. Ensure Org exists (from Clerk)
+      const orgSynced = await syncOrganizationFromClerk(orgId);
+      
+      // 2. Ensure Subscription exists (from Stripe) - now that Org exists, we can link it
+      const stripeSynced = await syncSubscriptionFromStripe(orgId);
 
-      if (synced) {
+      if (orgSynced || stripeSynced) {
         console.log('🔄 Retry reserving seat after sync...');
         seatResult = await organizationSeatOperations.assignSeat(orgId, email, role || 'member');
       } else {
-        console.log('❌ Sync failed or no subscription found in Stripe');
+        console.log('❌ All sync attempts failed');
       }
     }
 
