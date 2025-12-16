@@ -536,7 +536,7 @@ export const organizationSeatOperations = {
       seats_used: number;
       seats_total: number;
       seats: Array<{
-        user_id: string;
+        user_id: string | null;
         email: string;
         status: string;
         role: string | null;
@@ -548,12 +548,14 @@ export const organizationSeatOperations = {
     try {
       const client = await getAuthenticatedClient();
       
-      // Get subscription to get seat counts
+      // Get latest seat-eligible subscription (active OR trialing)
       const { data: subscription, error: subError } = await client
         .from('organization_subscriptions')
-        .select('seats_used, seats_total, quantity, overage_seats')
+        .select('seats_used, seats_total, quantity, overage_seats, status, updated_at')
         .eq('clerk_org_id', clerkOrgId)
-        .eq('status', 'active')
+        .in('status', ['active', 'trialing'])
+        .order('updated_at', { ascending: false })
+        .limit(1)
         .maybeSingle();
 
       if (subError) {
@@ -561,12 +563,12 @@ export const organizationSeatOperations = {
         return { data: null, error: subError };
       }
 
-      // Get active seats with user details
+      // Get seats (active + pending) for admin visibility
       const { data: seats, error: seatsError } = await client
         .from('organization_seats')
         .select('clerk_user_id, user_email, status, role, assigned_at')
         .eq('clerk_org_id', clerkOrgId)
-        .eq('status', 'active')
+        .in('status', ['active', 'pending'])
         .order('assigned_at', { ascending: false });
 
       if (seatsError) {
@@ -601,25 +603,33 @@ export const organizationSeatOperations = {
     try {
       const client = await getAuthenticatedClient();
       
-      // Check if user already has an active seat
-      const { data: existingSeat } = await client
+      // Check if user already has an active or pending seat
+      const { data: existingSeat, error: existingSeatError } = await client
         .from('organization_seats')
-        .select('id')
+        .select('id, status')
         .eq('clerk_org_id', clerkOrgId)
         .eq('user_email', userEmail)
-        .eq('status', 'active')
-        .single();
+        .in('status', ['active', 'pending'])
+        .order('assigned_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-      if (existingSeat) {
-        return { data: null, error: 'User already has an active seat in this organization' };
+      if (existingSeatError) {
+        return { data: null, error: existingSeatError };
       }
 
-      // Get subscription to check seat availability
+      if (existingSeat) {
+        return { data: null, error: 'User already has a reserved or active seat in this organization' };
+      }
+
+      // Get latest seat-eligible subscription (active OR trialing)
       const { data: subscription, error: subError } = await client
         .from('organization_subscriptions')
-        .select('id, seats_used, seats_total, overage_seats')
+        .select('id, seats_used, seats_total, overage_seats, status, updated_at')
         .eq('clerk_org_id', clerkOrgId)
-        .eq('status', 'active')
+        .in('status', ['active', 'trialing'])
+        .order('updated_at', { ascending: false })
+        .limit(1)
         .maybeSingle();
 
       if (subError || !subscription) {
@@ -631,16 +641,18 @@ export const organizationSeatOperations = {
         return { data: null, error: 'No available seats. Please upgrade your plan.' };
       }
 
-      // Assign the seat
+      const normalizedRole = role === 'admin' ? 'admin' : 'member';
+
+      // Reserve the seat (invite-first semantics): pending until membership is created/accepted
       const { data: seat, error: seatError } = await client
         .from('organization_seats')
         .insert({
           organization_subscription_id: subscription.id,
           clerk_org_id: clerkOrgId,
-          clerk_user_id: null, // Will be filled by Clerk lookup in API or when user accepts invite
+          clerk_user_id: null, // filled when user becomes a member (webhook)
           user_email: userEmail,
-          role: role,
-          status: 'active',
+          role: normalizedRole,
+          status: 'pending',
           assigned_at: new Date().toISOString()
         })
         .select()
@@ -860,6 +872,208 @@ export const organizationSeatOperations = {
       };
     } catch (error) {
       console.error('Error in getActiveSeatForUser:', error);
+      return { data: null, error };
+    }
+  },
+
+  // Rollback a reserved seat by email (used when Clerk invitation creation fails)
+  async releaseSeatByEmail(
+    clerkOrgId: string,
+    userEmail: string,
+    reason: string = 'invite_failed'
+  ): Promise<{ data: any | null; error: any }> {
+    try {
+      const client = await getAuthenticatedClient();
+
+      const { data: seat, error: seatError } = await client
+        .from('organization_seats')
+        .select('id, organization_subscription_id')
+        .eq('clerk_org_id', clerkOrgId)
+        .ilike('user_email', userEmail)
+        .eq('status', 'pending')
+        .is('clerk_user_id', null)
+        .order('assigned_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (seatError) {
+        return { data: null, error: seatError };
+      }
+
+      if (!seat) {
+        return { data: null, error: 'Pending seat not found for this email' };
+      }
+
+      const { data: revokedSeat, error: revokeError } = await client
+        .from('organization_seats')
+        .update({
+          status: 'revoked',
+          revoked_reason: reason,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', seat.id)
+        .select()
+        .single();
+
+      if (revokeError) {
+        return { data: null, error: revokeError };
+      }
+
+      // Decrement seats_used (best-effort)
+      const { data: subscription, error: subError } = await client
+        .from('organization_subscriptions')
+        .select('seats_used')
+        .eq('id', seat.organization_subscription_id)
+        .single();
+
+      if (!subError && subscription) {
+        await client
+          .from('organization_subscriptions')
+          .update({
+            seats_used: Math.max(0, (subscription.seats_used || 0) - 1),
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', seat.organization_subscription_id);
+      }
+
+      return { data: revokedSeat, error: null };
+    } catch (error) {
+      console.error('Error in releaseSeatByEmail:', error);
+      return { data: null, error };
+    }
+  },
+
+  // Claim an existing reserved seat (pending) on Clerk membership creation.
+  // If no reservation exists (e.g. org owner added directly), consume a seat if capacity allows.
+  async claimSeatForMembership(params: {
+    clerk_org_id: string;
+    clerk_user_id: string;
+    user_email: string;
+    user_name?: string | null;
+    role?: string | null;
+    assigned_by?: string | null;
+  }): Promise<{ data: any | null; error: any }> {
+    const {
+      clerk_org_id,
+      clerk_user_id,
+      user_email,
+      user_name = null,
+      role = null,
+      assigned_by = 'system_webhook'
+    } = params;
+
+    try {
+      const client = await getAuthenticatedClient();
+
+      const normalizedRole = role === 'admin' ? 'admin' : 'member';
+
+      // Get latest seat-eligible subscription
+      const { data: subscription, error: subError } = await client
+        .from('organization_subscriptions')
+        .select('id, seats_used, seats_total, overage_seats, status, updated_at')
+        .eq('clerk_org_id', clerk_org_id)
+        .in('status', ['active', 'trialing'])
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (subError || !subscription) {
+        return { data: null, error: 'Organization subscription not found' };
+      }
+
+      // If user already has an active seat, return it (idempotent)
+      const { data: existingByUser } = await client
+        .from('organization_seats')
+        .select('id, clerk_user_id, status')
+        .eq('clerk_org_id', clerk_org_id)
+        .eq('clerk_user_id', clerk_user_id)
+        .eq('status', 'active')
+        .limit(1)
+        .maybeSingle();
+
+      if (existingByUser) {
+        return { data: existingByUser, error: null };
+      }
+
+      // Try to claim a reserved seat by email
+      const { data: reservedSeat, error: reservedError } = await client
+        .from('organization_seats')
+        .select('id, organization_subscription_id')
+        .eq('clerk_org_id', clerk_org_id)
+        .ilike('user_email', user_email)
+        .eq('status', 'pending')
+        .is('clerk_user_id', null)
+        .order('assigned_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (reservedError) {
+        return { data: null, error: reservedError };
+      }
+
+      if (reservedSeat) {
+        const { data: updatedSeat, error: updateError } = await client
+          .from('organization_seats')
+          .update({
+            clerk_user_id,
+            user_name,
+            role: normalizedRole,
+            status: 'active',
+            assigned_by,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', reservedSeat.id)
+          .select()
+          .single();
+
+        if (updateError) {
+          return { data: null, error: updateError };
+        }
+
+        // Do NOT increment seats_used here (it was consumed during reservation)
+        return { data: updatedSeat, error: null };
+      }
+
+      // No reservation exists - consume a seat if capacity allows
+      if (subscription.seats_used >= subscription.seats_total + subscription.overage_seats) {
+        return { data: null, error: 'No available seats. Please upgrade your plan.' };
+      }
+
+      const { data: seat, error: seatError } = await client
+        .from('organization_seats')
+        .insert({
+          organization_subscription_id: subscription.id,
+          clerk_org_id,
+          clerk_user_id,
+          user_email,
+          user_name,
+          role: normalizedRole,
+          status: 'active',
+          assigned_by,
+          assigned_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+
+      if (seatError) {
+        return { data: null, error: seatError };
+      }
+
+      const { error: updateError } = await client
+        .from('organization_subscriptions')
+        .update({
+          seats_used: subscription.seats_used + 1,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', subscription.id);
+
+      if (updateError) {
+        return { data: null, error: updateError };
+      }
+
+      return { data: seat, error: null };
+    } catch (error) {
+      console.error('Error in claimSeatForMembership:', error);
       return { data: null, error };
     }
   }

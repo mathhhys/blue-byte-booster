@@ -1,0 +1,79 @@
+import { createClient } from '@supabase/supabase-js';
+import { orgAdminMiddleware } from '../../src/utils/clerk/token-verification.js';
+
+export default async function handler(req: any, res: any) {
+  if (req.method !== 'GET') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const { org_id } = req.query;
+
+  if (!org_id) {
+    return res.status(400).json({ error: 'Organization ID is required' });
+  }
+
+  try {
+    // Verify organization admin access (or at least member access to view credits?)
+    // For now, let's allow any member to view credits, but maybe restrict top-up to admins.
+    // The middleware checks if the user is a member of the org.
+    // If we want to restrict to admins, we'd need to check the role.
+    // Let's assume any member can view the credit balance.
+    // Wait, orgAdminMiddleware enforces admin role. Let's stick with that for now as per other endpoints.
+    // Actually, BillingDashboard calls this, and it might be visible to members too?
+    // The dashboard code says "Admin Access Required" for the whole component if not admin.
+    // So orgAdminMiddleware is appropriate.
+    
+    await orgAdminMiddleware(req, org_id);
+
+    const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !supabaseKey) {
+      return res.status(500).json({ error: 'Database configuration error' });
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    const { data: subscription, error } = await supabase
+      .from('organization_subscriptions')
+      .select('total_credits, used_credits')
+      .eq('clerk_org_id', org_id)
+      .in('status', ['active', 'trialing'])
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (error) {
+      // If no subscription found, return 0 credits
+      if (error.code === 'PGRST116') {
+        return res.status(200).json({
+          total_credits: 0,
+          used_credits: 0,
+          remaining_credits: 0
+        });
+      }
+      console.error('Error fetching organization credits:', error);
+      return res.status(500).json({ error: 'Failed to fetch credits' });
+    }
+
+    const total = subscription.total_credits || 0;
+    const used = subscription.used_credits || 0;
+    const remaining = Math.max(0, total - used);
+
+    return res.status(200).json({
+      total_credits: total,
+      used_credits: used,
+      remaining_credits: remaining
+    });
+
+  } catch (error: any) {
+    console.error('Error in credits API:', error);
+    if (error.message?.includes('Missing or invalid Authorization header')) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    if (error.message?.includes('User does not belong to this organization') || error.message?.includes('User is not an organization admin')) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+}

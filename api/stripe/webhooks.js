@@ -132,6 +132,107 @@ async function handleInvoicePaymentSucceeded(invoice, supabase) {
       expand: ['customer']
     });
 
+    // Check if this is an organization subscription
+    const { data: orgSubscription, error: orgSubError } = await supabase
+      .from('organization_subscriptions')
+      .select('*')
+      .eq('stripe_subscription_id', invoice.subscription)
+      .single();
+
+    if (orgSubscription) {
+      console.log('🏢 Processing organization subscription payment for org:', orgSubscription.clerk_org_id);
+      
+      // Determine if this is initial or recurring payment
+      const paymentType = await determinePaymentType(invoice, subscription);
+      console.log('Payment type determined:', paymentType);
+
+      // Skip initial payments as they're handled by checkout.session.completed
+      if (paymentType === 'initial') {
+        console.log('Skipping initial payment - handled by checkout flow');
+        return;
+      }
+
+      // Check for idempotency
+      const alreadyProcessed = await checkIdempotency(invoice.id, supabase);
+      if (alreadyProcessed) {
+        console.log('Invoice already processed, skipping');
+        return;
+      }
+
+      // Calculate credits to grant based on invoice type
+      const planType = orgSubscription.plan_type || 'teams';
+      const billingFrequency = orgSubscription.billing_frequency || 'monthly';
+      let seatsToGrantFor = 0;
+      let reason = 'renewal';
+
+      if (invoice.billing_reason === 'subscription_create' || invoice.billing_reason === 'subscription_cycle') {
+        // For new subscriptions or renewals, grant for all seats
+        seatsToGrantFor = orgSubscription.seats_total || 1;
+        reason = invoice.billing_reason;
+      } else if (invoice.billing_reason === 'subscription_update') {
+        // For updates (e.g. adding seats), calculate added seats from proration lines
+        // Sum quantities of positive proration lines
+        const prorationLines = invoice.lines.data.filter(line => line.proration && line.amount > 0);
+        seatsToGrantFor = prorationLines.reduce((sum, line) => sum + (line.quantity || 0), 0);
+        reason = 'seat_addition';
+        
+        // If no proration lines found but it's an update, maybe it's a plan change?
+        // For now, if 0 seats found, we grant 0 credits.
+        if (seatsToGrantFor === 0) {
+          console.log('Subscription update but no positive proration lines found (maybe downgrade or same price?), skipping credit grant');
+          return;
+        }
+      } else {
+        // Other reasons (e.g. manual), default to 0 or handle if needed
+        console.log('Unhandled billing reason for credit grant:', invoice.billing_reason);
+        return;
+      }
+      
+      const creditsToGrant = calculateCreditsToGrant(planType, billingFrequency, seatsToGrantFor);
+      
+      console.log('Granting organization credits:', {
+        orgId: orgSubscription.clerk_org_id,
+        creditsToGrant,
+        seatsToGrantFor,
+        reason,
+        invoiceId: invoice.id
+      });
+
+      // Update organization credits
+      const newCredits = (orgSubscription.total_credits || 0) + creditsToGrant;
+      
+      const { error: updateError } = await supabase
+        .from('organization_subscriptions')
+        .update({
+          total_credits: newCredits,
+          last_credit_recharge_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', orgSubscription.id);
+
+      if (updateError) {
+        console.error('Failed to update organization credits:', updateError);
+        throw updateError;
+      }
+
+      console.log('✅ Organization credits updated successfully');
+
+      // Record webhook processing
+      await recordWebhookProcessing(invoice.id, 'invoice.payment_succeeded', {
+        organization_id: orgSubscription.id,
+        clerk_org_id: orgSubscription.clerk_org_id,
+        creditsGranted: creditsToGrant,
+        planType,
+        billingFrequency,
+        seats: seatsToGrantFor,
+        reason
+      }, supabase);
+
+      return;
+    }
+
+    // --- Regular User Subscription Handling ---
+
     // Get user from Stripe customer
     const clerkUserId = await getUserFromStripeCustomer(subscription.customer, supabase);
     if (!clerkUserId) {
@@ -266,6 +367,8 @@ async function handleCheckoutSessionCompleted(session, supabase) {
       // Retrieve full subscription details to get current period end
       const subscription = await stripe.subscriptions.retrieve(session.subscription);
       
+      const seatsTotal = parseInt((metadata.seats_total || metadata.seats || '1'), 10) || 1;
+
       const { error: subError } = await supabase
         .from('organization_subscriptions')
         .upsert({
@@ -274,13 +377,14 @@ async function handleCheckoutSessionCompleted(session, supabase) {
           stripe_customer_id: session.customer,
           plan_type: metadata.plan_type || 'teams',
           billing_frequency: metadata.billing_frequency || 'monthly',
-          seats_total: parseInt(metadata.seats || '1'),
+          seats_total: seatsTotal,
           status: 'active',
           current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
           current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
           updated_at: new Date().toISOString()
         }, {
-          onConflict: 'stripe_subscription_id'
+          // Ensure we keep a single row per Clerk org
+          onConflict: 'clerk_org_id'
         });
 
       if (subError) {

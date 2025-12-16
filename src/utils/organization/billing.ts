@@ -1,5 +1,34 @@
 import { OrganizationBillingInfo, CreateOrganizationSubscriptionRequest } from '@/types/organization';
 
+async function readErrorMessage(response: Response): Promise<string> {
+  const anyRes: any = response as any;
+
+  try {
+    if (typeof anyRes.text === 'function') {
+      const text = await anyRes.text();
+      if (!text) {
+        return `HTTP ${anyRes.status || 'error'}`;
+      }
+
+      try {
+        const parsed = JSON.parse(text);
+        return parsed?.error || parsed?.message || text;
+      } catch {
+        return text;
+      }
+    }
+
+    if (typeof anyRes.json === 'function') {
+      const parsed = await anyRes.json();
+      return parsed?.error || parsed?.message || JSON.stringify(parsed);
+    }
+  } catch {
+    // ignore parsing errors
+  }
+
+  return `HTTP ${anyRes.status || 'error'}`;
+}
+
 // Mock API functions for organization billing
 // In production, these would call your actual backend endpoints
 
@@ -180,12 +209,11 @@ export const assignSeatToMember = async (
       }),
     });
 
-    const data = await response.json();
-
     if (!response.ok) {
+      const message = await readErrorMessage(response);
       return {
         success: false,
-        error: data.error || 'Failed to assign seat'
+        error: message || 'Failed to assign seat'
       };
     }
 
@@ -217,12 +245,11 @@ export const removeSeatFromMember = async (
       }),
     });
 
-    const data = await response.json();
-
     if (!response.ok) {
+      const message = await readErrorMessage(response);
       return {
         success: false,
-        error: data.error || 'Failed to remove seat'
+        error: message || 'Failed to remove seat'
       };
     }
 
@@ -255,12 +282,11 @@ export const updateSubscriptionQuantity = async (
       }),
     });
 
-    const data = await response.json();
-
     if (!response.ok) {
+      const message = await readErrorMessage(response);
       return {
         success: false,
-        error: data.error || 'Failed to update subscription quantity'
+        error: message || 'Failed to update subscription quantity'
       };
     }
 

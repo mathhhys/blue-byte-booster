@@ -1,16 +1,41 @@
-import { organizationSeatOperations } from '../../../src/utils/supabase/database';
-import { orgAdminMiddleware } from '../../../src/utils/clerk/token-verification';
+import { organizationSeatOperations } from '../../../src/utils/supabase/database.js';
+import { orgAdminMiddleware } from '../../../src/utils/clerk/token-verification.js';
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
-const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const supabase = createClient(supabaseUrl!, supabaseKey!);
+function getStripeClient() {
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key) {
+    throw new Error('STRIPE_SECRET_KEY is not configured');
+  }
+  return new Stripe(key);
+}
+
+function getSupabaseAdminClient() {
+  const supabaseUrl =
+    process.env.SUPABASE_URL ||
+    process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    process.env.VITE_SUPABASE_URL;
+
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl) {
+    throw new Error('SUPABASE_URL (or VITE_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_URL) is not configured');
+  }
+  if (!supabaseKey) {
+    throw new Error('SUPABASE_SERVICE_ROLE_KEY is not configured');
+  }
+
+  return createClient(supabaseUrl, supabaseKey);
+}
 
 async function syncSubscriptionFromStripe(clerkOrgId: string) {
   console.log('🔄 Syncing subscription from Stripe for org:', clerkOrgId);
+
   try {
+    const stripe = getStripeClient();
+    const supabase = getSupabaseAdminClient();
+
     // 1. Find Stripe Customer by metadata
     const customers = await stripe.customers.search({
       query: `metadata['clerk_org_id']:'${clerkOrgId}'`,
@@ -25,38 +50,46 @@ async function syncSubscriptionFromStripe(clerkOrgId: string) {
     const customer = customers.data[0];
     console.log('✅ Found Stripe customer:', customer.id);
 
-    // 2. Get active subscriptions
+    // 2. Get subscriptions (active OR trialing)
     const subscriptions = await stripe.subscriptions.list({
       customer: customer.id,
-      status: 'active',
-      limit: 1,
+      status: 'all',
+      limit: 10,
       expand: ['data.items']
     });
 
-    if (subscriptions.data.length === 0) {
-      console.log('❌ No active subscription found for customer:', customer.id);
+    const subscription: any = subscriptions.data.find(
+      (s: any) => s.status === 'active' || s.status === 'trialing'
+    );
+
+    if (!subscription) {
+      console.log('❌ No active/trialing subscription found for customer:', customer.id);
       return false;
     }
 
-    const subscription: any = subscriptions.data[0];
-    console.log('✅ Found active subscription:', subscription.id);
+    console.log('✅ Found subscription:', subscription.id, 'status:', subscription.status);
 
     // 3. Calculate seats
     const metadata = subscription.metadata || {};
     let seatsTotal = 1;
-    
-    // Try to get seats from metadata first
-    if (metadata.seats) {
-      seatsTotal = parseInt(metadata.seats);
+
+    if (metadata.seats_total) {
+      seatsTotal = parseInt(metadata.seats_total, 10);
+    } else if (metadata.seats) {
+      seatsTotal = parseInt(metadata.seats, 10);
     } else {
-      // Or sum up quantity of items
-      seatsTotal = subscription.items.data.reduce((sum: number, item: any) => sum + item.quantity, 0);
+      seatsTotal = subscription.items.data.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0);
+    }
+
+    if (!Number.isFinite(seatsTotal) || seatsTotal < 1) {
+      seatsTotal = 1;
     }
 
     const planType = metadata.plan_type || 'teams';
     const billingFrequency = metadata.billing_frequency || 'monthly';
 
     // 4. Create/Update organization_subscriptions record
+    // IMPORTANT: do NOT reset seats_used on upsert (existing orgs may already have seats assigned)
     const { error } = await supabase
       .from('organization_subscriptions')
       .upsert({
@@ -66,13 +99,12 @@ async function syncSubscriptionFromStripe(clerkOrgId: string) {
         plan_type: planType,
         billing_frequency: billingFrequency,
         seats_total: seatsTotal,
-        seats_used: 0,
-        status: 'active',
+        status: subscription.status,
         current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
         current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
         updated_at: new Date().toISOString()
       }, {
-        onConflict: 'clerk_org_id' // Assuming clerk_org_id is unique or we want to update by it
+        onConflict: 'clerk_org_id'
       });
 
     if (error) {
@@ -140,16 +172,19 @@ export default async function handler(req: any, res: any) {
         });
       }
       
-      if (error === 'User already has an active seat in this organization') {
-        return res.status(400).json({ error: 'User already has an active seat' });
+      if (
+        error === 'User already has a reserved or active seat in this organization' ||
+        error === 'User already has an active seat in this organization'
+      ) {
+        return res.status(400).json({ error: 'User already has a reserved or active seat' });
       }
       
       if (error === 'Organization subscription not found') {
-         return res.status(404).json({ 
-           error: 'Subscription not found', 
-           message: 'No active subscription found for this organization. Please ensure you have purchased a plan.' 
+         return res.status(404).json({
+           error: 'Subscription not found',
+           message: 'No active or trialing subscription found for this organization. Please ensure you have purchased a plan.'
          });
-      }
+       }
 
       return res.status(500).json({ error: 'Database error', details: error });
     }

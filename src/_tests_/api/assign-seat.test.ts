@@ -128,4 +128,43 @@ describe('Assign Seat API', () => {
       error: 'Subscription not found'
     }));
   });
+
+  it('should return 402 when no seats available', async () => {
+    (organizationSeatOperations.assignSeat as jest.Mock).mockResolvedValue({
+      data: null,
+      error: 'No available seats. Please upgrade your plan.'
+    });
+
+    await handler(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(402);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      error: 'Insufficient seats'
+    }));
+  });
+
+  it('should return 400 when user already has a seat', async () => {
+    (organizationSeatOperations.assignSeat as jest.Mock).mockResolvedValue({
+      data: null,
+      error: 'User already has a reserved or active seat in this organization'
+    });
+
+    await handler(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      error: 'User already has a reserved or active seat'
+    }));
+  });
+
+  it('should return 400 when missing parameters', async () => {
+    req.body = {}; // Empty body
+    
+    await handler(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      error: 'Organization ID and user email are required'
+    }));
+  });
 });

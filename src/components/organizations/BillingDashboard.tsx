@@ -361,10 +361,19 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
         }),
       });
   
-      const result = await response.json();
+      let result;
+      try {
+        result = await response.json();
+      } catch (e) {
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        // If ok but not JSON, maybe success? But we expect JSON.
+        console.error('Failed to parse invite response:', e);
+      }
       
       if (!response.ok) {
-        throw new Error(result.error || 'Failed to send invitation');
+        throw new Error(result?.error || `Failed to send invitation (${response.status})`);
       }
   
       toast({

@@ -1,8 +1,23 @@
 import { verifyToken, createClerkClient } from '@clerk/backend';
 
-const clerkClient = createClerkClient({
-  secretKey: process.env.CLERK_SECRET_KEY!
-});
+let cachedClerkClient: ReturnType<typeof createClerkClient> | null = null;
+
+function getClerkSecretKey(): string {
+  const key = process.env.CLERK_SECRET_KEY;
+  if (!key) {
+    throw new Error('CLERK_SECRET_KEY is not configured');
+  }
+  return key;
+}
+
+function getClerkClient() {
+  if (!cachedClerkClient) {
+    cachedClerkClient = createClerkClient({
+      secretKey: getClerkSecretKey()
+    });
+  }
+  return cachedClerkClient;
+}
 
 const normalizeOrgRole = (role?: string | null) => {
   if (!role) {
@@ -55,7 +70,7 @@ export async function orgAdminMiddleware(req: any, orgId: string): Promise<AuthR
     
     // Verify the Clerk token
     const claims = await verifyToken(token, {
-      secretKey: process.env.CLERK_SECRET_KEY!
+      secretKey: getClerkSecretKey()
     });
 
     console.log('🔍 DEBUG: Token claims:', JSON.stringify(claims, null, 2));
@@ -97,7 +112,7 @@ export async function orgAdminMiddleware(req: any, orgId: string): Promise<AuthR
     if (!membershipFound || !isAdminRole(membershipRole)) {
       console.log('🔄 DEBUG: Attempting Clerk API membership fallback lookup');
       try {
-        const membershipsResponse = await clerkClient.users.getOrganizationMembershipList({
+        const membershipsResponse = await getClerkClient().users.getOrganizationMembershipList({
           userId,
           limit: 100
         });
@@ -159,7 +174,7 @@ export async function getAuthUser(req: any): Promise<{ userId: string }> {
 
     const token = authHeader.substring(7);
     const claims = await verifyToken(token, {
-      secretKey: process.env.CLERK_SECRET_KEY!
+      secretKey: getClerkSecretKey()
     });
 
     const userId = claims.sub;

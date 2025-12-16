@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { createClient } from '@supabase/supabase-js'
 import { Webhook } from 'svix'
+import { organizationSeatOperations } from '../../src/utils/supabase/database.js'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Add debugging logs to validate deployment
@@ -134,10 +135,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.log('Webhook payload:', evt.data);
 
     // Initialize Supabase client
-    const supabase = createClient(
-      process.env.VITE_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    const supabaseUrl =
+      process.env.SUPABASE_URL ||
+      process.env.NEXT_PUBLIC_SUPABASE_URL ||
+      process.env.VITE_SUPABASE_URL;
+
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !supabaseKey) {
+      console.error('❌ Supabase env vars not configured for Clerk webhook:', {
+        hasSupabaseUrl: !!supabaseUrl,
+        hasServiceRoleKey: !!supabaseKey
+      });
+      return res.status(500).json({ error: 'Supabase is not configured.' });
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseKey);
 
     try {
       if (eventType === 'user.created' || eventType === 'user.updated') {
@@ -256,25 +269,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const userId = membership.public_user_data.user_id;
         const email = membership.public_user_data.identifier;
         const name = `${membership.public_user_data.first_name || ''} ${membership.public_user_data.last_name || ''}`.trim();
-        
+
         console.log(`Processing organization membership created for user ${userId} in org ${orgId}`);
 
-        // Use the assign_organization_seat function which checks limits
-        const { data: success, error } = await supabase.rpc('assign_organization_seat', {
-          p_clerk_org_id: orgId,
-          p_clerk_user_id: userId,
-          p_user_email: email,
-          p_user_name: name,
-          p_assigned_by: 'system_webhook'
+        // Invite-first seat model:
+        // - If a seat was reserved (pending) during invite, claim it by setting clerk_user_id and activating it.
+        // - If no seat was reserved (e.g. owner / manual add), consume a seat if capacity allows.
+        const { data: claimedSeat, error } = await organizationSeatOperations.claimSeatForMembership({
+          clerk_org_id: orgId,
+          clerk_user_id: userId,
+          user_email: email,
+          user_name: name,
+          role: membership.role || null,
+          assigned_by: 'system_webhook'
         });
 
         if (error) {
-          console.error('Error assigning organization seat:', error);
-          // Don't fail the webhook, just log error (might be seat limit reached)
-        } else if (success === false) {
-          console.warn(`Failed to assign seat to user ${userId} in org ${orgId} - likely seat limit reached or no active subscription`);
+          console.error('Error claiming/creating organization seat:', error);
+          // Don't fail the webhook; just log (might be seat limit reached)
         } else {
-          console.log(`Successfully assigned seat to user ${userId} in org ${orgId}`);
+          console.log(`✅ Seat claimed/created for user ${userId} in org ${orgId}`, claimedSeat);
         }
 
       } else if (eventType === 'organizationMembership.deleted') {
@@ -284,15 +298,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         console.log(`Processing organization membership deleted for user ${userId} in org ${orgId}`);
 
-        const { data: success, error } = await supabase.rpc('remove_organization_seat', {
-          p_clerk_org_id: orgId,
-          p_clerk_user_id: userId
-        });
+        const { data: revokedSeat, error } = await organizationSeatOperations.revokeSeat(
+          orgId,
+          userId,
+          'membership_deleted'
+        );
 
         if (error) {
-          console.error('Error removing organization seat:', error);
+          console.error('Error revoking organization seat:', error);
+          // Don't fail webhook
         } else {
-          console.log(`Successfully removed seat for user ${userId} in org ${orgId}`);
+          console.log(`✅ Seat revoked for user ${userId} in org ${orgId}`, revokedSeat);
         }
 
       } else {

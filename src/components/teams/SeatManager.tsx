@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 
 interface Seat {
-  user_id: string;
+  user_id: string | null;
   email: string;
   status: string;
   role: string | null;
@@ -33,6 +33,35 @@ interface SeatData {
   seats_used: number;
   seats_total: number;
   seats: Seat[];
+}
+
+async function readErrorMessage(response: Response): Promise<string> {
+  const anyRes: any = response as any;
+
+  try {
+    if (typeof anyRes.text === 'function') {
+      const text = await anyRes.text();
+      if (!text) {
+        return `HTTP ${anyRes.status || 'error'}`;
+      }
+
+      try {
+        const parsed = JSON.parse(text);
+        return parsed?.error || parsed?.message || text;
+      } catch {
+        return text;
+      }
+    }
+
+    if (typeof anyRes.json === 'function') {
+      const parsed = await anyRes.json();
+      return parsed?.error || parsed?.message || JSON.stringify(parsed);
+    }
+  } catch {
+    // ignore parsing errors
+  }
+
+  return `HTTP ${anyRes.status || 'error'}`;
 }
 
 export const SeatManager: React.FC = () => {
@@ -80,7 +109,8 @@ export const SeatManager: React.FC = () => {
       });
       
       if (!response.ok) {
-        throw new Error(`Failed to fetch seats: ${response.statusText}`);
+        const message = await readErrorMessage(response);
+        throw new Error(message || `Failed to fetch seats: ${response.statusText}`);
       }
       
       const data = await response.json();
@@ -123,8 +153,8 @@ export const SeatManager: React.FC = () => {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to send invitation');
+        const message = await readErrorMessage(response);
+        throw new Error(message || 'Failed to send invitation');
       }
 
       toast({
@@ -179,8 +209,8 @@ export const SeatManager: React.FC = () => {
       }
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to assign seat');
+        const message = await readErrorMessage(response);
+        throw new Error(message || 'Failed to assign seat');
       }
 
       toast({
@@ -221,18 +251,17 @@ export const SeatManager: React.FC = () => {
       }
 
       const API_BASE = import.meta.env.VITE_API_URL || '';
-      const response = await fetch(`${API_BASE}/api/organizations/seats/revoke`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          org_id: organization.id,
-          user_id: userId,
-        }),
-      });
+      const response = await fetch(
+        `${API_BASE}/api/organizations/seats/${encodeURIComponent(userId)}?orgId=${encodeURIComponent(organization.id)}`,
+        {
+          method: 'DELETE',
+          headers
+        }
+      );
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to revoke seat');
+        const message = await readErrorMessage(response);
+        throw new Error(message || 'Failed to revoke seat');
       }
 
       toast({
@@ -571,7 +600,7 @@ export const SeatManager: React.FC = () => {
               <div className="space-y-3">
                 {seatsData.seats.map((seat) => (
                   <div
-                    key={seat.user_id}
+                    key={seat.user_id ?? seat.email}
                     className="flex items-center justify-between p-3 bg-[#1a1a1a] rounded-lg"
                   >
                     <div className="flex items-center gap-3">
@@ -591,8 +620,8 @@ export const SeatManager: React.FC = () => {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleRevokeSeat(seat.user_id, seat.email)}
-                          disabled={isRevoking}
+                          onClick={() => seat.user_id && handleRevokeSeat(seat.user_id, seat.email)}
+                          disabled={isRevoking || !seat.user_id}
                           className="border-red-500/30 text-red-400 hover:bg-red-900/20"
                         >
                           <Trash2 className="w-4 h-4" />

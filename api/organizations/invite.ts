@@ -1,10 +1,132 @@
 import { createClerkClient } from '@clerk/backend';
 import { orgAdminMiddleware } from '../../src/utils/clerk/token-verification.js';
 import { organizationSeatOperations } from '../../src/utils/supabase/database.js';
+import Stripe from 'stripe';
+import { createClient } from '@supabase/supabase-js';
 
-const clerkClient = createClerkClient({
-  secretKey: process.env.CLERK_SECRET_KEY!
-});
+let cachedClerkClient: ReturnType<typeof createClerkClient> | null = null;
+
+function getClerkClient() {
+  if (!cachedClerkClient) {
+    const key = process.env.CLERK_SECRET_KEY;
+    if (!key) {
+      throw new Error('CLERK_SECRET_KEY is not configured');
+    }
+    cachedClerkClient = createClerkClient({
+      secretKey: key
+    });
+  }
+  return cachedClerkClient;
+}
+
+function getStripeClient() {
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key) {
+    throw new Error('STRIPE_SECRET_KEY is not configured');
+  }
+  return new Stripe(key);
+}
+
+function getSupabaseAdminClient() {
+  const supabaseUrl =
+    process.env.SUPABASE_URL ||
+    process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    process.env.VITE_SUPABASE_URL;
+
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl) {
+    throw new Error('SUPABASE_URL (or VITE_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_URL) is not configured');
+  }
+  if (!supabaseKey) {
+    throw new Error('SUPABASE_SERVICE_ROLE_KEY is not configured');
+  }
+
+  return createClient(supabaseUrl, supabaseKey);
+}
+
+async function syncSubscriptionFromStripe(clerkOrgId: string) {
+  console.log('🔄 Syncing subscription from Stripe for org (invite):', clerkOrgId);
+
+  try {
+    const stripe = getStripeClient();
+    const supabase = getSupabaseAdminClient();
+
+    const customers = await stripe.customers.search({
+      query: `metadata['clerk_org_id']:'${clerkOrgId}'`,
+      limit: 1
+    });
+
+    if (customers.data.length === 0) {
+      console.log('❌ No Stripe customer found for org:', clerkOrgId);
+      return false;
+    }
+
+    const customer = customers.data[0];
+
+    const subscriptions = await stripe.subscriptions.list({
+      customer: customer.id,
+      status: 'all',
+      limit: 10,
+      expand: ['data.items']
+    });
+
+    const subscription: any = subscriptions.data.find(
+      (s: any) => s.status === 'active' || s.status === 'trialing'
+    );
+
+    if (!subscription) {
+      console.log('❌ No active/trialing subscription found for customer:', customer.id);
+      return false;
+    }
+
+    const metadata = subscription.metadata || {};
+    let seatsTotal = 1;
+
+    if (metadata.seats_total) {
+      seatsTotal = parseInt(metadata.seats_total, 10);
+    } else if (metadata.seats) {
+      seatsTotal = parseInt(metadata.seats, 10);
+    } else {
+      seatsTotal = subscription.items.data.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0);
+    }
+
+    if (!Number.isFinite(seatsTotal) || seatsTotal < 1) {
+      seatsTotal = 1;
+    }
+
+    const planType = metadata.plan_type || 'teams';
+    const billingFrequency = metadata.billing_frequency || 'monthly';
+
+    const { error } = await supabase
+      .from('organization_subscriptions')
+      .upsert({
+        clerk_org_id: clerkOrgId,
+        stripe_subscription_id: subscription.id,
+        stripe_customer_id: customer.id,
+        plan_type: planType,
+        billing_frequency: billingFrequency,
+        seats_total: seatsTotal,
+        status: subscription.status,
+        current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
+        current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+        updated_at: new Date().toISOString()
+      }, {
+        onConflict: 'clerk_org_id'
+      });
+
+    if (error) {
+      console.error('❌ Error upserting organization subscription:', error);
+      return false;
+    }
+
+    console.log('✅ Organization subscription synced successfully (invite)');
+    return true;
+  } catch (error) {
+    console.error('❌ Error syncing subscription (invite):', error);
+    return false;
+  }
+}
 
 export default async function handler(req: any, res: any) {
   console.log('🟢 INVITE API ROUTE HIT');
@@ -25,39 +147,53 @@ export default async function handler(req: any, res: any) {
     const authResult = await orgAdminMiddleware(req, orgId);
     console.log('✅ Middleware passed for user:', authResult.userId, 'in org:', orgId);
 
-    // 1. Assign seat first (checks availability and reserves it)
-    console.log(`🔍 Attempting to assign seat for ${email} in org ${orgId}`);
-    const seatResult = await organizationSeatOperations.assignSeat(orgId, email, role || 'member');
+    // 1. Reserve seat first (checks availability and reserves it)
+    console.log(`🔍 Attempting to reserve seat for ${email} in org ${orgId}`);
+    let seatResult = await organizationSeatOperations.assignSeat(orgId, email, role || 'member');
+
+    // If subscription not found, try to sync from Stripe and retry
+    if (seatResult.error === 'Organization subscription not found') {
+      console.log('⚠️ Subscription not found, attempting to sync from Stripe...');
+      const synced = await syncSubscriptionFromStripe(orgId);
+
+      if (synced) {
+        console.log('🔄 Retry reserving seat after sync...');
+        seatResult = await organizationSeatOperations.assignSeat(orgId, email, role || 'member');
+      } else {
+        console.log('❌ Sync failed or no subscription found in Stripe');
+      }
+    }
 
     if (seatResult.error) {
-      console.error('❌ Failed to assign seat:', seatResult.error);
-      
+      console.error('❌ Failed to reserve seat:', seatResult.error);
+
       if (seatResult.error === 'No available seats. Please upgrade your plan.') {
         return res.status(402).json({
           error: 'Insufficient seats',
           message: 'No available seats. Please upgrade your plan to add more seats.'
         });
       }
-      
-      if (seatResult.error === 'User already has an active seat in this organization') {
-        // If they have a seat, we might still want to send the invite if they aren't in Clerk yet?
-        // But usually this means they are already handled.
-        // Let's proceed but log it, or maybe fail?
-        // If we fail, the user can't re-invite someone who lost the email but has a seat.
-        // Let's assume if they have a seat, we can proceed to invite (idempotent-ish).
-        console.log('⚠️ User already has a seat, proceeding to create invitation...');
+
+      // Seat already reserved/active -> allow re-inviting without consuming another seat
+      if (seatResult.error === 'User already has a reserved or active seat in this organization') {
+        console.log('⚠️ Seat already reserved/active, proceeding to create invitation (idempotent)...');
+      } else if (seatResult.error === 'Organization subscription not found') {
+        return res.status(404).json({
+          error: 'Subscription not found',
+          message: 'No active or trialing subscription found for this organization.'
+        });
       } else {
         return res.status(400).json({ error: seatResult.error });
       }
     } else {
-      console.log('✅ Seat assigned successfully');
+      console.log('✅ Seat reserved successfully');
     }
 
     // 2. Create invitation using Clerk Backend SDK
     console.log(`🔍 Creating invitation for ${email} in org ${orgId}`);
     
     try {
-      const invitation = await clerkClient.organizations.createOrganizationInvitation({
+      const invitation = await getClerkClient().organizations.createOrganizationInvitation({
         organizationId: orgId,
         emailAddress: email,
         role: role || 'basic_member',
@@ -78,24 +214,16 @@ export default async function handler(req: any, res: any) {
       });
     } catch (clerkError: any) {
       console.error('❌ Error creating Clerk invitation:', clerkError);
-      
-      // Rollback seat assignment if it was just created
+
+      // Rollback seat reservation only if we successfully created it in this request
       if (!seatResult.error && seatResult.data) {
-        console.log('↺ Rolling back seat assignment...');
-        // We don't have a direct "delete" but revokeSeat works
-        // Or we can just leave it? No, we should clean up.
-        // But revokeSeat sets status to 'revoked'.
-        // Ideally we should hard delete or set to 'revoked' with reason 'invite_failed'.
-        // For now, let's use revokeSeat.
-        // But revokeSeat needs clerkUserId which we don't have yet (it's null in DB).
-        // We can use a direct DB call if we had access, but we only have operations.
-        // Let's try to revoke by email if possible? No, revokeSeat takes clerkUserId.
-        // Wait, assignSeat returns the seat object.
-        // We might need a `deleteSeat` operation or similar.
-        // For now, we'll leave it as a "zombie" seat or manual cleanup?
-        // Actually, `revokeSeat` uses `clerkUserId`.
-        // We need to handle this.
-        // But for this task, let's just return the error.
+        console.log('↺ Rolling back reserved seat (invite_failed)...');
+        const rollback = await organizationSeatOperations.releaseSeatByEmail(orgId, email, 'invite_failed');
+        if (rollback.error) {
+          console.error('❌ Failed to rollback seat reservation:', rollback.error);
+        } else {
+          console.log('✅ Seat reservation rolled back');
+        }
       }
 
       throw clerkError; // Re-throw to be handled by outer catch
