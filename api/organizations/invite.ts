@@ -232,7 +232,8 @@ export default async function handler(req: any, res: any) {
       if (seatResult.error === 'No available seats. Please upgrade your plan.') {
         return res.status(402).json({
           error: 'Insufficient seats',
-          message: 'No available seats. Please upgrade your plan to add more seats.'
+          message: 'No available seats. Please upgrade your plan to add more seats.',
+          code: 'INSUFFICIENT_SEATS'
         });
       }
 
@@ -242,10 +243,22 @@ export default async function handler(req: any, res: any) {
       } else if (seatResult.error === 'Organization subscription not found') {
         return res.status(404).json({
           error: 'Subscription not found',
-          message: 'No active or trialing subscription found for this organization.'
+          message: 'Your organization subscription could not be found. This may be because:\n' +
+                   '1. The Stripe subscription was not properly synced\n' +
+                   '2. The organization was not created in the database\n' +
+                   '\nPlease contact support or try creating a new subscription.',
+          code: 'SUBSCRIPTION_NOT_FOUND',
+          orgId: orgId,
+          troubleshooting: {
+            suggestion: 'Check that your Stripe subscription is active and linked to this organization',
+            supportEmail: 'support@softcodes.ai'
+          }
         });
       } else {
-        return res.status(400).json({ error: seatResult.error });
+        return res.status(400).json({
+          error: seatResult.error,
+          code: 'SEAT_RESERVATION_FAILED'
+        });
       }
     } else {
       console.log('✅ Seat reserved successfully');

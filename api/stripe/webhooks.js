@@ -75,6 +75,10 @@ export default async function handler(req, res) {
         await handleCheckoutSessionCompleted(event.data.object, supabase);
         break;
 
+      case 'customer.subscription.created':
+        await handleSubscriptionCreated(event.data.object, supabase);
+        break;
+
       case 'payment_intent.succeeded':
         await handlePaymentIntentSucceeded(event.data.object, supabase);
         break;
@@ -412,6 +416,136 @@ async function handleCheckoutSessionCompleted(session, supabase) {
 
   } catch (error) {
     console.error('❌ Error processing checkout session completed:', error);
+    throw error;
+  }
+}
+
+// Handle subscription creation - ensures organization exists
+async function handleSubscriptionCreated(subscription, supabase) {
+  console.log('🆕 Processing subscription created:', subscription.id);
+  
+  try {
+    // Get clerk_org_id from subscription metadata
+    const metadata = subscription.metadata || {};
+    const clerkOrgId = metadata.clerk_org_id;
+    
+    if (!clerkOrgId) {
+      console.log('⚠️ No clerk_org_id in subscription metadata, skipping organization sync');
+      return;
+    }
+
+    console.log('🏢 Ensuring organization exists for:', clerkOrgId);
+
+    // First, ensure the organization exists in our database
+    const { data: existingOrg, error: orgCheckError } = await supabase
+      .from('organizations')
+      .select('id')
+      .eq('clerk_org_id', clerkOrgId)
+      .maybeSingle();
+
+    let organizationId = existingOrg?.id;
+
+    if (!existingOrg) {
+      console.log('Creating organization record for:', clerkOrgId);
+      
+      // Get organization name from metadata or use default
+      const orgName = metadata.organization_name || `Organization ${clerkOrgId.slice(-8)}`;
+      
+      // Create organization using the RPC function
+      const { data: newOrg, error: orgError } = await supabase
+        .rpc('upsert_organization', {
+          p_clerk_org_id: clerkOrgId,
+          p_name: orgName
+        });
+
+      if (orgError) {
+        console.error('Failed to create organization:', orgError);
+        // Try direct insert as fallback
+        const { data: insertedOrg, error: insertError } = await supabase
+          .from('organizations')
+          .insert({
+            clerk_org_id: clerkOrgId,
+            name: orgName
+          })
+          .select('id')
+          .single();
+        
+        if (insertError) {
+          console.error('Failed to insert organization:', insertError);
+          throw insertError;
+        }
+        organizationId = insertedOrg.id;
+      } else {
+        // Get the organization ID after RPC
+        const { data: org } = await supabase
+          .from('organizations')
+          .select('id')
+          .eq('clerk_org_id', clerkOrgId)
+          .single();
+        organizationId = org?.id;
+      }
+      
+      console.log('✅ Organization created with ID:', organizationId);
+    } else {
+      console.log('✅ Organization already exists with ID:', organizationId);
+    }
+
+    // Now create or update the organization subscription
+    const seatsTotal = parseInt((metadata.seats_total || metadata.seats || '1'), 10) || 1;
+    const planType = metadata.plan_type || 'teams';
+    const billingFrequency = metadata.billing_frequency || 'monthly';
+
+    // Calculate initial credits
+    const baseCredits = billingFrequency === 'yearly' ? 6000 : 500;
+    const totalCredits = baseCredits * seatsTotal;
+
+    const subscriptionData = {
+      clerk_org_id: clerkOrgId,
+      stripe_subscription_id: subscription.id,
+      stripe_customer_id: subscription.customer,
+      plan_type: planType,
+      billing_frequency: billingFrequency,
+      seats_total: seatsTotal,
+      seats_used: 0,
+      status: subscription.status,
+      current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
+      current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+      total_credits: totalCredits,
+      used_credits: 0,
+      updated_at: new Date().toISOString()
+    };
+
+    if (organizationId) {
+      subscriptionData.organization_id = organizationId;
+    }
+
+    const { error: subError } = await supabase
+      .from('organization_subscriptions')
+      .upsert(subscriptionData, {
+        onConflict: 'clerk_org_id'
+      });
+
+    if (subError) {
+      console.error('Error creating organization subscription:', subError);
+      throw subError;
+    }
+
+    console.log('✅ Organization subscription created successfully');
+    console.log('  - Seats:', seatsTotal);
+    console.log('  - Plan:', planType);
+    console.log('  - Billing:', billingFrequency);
+    console.log('  - Credits:', totalCredits);
+
+    await recordWebhookProcessing(subscription.id, 'customer.subscription.created', {
+      clerk_org_id: clerkOrgId,
+      organization_id: organizationId,
+      seats_total: seatsTotal,
+      plan_type: planType,
+      billing_frequency: billingFrequency
+    }, supabase);
+
+  } catch (error) {
+    console.error('❌ Error processing subscription created:', error);
     throw error;
   }
 }

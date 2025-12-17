@@ -5,16 +5,17 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { 
-  Mail, 
-  Plus, 
-  Trash2, 
-  Send, 
-  Users, 
-  CheckCircle, 
-  Clock, 
+  Mail,
+  Plus,
+  Trash2,
+  Send,
+  Users,
+  CheckCircle,
+  Clock,
   XCircle,
   Copy,
-  ExternalLink
+  ExternalLink,
+  RefreshCw
 } from 'lucide-react';
 import { useUser } from '@clerk/clerk-react';
 import { useTeamInvitations, invitationUtils } from '@/utils/clerk/invitations';
@@ -73,7 +74,7 @@ export const InvitationManager: React.FC<InvitationManagerProps> = ({
     const existingInvitation = invitations.find(
       inv => inv.email.toLowerCase() === emailInput.toLowerCase() && inv.status === 'pending'
     );
-    
+
     if (existingInvitation) {
       setError('This email has already been invited');
       return;
@@ -83,7 +84,7 @@ export const InvitationManager: React.FC<InvitationManagerProps> = ({
     const pendingAndAcceptedInvitations = invitations.filter(
       inv => inv.status === 'pending' || inv.status === 'accepted'
     );
-    
+
     if (pendingAndAcceptedInvitations.length >= maxSeats - 1) { // -1 for the owner
       setError(`Maximum of ${maxSeats} team members allowed`);
       return;
@@ -95,17 +96,29 @@ export const InvitationManager: React.FC<InvitationManagerProps> = ({
 
     try {
       const result = await sendInvitation(emailInput, subscriptionId, user.id);
-      
+
       if (result.success) {
         setSuccess(`Invitation sent to ${emailInput}`);
         setEmailInput('');
         await loadInvitations(); // Reload to show new invitation
       } else {
-        setError(result.error || 'Failed to send invitation');
+        // Check for specific error codes
+        const errorMessage = result.error || 'Failed to send invitation';
+        if (errorMessage.includes('Subscription not found') || errorMessage.includes('SUBSCRIPTION_NOT_FOUND')) {
+          setError('⚠️ Your organization subscription could not be found. Please click "Sync Subscription" below to fix this issue.');
+        } else {
+          setError(errorMessage);
+        }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error sending invitation:', error);
-      setError('Failed to send invitation');
+
+      // Enhanced error handling
+      if (error.message?.includes('Subscription not found')) {
+        setError('⚠️ Your organization subscription could not be found. Please click "Sync Subscription" below to fix this issue.');
+      } else {
+        setError('Failed to send invitation. Please try again or contact support.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -119,7 +132,7 @@ export const InvitationManager: React.FC<InvitationManagerProps> = ({
 
     try {
       const success = await revokeInvitation(invitation.clerk_invitation_id, invitation.id);
-      
+
       if (success) {
         setSuccess(`Invitation to ${invitation.email} has been revoked`);
         await loadInvitations(); // Reload to show updated status
@@ -130,6 +143,43 @@ export const InvitationManager: React.FC<InvitationManagerProps> = ({
       console.error('Error revoking invitation:', error);
       setError('Failed to revoke invitation');
     } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSyncSubscription = async () => {
+    if (!user || !organizationId) return;
+
+    setIsLoading(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const response = await fetch('/api/organizations/sync-subscription', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          orgId: organizationId
+        })
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        setSuccess('✅ Subscription synced successfully! You can now send invitations.');
+        // Give a moment for the sync to complete before allowing retry
+        setTimeout(() => {
+          setIsLoading(false);
+        }, 1000);
+      } else {
+        setError(`❌ Failed to sync subscription: ${result.error || 'Unknown error'}`);
+        setIsLoading(false);
+      }
+    } catch (error: any) {
+      console.error('Error syncing subscription:', error);
+      setError(`❌ Error syncing subscription: ${error.message || 'Unknown error'}`);
       setIsLoading(false);
     }
   };
@@ -199,13 +249,13 @@ export const InvitationManager: React.FC<InvitationManagerProps> = ({
               </span>
             </div>
             <div className="w-full bg-slate-600 rounded-full h-2">
-              <div 
+              <div
                 className="bg-blue-600 h-2 rounded-full transition-all duration-300"
                 style={{ width: `${((pendingAndAcceptedCount + 1) / maxSeats) * 100}%` }}
               />
             </div>
             <p className="text-sm text-gray-400 mt-2">
-              {remainingSeats > 0 
+              {remainingSeats > 0
                 ? `${remainingSeats} seat${remainingSeats > 1 ? 's' : ''} remaining`
                 : 'All seats are occupied'
               }
@@ -248,6 +298,20 @@ export const InvitationManager: React.FC<InvitationManagerProps> = ({
             <Alert className="border-red-500/30 bg-red-900/20">
               <XCircle className="w-4 h-4" />
               <AlertDescription className="text-red-300">{error}</AlertDescription>
+              {(error.includes('Subscription not found') || error.includes('subscription')) && (
+                <div className="mt-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleSyncSubscription}
+                    disabled={isLoading}
+                    className="border-red-500/30 text-red-400 hover:bg-red-900/20"
+                  >
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    {isLoading ? 'Syncing...' : 'Sync Subscription'}
+                  </Button>
+                </div>
+              )}
             </Alert>
           )}
 
@@ -261,7 +325,7 @@ export const InvitationManager: React.FC<InvitationManagerProps> = ({
           {/* Invitations List */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-white">Team Invitations</h3>
-            
+
             {invitations.length === 0 ? (
               <div className="text-center py-8 text-gray-400">
                 <Mail className="w-12 h-12 mx-auto mb-4 opacity-50" />
@@ -284,12 +348,12 @@ export const InvitationManager: React.FC<InvitationManagerProps> = ({
                         </p>
                       </div>
                     </div>
-                    
+
                     <div className="flex items-center gap-3">
                       <Badge variant={getStatusBadgeVariant(invitation.status)}>
                         {invitationUtils.formatInvitationStatus(invitation.status)}
                       </Badge>
-                      
+
                       {invitation.status === 'pending' && (
                         <div className="flex gap-2">
                           <Button
