@@ -37,7 +37,7 @@ if (isServerEnvironment) {
 }
 
 // Helper function to get appropriate client with authentication
-async function getAuthenticatedClient() {
+export async function getAuthenticatedClient() {
   console.log('🔧 getAuthenticatedClient() called');
   console.log('- isServerEnvironment:', isServerEnvironment);
   console.log('- serverSupabase exists:', !!serverSupabase);
@@ -1172,6 +1172,48 @@ export const organizationSubscriptionOperations = {
     } catch (error) {
       console.error('Error in updateSubscriptionQuantity:', error);
       return { data: null, error };
+    }
+  },
+
+  // Deduct credits from an organization's shared pool
+  async deductOrgCredits(clerkOrgId: string, amount: number, description: string = 'API Usage'): Promise<{ success: boolean; error?: any }> {
+    try {
+      const client = await getAuthenticatedClient();
+      
+      // We use a RPC or a direct update with a check to ensure we don't go below zero
+      // For now, let's use a direct update with used_credits increment
+      // In a production app, you'd want a Postgres function to handle this atomically
+      
+      const { data: subscription, error: fetchError } = await client
+        .from('organization_subscriptions')
+        .select('id, total_credits, used_credits')
+        .eq('clerk_org_id', clerkOrgId)
+        .in('status', ['active', 'trialing'])
+        .single();
+
+      if (fetchError || !subscription) {
+        return { success: false, error: 'No active organization subscription found' };
+      }
+
+      const remaining = subscription.total_credits - subscription.used_credits;
+      if (remaining < amount) {
+        return { success: false, error: 'Insufficient organization credits' };
+      }
+
+      const { error: updateError } = await client
+        .from('organization_subscriptions')
+        .update({
+          used_credits: subscription.used_credits + amount,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', subscription.id);
+
+      if (updateError) throw updateError;
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error deducting organization credits:', error);
+      return { success: false, error };
     }
   }
 };

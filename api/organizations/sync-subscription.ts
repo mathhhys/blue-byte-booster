@@ -138,7 +138,7 @@ async function syncSubscriptionFromStripe(clerkOrgId: string) {
     const planType = metadata.plan_type || 'teams';
     const billingFrequency = metadata.billing_frequency || 'monthly';
     
-    // Calculate credits
+    // Calculate credits (500 per seat for monthly, 6000 for yearly)
     const baseCredits = billingFrequency === 'yearly' ? 6000 : 500;
     const totalCredits = baseCredits * seatsTotal;
 

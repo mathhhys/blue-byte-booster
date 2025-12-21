@@ -341,6 +341,48 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           console.log(`✅ Seat revoked for user ${userId} in org ${orgId}`, revokedSeat);
         }
 
+      } else if (eventType === 'organizationInvitation.created') {
+        const invitation = evt.data;
+        const orgId = invitation.organization_id;
+        const email = invitation.email_address;
+
+        console.log(`Processing organization invitation created for ${email} in org ${orgId}`);
+
+        // Reserve a seat in Supabase when a native Clerk invitation is created
+        const { data: reservedSeat, error } = await organizationSeatOperations.assignSeat(
+          orgId,
+          email,
+          invitation.role === 'admin' ? 'admin' : 'member'
+        );
+
+        if (error) {
+          console.error('Error reserving organization seat from invitation:', error);
+        } else {
+          console.log(`✅ Seat reserved for invitation to ${email} in org ${orgId}`, reservedSeat);
+        }
+
+      } else if (eventType === 'organizationInvitation.revoked' || eventType === 'organizationInvitation.accepted') {
+        // Note: 'accepted' is usually followed by membership.created which handles the activation.
+        // If revoked, we release the seat.
+        if (eventType === 'organizationInvitation.revoked') {
+          const invitation = evt.data;
+          const orgId = invitation.organization_id;
+          const email = invitation.email_address;
+
+          console.log(`Processing organization invitation revoked for ${email} in org ${orgId}`);
+
+          const { data: releasedSeat, error } = await organizationSeatOperations.releaseSeatByEmail(
+            orgId,
+            email,
+            'invitation_revoked'
+          );
+
+          if (error) {
+            console.error('Error releasing organization seat:', error);
+          } else {
+            console.log(`✅ Seat released for revoked invitation to ${email} in org ${orgId}`, releasedSeat);
+          }
+        }
       } else {
         console.log(`Unhandled Clerk webhook event type: ${eventType}`);
       }

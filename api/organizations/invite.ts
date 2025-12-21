@@ -204,67 +204,48 @@ export default async function handler(req: any, res: any) {
     const authResult = await orgAdminMiddleware(req, orgId);
     console.log('✅ Middleware passed for user:', authResult.userId, 'in org:', orgId);
 
-    // 1. Reserve seat first (checks availability and reserves it)
-    console.log(`🔍 Attempting to reserve seat for ${email} in org ${orgId}`);
-    let seatResult = await organizationSeatOperations.assignSeat(orgId, email, role || 'member');
+    // 1. Check seat availability before inviting
+    console.log(`🔍 Checking seat availability for ${email} in org ${orgId}`);
+    
+    const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const supabase = createClient(supabaseUrl!, supabaseKey!);
 
-    // If subscription not found, try to sync from Clerk then Stripe and retry
-    if (seatResult.error === 'Organization subscription not found') {
-      console.log('⚠️ Subscription not found, attempting full sync...');
+    const { data: subscription, error: subError } = await supabase
+      .from('organization_subscriptions')
+      .select('seats_total, seats_used, overage_seats')
+      .eq('clerk_org_id', orgId)
+      .in('status', ['active', 'trialing'])
+      .maybeSingle();
+
+    if (subError || !subscription) {
+      console.log('⚠️ Subscription not found, attempting sync...');
+      await syncOrganizationFromClerk(orgId);
+      await syncSubscriptionFromStripe(orgId);
       
-      // 1. Ensure Org exists (from Clerk)
-      const orgSynced = await syncOrganizationFromClerk(orgId);
+      // Re-fetch
+      const { data: retrySub } = await supabase
+        .from('organization_subscriptions')
+        .select('seats_total, seats_used, overage_seats')
+        .eq('clerk_org_id', orgId)
+        .in('status', ['active', 'trialing'])
+        .maybeSingle();
+        
+      if (!retrySub) {
+        return res.status(404).json({ error: 'Subscription not found' });
+      }
       
-      // 2. Ensure Subscription exists (from Stripe) - now that Org exists, we can link it
-      const stripeSynced = await syncSubscriptionFromStripe(orgId);
-
-      if (orgSynced || stripeSynced) {
-        console.log('🔄 Retry reserving seat after sync...');
-        seatResult = await organizationSeatOperations.assignSeat(orgId, email, role || 'member');
-      } else {
-        console.log('❌ All sync attempts failed');
-      }
-    }
-
-    if (seatResult.error) {
-      console.error('❌ Failed to reserve seat:', seatResult.error);
-
-      if (seatResult.error === 'No available seats. Please upgrade your plan.') {
-        return res.status(402).json({
-          error: 'Insufficient seats',
-          message: 'No available seats. Please upgrade your plan to add more seats.',
-          code: 'INSUFFICIENT_SEATS'
-        });
-      }
-
-      // Seat already reserved/active -> allow re-inviting without consuming another seat
-      if (seatResult.error === 'User already has a reserved or active seat in this organization') {
-        console.log('⚠️ Seat already reserved/active, proceeding to create invitation (idempotent)...');
-      } else if (seatResult.error === 'Organization subscription not found') {
-        return res.status(404).json({
-          error: 'Subscription not found',
-          message: 'Your organization subscription could not be found. This may be because:\n' +
-                   '1. The Stripe subscription was not properly synced\n' +
-                   '2. The organization was not created in the database\n' +
-                   '\nPlease contact support or try creating a new subscription.',
-          code: 'SUBSCRIPTION_NOT_FOUND',
-          orgId: orgId,
-          troubleshooting: {
-            suggestion: 'Check that your Stripe subscription is active and linked to this organization',
-            supportEmail: 'support@softcodes.ai'
-          }
-        });
-      } else {
-        return res.status(400).json({
-          error: seatResult.error,
-          code: 'SEAT_RESERVATION_FAILED'
-        });
+      if (retrySub.seats_used >= retrySub.seats_total + (retrySub.overage_seats || 0)) {
+        return res.status(402).json({ error: 'Insufficient seats' });
       }
     } else {
-      console.log('✅ Seat reserved successfully');
+      if (subscription.seats_used >= subscription.seats_total + (subscription.overage_seats || 0)) {
+        return res.status(402).json({ error: 'Insufficient seats' });
+      }
     }
 
     // 2. Create invitation using Clerk Backend SDK
+    // The Clerk Webhook (organizationInvitation.created) will handle the actual seat reservation in Supabase.
     console.log(`🔍 Creating invitation for ${email} in org ${orgId}`);
     
     try {
@@ -289,18 +270,7 @@ export default async function handler(req: any, res: any) {
       });
     } catch (clerkError: any) {
       console.error('❌ Error creating Clerk invitation:', clerkError);
-
-      // Rollback seat reservation only if we successfully created it in this request
-      if (!seatResult.error && seatResult.data) {
-        console.log('↺ Rolling back reserved seat (invite_failed)...');
-        const rollback = await organizationSeatOperations.releaseSeatByEmail(orgId, email, 'invite_failed');
-        if (rollback.error) {
-          console.error('❌ Failed to rollback seat reservation:', rollback.error);
-        } else {
-          console.log('✅ Seat reservation rolled back');
-        }
-      }
-
+      // No rollback needed here because the webhook only fires if Clerk successfully creates the invitation.
       throw clerkError; // Re-throw to be handled by outer catch
     }
 

@@ -54,19 +54,14 @@ export default async function handler(req: any, res: any) {
       proration_behavior: 'always_invoice', // Charge immediately for upgrade
     });
 
-    // Update the database
-    const { data: subscription, error: dbError } = await organizationSubscriptionOperations.updateSubscriptionQuantity(orgId, newQuantity);
+    // We do NOT update the database here.
+    // We let the Stripe Webhook (customer.subscription.updated) handle the database update.
+    // This ensures that credits are granted correctly and the DB stays in sync with Stripe's proration logic.
 
-    if (dbError) {
-      console.error('❌ API: Database error:', dbError);
-      return res.status(500).json({ error: 'Database error', details: dbError });
-    }
-
-    console.log('✅ API: Subscription quantity updated successfully');
+    console.log('✅ API: Stripe subscription update initiated');
     return res.status(200).json({
-      data: subscription,
-      error: null,
-      message: 'Subscription quantity updated successfully'
+      success: true,
+      message: 'Subscription update initiated. Changes will reflect shortly.'
     });
   } catch (error: any) {
     console.error('❌ API: Exception:', error);

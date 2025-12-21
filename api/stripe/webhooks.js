@@ -372,6 +372,11 @@ async function handleCheckoutSessionCompleted(session, supabase) {
       const subscription = await stripe.subscriptions.retrieve(session.subscription);
       
       const seatsTotal = parseInt((metadata.seats_total || metadata.seats || '1'), 10) || 1;
+      const planType = metadata.plan_type || 'teams';
+      const billingFrequency = metadata.billing_frequency || 'monthly';
+
+      // Calculate initial credits (500 per seat)
+      const creditsToGrant = calculateCreditsToGrant(planType, billingFrequency, seatsTotal);
 
       const { error: subError } = await supabase
         .from('organization_subscriptions')
@@ -379,10 +384,12 @@ async function handleCheckoutSessionCompleted(session, supabase) {
           clerk_org_id: metadata.clerk_org_id,
           stripe_subscription_id: session.subscription,
           stripe_customer_id: session.customer,
-          plan_type: metadata.plan_type || 'teams',
-          billing_frequency: metadata.billing_frequency || 'monthly',
+          plan_type: planType,
+          billing_frequency: billingFrequency,
           seats_total: seatsTotal,
           status: 'active',
+          total_credits: creditsToGrant, // Set initial credits
+          used_credits: 0,
           current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
           current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
           updated_at: new Date().toISOString()
@@ -395,7 +402,44 @@ async function handleCheckoutSessionCompleted(session, supabase) {
         console.error('Error creating organization subscription:', subError);
         throw subError;
       }
-      console.log('✅ Organization subscription created/updated');
+      console.log('✅ Organization subscription created/updated with credits:', creditsToGrant);
+    }
+
+    // Handle Organization Credit Top-up
+    if (metadata.purchase_type === 'org_credit_topup' && metadata.clerk_org_id) {
+      const creditsToAdd = parseInt(metadata.credits_to_add || '0', 10);
+      console.log(`🏢 Processing Organization Credit Top-up for: ${metadata.clerk_org_id} (Amount: ${creditsToAdd})`);
+
+      if (creditsToAdd > 0) {
+        // Get current credits
+        const { data: orgSub, error: fetchError } = await supabase
+          .from('organization_subscriptions')
+          .select('id, total_credits')
+          .eq('clerk_org_id', metadata.clerk_org_id)
+          .single();
+
+        if (fetchError || !orgSub) {
+          console.error('❌ Org subscription not found for top-up:', fetchError);
+          throw new Error('Organization subscription not found');
+        }
+
+        const newTotal = (orgSub.total_credits || 0) + creditsToAdd;
+
+        const { error: updateError } = await supabase
+          .from('organization_subscriptions')
+          .update({
+            total_credits: newTotal,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', orgSub.id);
+
+        if (updateError) {
+          console.error('❌ Failed to update org credits:', updateError);
+          throw updateError;
+        }
+
+        console.log(`✅ Successfully added ${creditsToAdd} credits to org pool. New total: ${newTotal}`);
+      }
     }
 
     // This handles initial subscription setup
@@ -588,17 +632,29 @@ async function handleSubscriptionUpdated(subscription, supabase) {
     }
 
     // Update organization subscription with new seats_total
+    const oldSeats = orgSubscription.seats_total || 0;
+    const seatDelta = totalQuantity - oldSeats;
+
+    const updateData = {
+      seats_total: totalQuantity,
+      status: subscription.status,
+      updated_at: new Date().toISOString(),
+      // Reset overage seats if seats_total increased
+      overage_seats: orgSubscription.overage_seats > 0 ?
+        Math.max(0, orgSubscription.overage_seats - (totalQuantity - orgSubscription.seats_total)) :
+        orgSubscription.overage_seats
+    };
+
+    // If seats were added, grant bonus credits (500 per seat)
+    if (seatDelta > 0) {
+      const bonusCredits = calculateCreditsToGrant(orgSubscription.plan_type, orgSubscription.billing_frequency, seatDelta);
+      updateData.total_credits = (orgSubscription.total_credits || 0) + bonusCredits;
+      console.log(`🎁 Granting ${bonusCredits} bonus credits for ${seatDelta} new seats`);
+    }
+
     const { error: updateError } = await supabase
       .from('organization_subscriptions')
-      .update({
-        seats_total: totalQuantity,
-        status: subscription.status,
-        updated_at: new Date().toISOString(),
-        // Reset overage seats if seats_total increased
-        overage_seats: orgSubscription.overage_seats > 0 ?
-          Math.max(0, orgSubscription.overage_seats - (totalQuantity - orgSubscription.seats_total)) :
-          orgSubscription.overage_seats
-      })
+      .update(updateData)
       .eq('stripe_subscription_id', subscription.id);
 
     if (updateError) {
