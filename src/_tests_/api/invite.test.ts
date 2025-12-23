@@ -63,7 +63,7 @@ describe('Invite API', () => {
     mockCreateOrganizationInvitation.mockResolvedValue({
       id: 'inv_123',
       emailAddress: 'test@example.com',
-      role: 'basic_member',
+      role: 'member',
       status: 'pending',
       createdAt: Date.now()
     });

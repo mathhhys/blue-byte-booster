@@ -237,12 +237,14 @@ export default async function handler(req: any, res: any) {
 
     // 2. Create invitation using Clerk Backend SDK
     console.log(`🔍 Creating Clerk invitation for ${email} in org ${orgId}`);
+    console.log(`🔍 Using role: ${role || 'member'} (requested: ${role})`);
+    console.log(`🔍 Inviter User ID: ${authResult.userId}`);
     
     try {
       const invitation = await getClerkClient().organizations.createOrganizationInvitation({
         organizationId: orgId,
         emailAddress: email,
-        role: role || 'basic_member',
+        role: role || 'member',
         inviterUserId: authResult.userId,
       });
 
@@ -259,7 +261,9 @@ export default async function handler(req: any, res: any) {
         }
       });
     } catch (clerkError: any) {
-      console.error('❌ Error creating Clerk invitation:', JSON.stringify(clerkError, null, 2));
+      console.error('❌ Error creating Clerk invitation. Full error:', JSON.stringify(clerkError, null, 2));
+      console.error('❌ Clerk Error Status:', clerkError.status);
+      console.error('❌ Clerk Error Message:', clerkError.message);
       
       // ROLLBACK: Release the reserved seat if Clerk fails
       console.log(`🔄 Rolling back seat reservation for ${email} in org ${orgId}`);

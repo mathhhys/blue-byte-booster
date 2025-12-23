@@ -127,7 +127,7 @@ export class ClerkInvitationManager {
         body: JSON.stringify({
           orgId: organizationId,
           email,
-          role: 'basic_member'
+          role: 'member'
         })
       });
 

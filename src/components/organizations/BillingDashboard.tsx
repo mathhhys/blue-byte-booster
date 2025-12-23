@@ -352,7 +352,7 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
         body: JSON.stringify({
           orgId: organization.id,
           email: newMemberEmail,
-          role: 'basic_member',
+          role: 'member',
         }),
       });
   

@@ -78,7 +78,7 @@ export const SeatManager: React.FC = () => {
   const [showBuySeatsModal, setShowBuySeatsModal] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteRole, setInviteRole] = useState('basic_member');
+  const [inviteRole, setInviteRole] = useState('member');
   const [buySeatsQuantity, setBuySeatsQuantity] = useState(1);
 
   useEffect(() => {
@@ -403,7 +403,7 @@ export const SeatManager: React.FC = () => {
                       <SelectValue placeholder="Select role" />
                     </SelectTrigger>
                     <SelectContent className="bg-[#2a2a2a] border-white/10 text-white">
-                      <SelectItem value="basic_member">Member</SelectItem>
+                      <SelectItem value="member">Member</SelectItem>
                       <SelectItem value="admin">Admin</SelectItem>
                     </SelectContent>
                   </Select>
