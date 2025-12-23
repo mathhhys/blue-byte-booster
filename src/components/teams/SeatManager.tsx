@@ -118,11 +118,6 @@ export const SeatManager: React.FC = () => {
       setSeatsData(data.data);
     } catch (error) {
       console.error('Error loading seats:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load seat information",
-        variant: "destructive",
-      });
     } finally {
       setIsLoading(false);
     }

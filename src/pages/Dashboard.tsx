@@ -150,11 +150,6 @@ const Dashboard = () => {
         
         if (error) {
           console.error('❌ Database fetch error:', error);
-          toast({
-            title: "Database Error",
-            description: `Failed to fetch user data: ${error.message || 'Unknown error'}`,
-            variant: "destructive",
-          });
         } else if (data) {
           console.log('✅ Successfully fetched user data:');
           console.log('- Credits:', data.credits);
@@ -164,11 +159,6 @@ const Dashboard = () => {
           
           setDbUser(data);
           setCurrentBalance(data.credits);
-          
-          toast({
-            title: "Data Loaded",
-            description: `Found user with ${data.credits} credits on ${data.plan_type} plan`,
-          });
         } else {
           console.log('⚠️ No user found in database for Clerk ID:', user.id);
           console.log('Attempting to initialize user in database...');
@@ -194,11 +184,6 @@ const Dashboard = () => {
           
           if (initError) {
             console.error('❌ Error initializing user:', initError);
-            toast({
-              title: "Initialization Error",
-              description: `Failed to create user in database: ${initError.message || 'Unknown error'}`,
-              variant: "destructive",
-            });
           } else if (newUser) {
             console.log('✅ Successfully created user in database:');
             console.log('- Credits:', newUser.credits);
@@ -206,18 +191,8 @@ const Dashboard = () => {
             
             setDbUser(newUser);
             setCurrentBalance(newUser.credits);
-            
-            toast({
-              title: "Account Created",
-              description: `Welcome! Account created with ${newUser.credits} credits on ${newUser.plan_type} plan`,
-            });
           } else {
             console.log('❌ Failed to create user in database');
-            toast({
-              title: "User Creation Failed",
-              description: "Could not create user account in database",
-              variant: "destructive",
-            });
           }
         }
         

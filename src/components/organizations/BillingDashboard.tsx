@@ -134,11 +134,6 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
       await loadSeatsData();
     } catch (error) {
       console.error('Error loading billing info:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load billing information",
-        variant: "destructive",
-      });
       // Set to null if we can't load data
       setSubscriptionData(null);
     } finally {

@@ -57,7 +57,6 @@ export const InvitationManager: React.FC<InvitationManagerProps> = ({
       setInvitations(data || []);
     } catch (error) {
       console.error('Error loading invitations:', error);
-      setError('Failed to load invitations');
     }
   };
 
