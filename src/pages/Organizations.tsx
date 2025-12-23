@@ -6,8 +6,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import {
   Settings,
-  Search,
-  Bell,
   Users,
   Home,
   Code,
@@ -16,6 +14,8 @@ import {
   Mail,
   Building,
   DollarSign,
+  RefreshCw,
+  Loader2,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
@@ -36,6 +36,7 @@ import {
 } from '@/components/ui/sidebar';
 import { BillingDashboard } from '@/components/organizations/BillingDashboard';
 import { SeatManager } from '@/components/teams/SeatManager';
+import { createStripeCustomerPortalSession } from '@/api/stripe';
 
 // Dark theme appearance configuration for Clerk components
 const clerkAppearance = {
@@ -72,6 +73,7 @@ const Organizations = () => {
   const { organization, isLoaded: orgLoaded, membership } = useOrganization();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('settings');
+  const [isBillingPortalLoading, setIsBillingPortalLoading] = useState(false);
 
   const isAdmin = membership?.role === 'org:admin';
 
@@ -86,18 +88,70 @@ const Organizations = () => {
     }
   }, [organization, isAdmin]);
 
+  // Billing portal redirect function
+  const handleBillingPortalRedirect = async () => {
+    if (!user?.id) {
+      toast({
+        title: "Authentication Required",
+        description: "Please sign in to access billing information",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsBillingPortalLoading(true);
+
+    try {
+      const result = await createStripeCustomerPortalSession(user.id);
+
+      if (result.success) {
+        if (result.url) {
+          window.location.href = result.url;
+        } else if ('mock' in result && result.mock && import.meta.env.DEV) {
+          toast({
+            title: "Development Mode",
+            description: "Billing portal would redirect in production. Using mock implementation.",
+          });
+        } else {
+          toast({
+            title: "Billing Portal Error",
+            description: "Failed to access billing portal. Please try again.",
+            variant: "destructive",
+          });
+        }
+      } else {
+        toast({
+          title: "Billing Portal Error",
+          description: ('error' in result ? result.error : null) || "Failed to access billing portal. Please try again.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('❌ Error accessing billing portal:', error);
+      toast({
+        title: "Billing Portal Error",
+        description: "An unexpected error occurred. Please try again later.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsBillingPortalLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#121212] text-white">
       <SidebarProvider>
         {/* Sidebar */}
         <Sidebar className="border-r border-[#2a2a2a] bg-[#161616]">
-          <SidebarHeader className="p-4 border-b border-[#2a2a2a]">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-                <Code className="w-5 h-5 text-white" />
-              </div>
-              <span className="font-semibold text-white">Softcodes</span>
-            </div>
+          <SidebarHeader className="h-32 flex items-center justify-center p-0 border-b border-[#2a2a2a]">
+            <Link to="/" className="mt-0 mb-0 relative w-32 h-32 overflow-hidden" style={{ display: "inline-block" }}>
+              <img
+                src="https://xraquejellmoyrpqcirs.supabase.co/storage/v1/object/public/softcodes-logo/softcodes%20logo%20navbar%20desktop%20not%20scrolled.svg"
+                alt="Softcodes Logo"
+                className="w-32 h-32 object-contain"
+                loading="eager"
+              />
+            </Link>
           </SidebarHeader>
 
           <SidebarContent className="p-4">
@@ -140,7 +194,7 @@ const Organizations = () => {
             {/* Navigation Menu */}
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton 
+                <SidebarMenuButton
                   asChild
                   className="text-white/70 hover:text-white hover:bg-white/10"
                 >
@@ -153,26 +207,29 @@ const Organizations = () => {
               </SidebarMenuItem>
               
               <SidebarMenuItem>
-                <SidebarMenuButton 
-                  asChild
+                <SidebarMenuButton
                   className="text-white/70 hover:text-white hover:bg-white/10"
+                  onClick={handleBillingPortalRedirect}
+                  disabled={isBillingPortalLoading}
                 >
-                  <Link to="/dashboard">
-                    <CreditCard className="w-4 h-4" />
-                    <span>Billing</span>
-                    <SidebarMenuBadge></SidebarMenuBadge>
-                  </Link>
+                  <CreditCard className="w-4 h-4" />
+                  <span>
+                    {isBillingPortalLoading ? 'Loading...' : 'Billing'}
+                  </span>
+                  <SidebarMenuBadge></SidebarMenuBadge>
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
               <SidebarMenuItem>
-                <SidebarMenuButton 
-                  isActive 
-                  className="bg-blue-600/20 text-white"
+                <SidebarMenuButton
+                  asChild
+                  className={`${organization ? 'bg-blue-600/20 text-white' : 'text-white/70'} hover:text-white hover:bg-white/10`}
                 >
-                  <Users className="w-4 h-4" />
-                  <span>{organization ? organization.name : 'Organizations'}</span>
-                  <SidebarMenuBadge>{organization ? '1' : ''}</SidebarMenuBadge>
+                  <Link to="/organizations">
+                    <Users className="w-4 h-4" />
+                    <span>{organization ? organization.name : 'Organizations'}</span>
+                    <SidebarMenuBadge>{organization ? '1' : ''}</SidebarMenuBadge>
+                  </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
@@ -188,34 +245,34 @@ const Organizations = () => {
               <SidebarMenu>
 
                 <SidebarMenuItem>
-                  <SidebarMenuButton className="text-white/70 hover:text-white hover:bg-white/10">
-                    <FileText className="w-4 h-4" />
-                    <span>Docs</span>
+                  <SidebarMenuButton asChild className="text-white/70 hover:text-white hover:bg-white/10">
+                    <a href="https://docs.softcodes.ai/InstallingSoftcodes" target="_blank" rel="noopener noreferrer">
+                      <FileText className="w-4 h-4" />
+                      <span>Get Started</span>
+                    </a>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
-
+            
                 <SidebarMenuItem>
-                  <SidebarMenuButton className="text-white/70 hover:text-white hover:bg-white/10">
-                    <Mail className="w-4 h-4" />
-                    <span>Contact Support</span>
+                  <SidebarMenuButton asChild className="text-white/70 hover:text-white hover:bg-white/10">
+                    <a href="https://docs.softcodes.ai/InstallingSoftcodes" target="_blank" rel="noopener noreferrer">
+                      <FileText className="w-4 h-4" />
+                      <span>Docs</span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+            
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild className="text-white/70 hover:text-white hover:bg-white/10">
+                    <a href="mailto:mathys@softcodes.io">
+                      <Mail className="w-4 h-4" />
+                      <span>Contact Support</span>
+                    </a>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               </SidebarMenu>
             </div>
           </SidebarContent>
-
-          <SidebarFooter className="p-4 border-t border-[#2a2a2a]">
-            <div className="bg-[#2a2a2a] rounded-lg p-4 border border-[#2a2a2a]">
-              <div className="text-sm font-medium text-white mb-1">Upgrade to Pro</div>
-              <div className="text-xs text-white/70 mb-3">
-                Unlock unlimited credits, advanced analytics, and priority support.
-              </div>
-              <div className="text-lg font-bold text-white mb-2">$29<span className="text-sm font-normal text-white/70">/month</span></div>
-              <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white">
-                Upgrade Now
-              </Button>
-            </div>
-          </SidebarFooter>
         </Sidebar>
 
         {/* Main Content */}
@@ -233,25 +290,11 @@ const Organizations = () => {
               </div>
               
               <div className="flex items-center gap-4">
-                {/* Search */}
-                <div className="relative hidden md:block">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <Input
-                    placeholder="Search organizations..."
-                    className="pl-10 w-80 bg-[#2a2a2a] border-white/10 text-white placeholder-gray-400"
-                  />
-                </div>
 
-                {/* Notifications */}
-                <Button variant="ghost" size="icon" className="text-gray-400 hover:text-white relative">
-                  <Bell className="w-4 h-4" />
-                  <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full text-xs flex items-center justify-center text-white">
-                    1
-                  </span>
-                </Button>
+
 
                 {/* User */}
-                <UserButton 
+                <UserButton
                   appearance={{
                     elements: {
                       avatarBox: 'w-8 h-8',
