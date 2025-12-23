@@ -50,7 +50,13 @@ async function syncOrganizationFromClerk(clerkOrgId: string) {
     const clerk = getClerkClient();
     const supabase = getSupabaseAdminClient();
 
-    const org = await clerk.organizations.getOrganization({ organizationId: clerkOrgId });
+    let org;
+    try {
+      org = await clerk.organizations.getOrganization({ organizationId: clerkOrgId });
+    } catch (clerkError: any) {
+      console.error(`❌ Clerk API error fetching org ${clerkOrgId}:`, JSON.stringify(clerkError, null, 2));
+      return { success: false, error: `Clerk organization not found: ${clerkOrgId}` };
+    }
     
     const { error } = await supabase.rpc('upsert_organization', {
       p_clerk_org_id: org.id,

@@ -204,49 +204,39 @@ export default async function handler(req: any, res: any) {
     const authResult = await orgAdminMiddleware(req, orgId);
     console.log('✅ Middleware passed for user:', authResult.userId, 'in org:', orgId);
 
-    // 1. Check seat availability before inviting
-    console.log(`🔍 Checking seat availability for ${email} in org ${orgId}`);
+    // 1. Reserve seat in Supabase BEFORE calling Clerk
+    // This ensures immediate seat reduction and handles availability checks.
+    console.log(`🔍 Reserving seat for ${email} in org ${orgId}`);
     
-    const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    const supabase = createClient(supabaseUrl!, supabaseKey!);
-
-    const { data: subscription, error: subError } = await supabase
-      .from('organization_subscriptions')
-      .select('seats_total, seats_used, overage_seats')
-      .eq('clerk_org_id', orgId)
-      .in('status', ['active', 'trialing'])
-      .maybeSingle();
-
-    if (subError || !subscription) {
-      console.log('⚠️ Subscription not found, attempting sync...');
-      await syncOrganizationFromClerk(orgId);
-      await syncSubscriptionFromStripe(orgId);
+    const seatResult = await organizationSeatOperations.assignSeat(orgId, email, role === 'admin' ? 'admin' : 'member');
+    
+    if (seatResult.error) {
+      console.log('❌ Seat reservation failed:', seatResult.error);
       
-      // Re-fetch
-      const { data: retrySub } = await supabase
-        .from('organization_subscriptions')
-        .select('seats_total, seats_used, overage_seats')
-        .eq('clerk_org_id', orgId)
-        .in('status', ['active', 'trialing'])
-        .maybeSingle();
+      if (seatResult.error === 'No available seats. Please upgrade your plan.') {
+        return res.status(402).json({ error: 'Insufficient seats' });
+      }
+      
+      if (seatResult.error === 'User already has a reserved or active seat in this organization') {
+        // If seat already exists, we can still try to create the Clerk invitation (idempotency)
+        console.log('⚠️ Seat already reserved, proceeding to Clerk invitation...');
+      } else if (seatResult.error === 'Organization subscription not found') {
+        console.log('⚠️ Subscription not found, attempting sync...');
+        await syncOrganizationFromClerk(orgId);
+        await syncSubscriptionFromStripe(orgId);
         
-      if (!retrySub) {
-        return res.status(404).json({ error: 'Subscription not found' });
-      }
-      
-      if (retrySub.seats_used >= retrySub.seats_total + (retrySub.overage_seats || 0)) {
-        return res.status(402).json({ error: 'Insufficient seats' });
-      }
-    } else {
-      if (subscription.seats_used >= subscription.seats_total + (subscription.overage_seats || 0)) {
-        return res.status(402).json({ error: 'Insufficient seats' });
+        // Retry reservation
+        const retryResult = await organizationSeatOperations.assignSeat(orgId, email, role === 'admin' ? 'admin' : 'member');
+        if (retryResult.error) {
+          return res.status(retryResult.error === 'No available seats. Please upgrade your plan.' ? 402 : 404).json({ error: retryResult.error });
+        }
+      } else {
+        return res.status(500).json({ error: 'Database error', details: seatResult.error });
       }
     }
 
     // 2. Create invitation using Clerk Backend SDK
-    // The Clerk Webhook (organizationInvitation.created) will handle the actual seat reservation in Supabase.
-    console.log(`🔍 Creating invitation for ${email} in org ${orgId}`);
+    console.log(`🔍 Creating Clerk invitation for ${email} in org ${orgId}`);
     
     try {
       const invitation = await getClerkClient().organizations.createOrganizationInvitation({
@@ -256,7 +246,7 @@ export default async function handler(req: any, res: any) {
         inviterUserId: authResult.userId,
       });
 
-      console.log('✅ Invitation created:', invitation.id);
+      console.log('✅ Clerk invitation created:', invitation.id);
 
       return res.status(200).json({
         success: true,
@@ -269,8 +259,21 @@ export default async function handler(req: any, res: any) {
         }
       });
     } catch (clerkError: any) {
-      console.error('❌ Error creating Clerk invitation:', clerkError);
-      // No rollback needed here because the webhook only fires if Clerk successfully creates the invitation.
+      console.error('❌ Error creating Clerk invitation:', JSON.stringify(clerkError, null, 2));
+      
+      // ROLLBACK: Release the reserved seat if Clerk fails
+      console.log(`🔄 Rolling back seat reservation for ${email} in org ${orgId}`);
+      await organizationSeatOperations.releaseSeatByEmail(orgId, email, 'invite_failed');
+      
+      // Handle specific Clerk errors
+      if (clerkError.errors && clerkError.errors.length > 0) {
+        const error = clerkError.errors[0];
+        if (error.code === 'form_identifier_exists') {
+          return res.status(400).json({ error: 'User is already a member or has a pending invitation in Clerk' });
+        }
+        return res.status(400).json({ error: error.message || 'Failed to create invitation' });
+      }
+      
       throw clerkError; // Re-throw to be handled by outer catch
     }
 

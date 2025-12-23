@@ -701,14 +701,10 @@ export const organizationSeatOperations = {
         return { data: null, error: seatError };
       }
 
-      // Update seats_used count
-      const { error: updateError } = await client
-        .from('organization_subscriptions')
-        .update({
-          seats_used: subscription.seats_used + 1,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', subscription.id);
+      // Update seats_used count atomically
+      const { error: updateError } = await client.rpc('increment_seats_used', {
+        p_subscription_id: subscription.id
+      });
 
       if (updateError) {
         return { data: null, error: updateError };
@@ -758,22 +754,10 @@ export const organizationSeatOperations = {
         return { data: null, error: revokeError };
       }
 
-      // Update seats_used count
-      const { data: subscription } = await client
-        .from('organization_subscriptions')
-        .select('seats_used')
-        .eq('id', seat.organization_subscription_id)
-        .single();
-
-      if (subscription) {
-        await client
-          .from('organization_subscriptions')
-          .update({
-            seats_used: Math.max(0, subscription.seats_used - 1),
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', seat.organization_subscription_id);
-      }
+      // Update seats_used count atomically
+      await client.rpc('decrement_seats_used', {
+        p_subscription_id: seat.organization_subscription_id
+      });
 
       return { data: revokedSeat, error: null };
     } catch (error) {
@@ -958,22 +942,10 @@ export const organizationSeatOperations = {
         return { data: null, error: revokeError };
       }
 
-      // Decrement seats_used (best-effort)
-      const { data: subscription, error: subError } = await client
-        .from('organization_subscriptions')
-        .select('seats_used')
-        .eq('id', seat.organization_subscription_id)
-        .single();
-
-      if (!subError && subscription) {
-        await client
-          .from('organization_subscriptions')
-          .update({
-            seats_used: Math.max(0, (subscription.seats_used || 0) - 1),
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', seat.organization_subscription_id);
-      }
+      // Decrement seats_used atomically
+      await client.rpc('decrement_seats_used', {
+        p_subscription_id: seat.organization_subscription_id
+      });
 
       return { data: revokedSeat, error: null };
     } catch (error) {
@@ -1098,13 +1070,9 @@ export const organizationSeatOperations = {
         return { data: null, error: seatError };
       }
 
-      const { error: updateError } = await client
-        .from('organization_subscriptions')
-        .update({
-          seats_used: subscription.seats_used + 1,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', subscription.id);
+      const { error: updateError } = await client.rpc('increment_seats_used', {
+        p_subscription_id: subscription.id
+      });
 
       if (updateError) {
         return { data: null, error: updateError };
