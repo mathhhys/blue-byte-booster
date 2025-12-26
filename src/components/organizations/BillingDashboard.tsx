@@ -87,8 +87,9 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
   const [isSeatDialogOpen, setIsSeatDialogOpen] = useState(false);
 
   const isAdmin = membership?.role === 'org:admin';
-  const memberCount = memberships?.count || 0;
-  const pendingInvitationsCount = invitations?.count || 0;
+  // Use organization.membersCount for more accurate count as per Clerk docs
+  const memberCount = organization?.membersCount || memberships?.count || 0;
+  const pendingInvitationsCount = organization?.pendingInvitationsCount || invitations?.count || 0;
   
   // Use seatsData if available, otherwise fall back to Clerk data
   const totalUsedSeats = seatsData?.seats_used || (memberCount + pendingInvitationsCount);
@@ -100,7 +101,7 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
     if (organization?.id) {
       loadBillingInfo();
     }
-  }, [organization?.id, memberships?.count]);
+  }, [organization?.id, organization?.membersCount, memberships?.count]);
 
   const loadBillingInfo = async () => {
     if (!organization?.id) return;
