@@ -173,7 +173,9 @@ async function syncOrganizationFromClerk(clerkOrgId: string) {
     
     const { error } = await supabase.rpc('upsert_organization', {
       p_clerk_org_id: org.id,
-      p_name: org.name
+      p_name: org.name,
+      p_members_count: (org as any).membersCount || (org as any).members_count || 0,
+      p_pending_invitations_count: (org as any).pendingInvitationsCount || (org as any).pending_invitations_count || 0
     });
 
     if (error) {

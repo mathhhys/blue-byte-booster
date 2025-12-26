@@ -254,7 +254,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const { data, error } = await supabase.rpc('upsert_organization', {
           p_clerk_org_id: org.id,
           p_name: org.name,
-          p_stripe_customer_id: null // Will be updated by Stripe webhook later
+          p_stripe_customer_id: null, // Will be updated by Stripe webhook later
+          p_members_count: (org as any).members_count || (org as any).membersCount || 0,
+          p_pending_invitations_count: (org as any).pending_invitations_count || (org as any).pendingInvitationsCount || 0
         });
 
         if (error) {
