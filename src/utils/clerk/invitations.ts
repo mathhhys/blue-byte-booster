@@ -81,7 +81,8 @@ export class ClerkInvitationManager {
       const clerkInvitation = await this.createClerkInvitation(
         this.organizationId,
         invitationData.email,
-        token
+        token,
+        invitationData.role
       );
 
       // Store invitation in our database
@@ -111,7 +112,7 @@ export class ClerkInvitationManager {
   }
 
   // Create Clerk invitation
-  private async createClerkInvitation(organizationId: string, email: string, token?: string | null) {
+  private async createClerkInvitation(organizationId: string, email: string, token?: string | null, role: string = 'basic_member') {
     try {
       const API_BASE = import.meta.env.VITE_API_URL || '';
       const headers: Record<string, string> = {
@@ -127,7 +128,7 @@ export class ClerkInvitationManager {
         body: JSON.stringify({
           orgId: organizationId,
           email,
-          role: 'member'
+          role
         })
       });
 
@@ -230,12 +231,13 @@ export const useTeamInvitations = (organizationId?: string) => {
   const { getToken } = useAuth();
   const invitationManager = new ClerkInvitationManager(organizationId);
 
-  const sendInvitation = async (email: string, subscriptionId: string, inviterId: string) => {
+  const sendInvitation = async (email: string, subscriptionId: string, inviterId: string, role: string = 'basic_member') => {
     const token = await getToken();
     return await invitationManager.sendInvitation({
       email,
       subscriptionId,
       inviterId,
+      role
     }, token);
   };
 

@@ -239,6 +239,36 @@ export const userOperations = {
     } catch (error) {
       return { data: null, error };
     }
+  },
+
+  // Get organization by Clerk ID
+  async getOrganizationByClerkId(clerkOrgId: string): Promise<{ data: any | null; error: any }> {
+    try {
+      const client = await getAuthenticatedClient();
+      const { data, error } = await client
+        .from('organizations')
+        .select('*')
+        .eq('clerk_org_id', clerkOrgId)
+        .maybeSingle();
+
+      return { data, error };
+    } catch (error) {
+      return { data: null, error };
+    }
+  },
+
+  // Increment invitation count for an organization
+  async incrementInvitationCount(clerkOrgId: string): Promise<{ success: boolean; error: any }> {
+    try {
+      const client = await getAuthenticatedClient();
+      const { error } = await client.rpc('increment_invitation_count', {
+        p_clerk_org_id: clerkOrgId
+      });
+
+      return { success: !error, error };
+    } catch (error) {
+      return { success: false, error };
+    }
   }
 };
 

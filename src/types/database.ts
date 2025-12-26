@@ -396,6 +396,7 @@ export interface InvitationData {
   email: string;
   subscriptionId: string;
   inviterId: string;
+  role?: string;
 }
 
 export interface InvitationResult {

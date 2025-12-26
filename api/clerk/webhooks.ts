@@ -361,6 +361,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           console.log(`✅ Seat reserved for invitation to ${email} in org ${orgId}`, reservedSeat);
         }
 
+        // Increment invitation count in organizations table
+        const { error: countError } = await supabase.rpc('increment_invitation_count', {
+          p_clerk_org_id: orgId
+        });
+
+        if (countError) {
+          console.error('Error incrementing invitation count:', countError);
+        } else {
+          console.log(`✅ Invitation count incremented for org ${orgId}`);
+        }
+
       } else if (eventType === 'organizationInvitation.revoked' || eventType === 'organizationInvitation.accepted') {
         // Note: 'accepted' is usually followed by membership.created which handles the activation.
         // If revoked, we release the seat.

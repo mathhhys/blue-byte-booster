@@ -73,12 +73,12 @@ export const SeatManager: React.FC = () => {
   const [isAssigning, setIsAssigning] = useState(false);
   const [isRevoking, setIsRevoking] = useState(false);
   const [assignEmail, setAssignEmail] = useState('');
-  const [assignRole, setAssignRole] = useState('member');
+  const [assignRole, setAssignRole] = useState('org:member');
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showBuySeatsModal, setShowBuySeatsModal] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteRole, setInviteRole] = useState('member');
+  const [inviteRole, setInviteRole] = useState('basic_member');
   const [buySeatsQuantity, setBuySeatsQuantity] = useState(1);
 
   useEffect(() => {
@@ -149,6 +149,7 @@ export const SeatManager: React.FC = () => {
 
       if (!response.ok) {
         const message = await readErrorMessage(response);
+        console.error('❌ Invitation failed:', message);
         throw new Error(message || 'Failed to send invitation');
       }
 
@@ -403,7 +404,7 @@ export const SeatManager: React.FC = () => {
                       <SelectValue placeholder="Select role" />
                     </SelectTrigger>
                     <SelectContent className="bg-[#2a2a2a] border-white/10 text-white">
-                      <SelectItem value="member">Member</SelectItem>
+                      <SelectItem value="basic_member">Member</SelectItem>
                       <SelectItem value="admin">Admin</SelectItem>
                     </SelectContent>
                   </Select>
@@ -467,8 +468,8 @@ export const SeatManager: React.FC = () => {
                       <SelectValue placeholder="Select role" />
                     </SelectTrigger>
                     <SelectContent className="bg-[#2a2a2a] border-white/10 text-white">
-                      <SelectItem value="member">Member</SelectItem>
-                      <SelectItem value="admin">Admin</SelectItem>
+                      <SelectItem value="org:member">Member</SelectItem>
+                      <SelectItem value="org:admin">Admin</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

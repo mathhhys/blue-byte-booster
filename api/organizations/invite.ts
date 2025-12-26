@@ -9,6 +9,10 @@ let cachedClerkClient: ReturnType<typeof createClerkClient> | null = null;
 function getClerkClient() {
   if (!cachedClerkClient) {
     const key = process.env.CLERK_SECRET_KEY;
+    console.log('🔍 DEBUG: Clerk Secret Key present:', !!key);
+    if (key) {
+      console.log('🔍 DEBUG: Clerk Secret Key prefix:', key.substring(0, 8) + '...');
+    }
     if (!key) {
       throw new Error('CLERK_SECRET_KEY is not configured');
     }
@@ -244,8 +248,7 @@ export default async function handler(req: any, res: any) {
       const invitation = await getClerkClient().organizations.createOrganizationInvitation({
         organizationId: orgId,
         emailAddress: email,
-        role: role || 'member',
-        inviterUserId: authResult.userId,
+        role: role === 'admin' ? 'admin' : 'basic_member',
       });
 
       console.log('✅ Clerk invitation created:', invitation.id);
@@ -275,10 +278,16 @@ export default async function handler(req: any, res: any) {
         if (error.code === 'form_identifier_exists') {
           return res.status(400).json({ error: 'User is already a member or has a pending invitation in Clerk' });
         }
-        return res.status(400).json({ error: error.message || 'Failed to create invitation' });
+        return res.status(400).json({
+          error: error.message || 'Failed to create invitation',
+          clerkError: clerkError
+        });
       }
       
-      throw clerkError; // Re-throw to be handled by outer catch
+      return res.status(400).json({
+        error: clerkError.message || 'Failed to create invitation',
+        clerkError: clerkError
+      });
     }
 
   } catch (error: any) {

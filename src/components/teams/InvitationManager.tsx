@@ -94,7 +94,7 @@ export const InvitationManager: React.FC<InvitationManagerProps> = ({
     setSuccess(null);
 
     try {
-      const result = await sendInvitation(emailInput, subscriptionId, user.id);
+      const result = await sendInvitation(emailInput, subscriptionId, user.id, 'basic_member');
 
       if (result.success) {
         setSuccess(`Invitation sent to ${emailInput}`);
