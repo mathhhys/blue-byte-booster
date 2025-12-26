@@ -58,11 +58,40 @@ async function syncOrganizationFromClerk(clerkOrgId: string) {
       return { success: false, error: `Clerk organization not found: ${clerkOrgId}` };
     }
     
+    // Fetch actual member count from Clerk
+    let membersCount = 0;
+    try {
+      const memberships = await clerk.organizations.getOrganizationMembershipList({
+        organizationId: clerkOrgId,
+        limit: 1 // We only need totalCount
+      });
+      membersCount = memberships.totalCount || 0;
+      console.log(`📊 Fetched members count from Clerk: ${membersCount}`);
+    } catch (memberError) {
+      console.error('Error fetching members count:', memberError);
+      // Continue with 0 if fetch fails
+    }
+
+    // Fetch actual pending invitation count from Clerk
+    let pendingInvitationsCount = 0;
+    try {
+      const invitations = await clerk.organizations.getOrganizationInvitationList({
+        organizationId: clerkOrgId,
+        status: ['pending'], // Only count pending invitations
+        limit: 1 // We only need totalCount
+      });
+      pendingInvitationsCount = invitations.totalCount || 0;
+      console.log(`📊 Fetched pending invitations count from Clerk: ${pendingInvitationsCount}`);
+    } catch (inviteError) {
+      console.error('Error fetching invitations count:', inviteError);
+      // Continue with 0 if fetch fails
+    }
+    
     const { error } = await supabase.rpc('upsert_organization', {
       p_clerk_org_id: org.id,
       p_name: org.name,
-      p_members_count: (org as any).membersCount || (org as any).members_count || 0,
-      p_pending_invitations_count: (org as any).pendingInvitationsCount || (org as any).pending_invitations_count || 0
+      p_members_count: membersCount,
+      p_pending_invitations_count: pendingInvitationsCount
     });
 
     if (error) {
@@ -70,8 +99,19 @@ async function syncOrganizationFromClerk(clerkOrgId: string) {
       return { success: false, error: error.message };
     }
 
-    console.log('✅ Organization synced successfully from Clerk');
-    return { success: true, organization: { id: org.id, name: org.name } };
+    console.log('✅ Organization synced successfully from Clerk with counts:', {
+      members: membersCount,
+      invitations: pendingInvitationsCount
+    });
+    return {
+      success: true,
+      organization: {
+        id: org.id,
+        name: org.name,
+        membersCount,
+        pendingInvitationsCount
+      }
+    };
   } catch (error: any) {
     console.error('❌ Error syncing organization from Clerk:', error);
     return { success: false, error: error.message };

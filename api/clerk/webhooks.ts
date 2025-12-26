@@ -323,6 +323,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           console.log(`✅ Seat claimed/created for user ${userId} in org ${orgId}`, claimedSeat);
         }
 
+        // Increment member count
+        const { error: countError } = await supabase.rpc('update_member_count', {
+          p_clerk_org_id: orgId,
+          p_delta: 1
+        });
+
+        if (countError) {
+          console.error('Error incrementing member count:', countError);
+        } else {
+          console.log(`✅ Member count incremented for org ${orgId}`);
+        }
+
       } else if (eventType === 'organizationMembership.deleted') {
         const membership = evt.data;
         const orgId = membership.organization.id;
@@ -341,6 +353,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           // Don't fail webhook
         } else {
           console.log(`✅ Seat revoked for user ${userId} in org ${orgId}`, revokedSeat);
+        }
+
+        // Decrement member count
+        const { error: countError } = await supabase.rpc('update_member_count', {
+          p_clerk_org_id: orgId,
+          p_delta: -1
+        });
+
+        if (countError) {
+          console.error('Error decrementing member count:', countError);
+        } else {
+          console.log(`✅ Member count decremented for org ${orgId}`);
         }
 
       } else if (eventType === 'organizationInvitation.created') {
@@ -364,8 +388,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
 
         // Increment invitation count in organizations table
-        const { error: countError } = await supabase.rpc('increment_invitation_count', {
-          p_clerk_org_id: orgId
+        const { error: countError } = await supabase.rpc('update_invitation_count', {
+          p_clerk_org_id: orgId,
+          p_delta: 1
         });
 
         if (countError) {
@@ -374,27 +399,54 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           console.log(`✅ Invitation count incremented for org ${orgId}`);
         }
 
-      } else if (eventType === 'organizationInvitation.revoked' || eventType === 'organizationInvitation.accepted') {
-        // Note: 'accepted' is usually followed by membership.created which handles the activation.
-        // If revoked, we release the seat.
-        if (eventType === 'organizationInvitation.revoked') {
-          const invitation = evt.data;
-          const orgId = invitation.organization_id;
-          const email = invitation.email_address;
+      } else if (eventType === 'organizationInvitation.accepted') {
+        const invitation = evt.data;
+        const orgId = invitation.organization_id;
+        const email = invitation.email_address;
 
-          console.log(`Processing organization invitation revoked for ${email} in org ${orgId}`);
+        console.log(`Processing organization invitation accepted for ${email} in org ${orgId}`);
 
-          const { data: releasedSeat, error } = await organizationSeatOperations.releaseSeatByEmail(
-            orgId,
-            email,
-            'invitation_revoked'
-          );
+        // Decrement invitation count (member count will be incremented by membership.created)
+        const { error: countError } = await supabase.rpc('update_invitation_count', {
+          p_clerk_org_id: orgId,
+          p_delta: -1
+        });
 
-          if (error) {
-            console.error('Error releasing organization seat:', error);
-          } else {
-            console.log(`✅ Seat released for revoked invitation to ${email} in org ${orgId}`, releasedSeat);
-          }
+        if (countError) {
+          console.error('Error decrementing invitation count after acceptance:', countError);
+        } else {
+          console.log(`✅ Invitation count decremented for accepted invitation in org ${orgId}`);
+        }
+
+      } else if (eventType === 'organizationInvitation.revoked') {
+        const invitation = evt.data;
+        const orgId = invitation.organization_id;
+        const email = invitation.email_address;
+
+        console.log(`Processing organization invitation revoked for ${email} in org ${orgId}`);
+
+        const { data: releasedSeat, error } = await organizationSeatOperations.releaseSeatByEmail(
+          orgId,
+          email,
+          'invitation_revoked'
+        );
+
+        if (error) {
+          console.error('Error releasing organization seat:', error);
+        } else {
+          console.log(`✅ Seat released for revoked invitation to ${email} in org ${orgId}`, releasedSeat);
+        }
+
+        // Decrement invitation count
+        const { error: countError } = await supabase.rpc('update_invitation_count', {
+          p_clerk_org_id: orgId,
+          p_delta: -1
+        });
+
+        if (countError) {
+          console.error('Error decrementing invitation count:', countError);
+        } else {
+          console.log(`✅ Invitation count decremented for org ${orgId}`);
         }
       } else {
         console.log(`Unhandled Clerk webhook event type: ${eventType}`);
