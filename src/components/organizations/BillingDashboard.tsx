@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useOrganization, useOrganizationList, useAuth } from '@clerk/clerk-react';
+import { useOrganization, useAuth } from '@clerk/clerk-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -7,19 +7,13 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import {
   CreditCard,
-  Users,
   Settings,
   Plus,
-  Trash2,
   AlertTriangle,
   CheckCircle,
   Loader2,
   ExternalLink,
-  Crown,
-  Mail,
-  UserPlus,
   Clock,
-  X,
   RefreshCw,
 } from 'lucide-react';
 import {
@@ -27,12 +21,10 @@ import {
   createOrganizationSubscription,
   getOrganizationSubscription,
   formatSeatCost,
-  assignSeatToMember,
   getOrgCredits,
   createOrgCreditTopup,
   formatOrgCreditUsage,
   updateSubscriptionQuantity,
-  removeSeatFromMember,
 } from '@/utils/organization/billing';
 import {
   Dialog,
@@ -62,22 +54,9 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
     trial_end?: number | null;
     trial_start?: number | null;
   } | null>(null);
-  const [seatsData, setSeatsData] = useState<{
-    seats_used: number;
-    seats_total: number;
-    seats: Array<{
-      user_id: string;
-      email: string;
-      status: string;
-      role: string | null;
-      assigned_at: string;
-    }>;
-  } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreatingSubscription, setIsCreatingSubscription] = useState(false);
   const [isOpeningPortal, setIsOpeningPortal] = useState(false);
-  const [newMemberEmail, setNewMemberEmail] = useState('');
-  const [isInviting, setIsInviting] = useState(false);
   const [selectedSeats, setSelectedSeats] = useState(5);
   const [orgCredits, setOrgCredits] = useState(null);
   const [isLoadingCredits, setIsLoadingCredits] = useState(false);
@@ -91,8 +70,8 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
   const memberCount = organization?.membersCount || memberships?.count || 0;
   const pendingInvitationsCount = organization?.pendingInvitationsCount || invitations?.count || 0;
   
-  // Use seatsData if available, otherwise fall back to Clerk data
-  const totalUsedSeats = seatsData?.seats_used || (memberCount + pendingInvitationsCount);
+  // Use Clerk data for seat usage
+  const totalUsedSeats = memberCount + pendingInvitationsCount;
   const maxSeats = subscriptionData?.seats_total || 0;
   const availableSeats = Math.max(0, maxSeats - totalUsedSeats);
   const percentUsed = maxSeats > 0 ? Math.round((totalUsedSeats / maxSeats) * 100) : 0;
@@ -131,43 +110,12 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
         setSubscriptionData(null);
       }
 
-      // Load seats data from database
-      await loadSeatsData();
     } catch (error) {
       console.error('Error loading billing info:', error);
       // Set to null if we can't load data
       setSubscriptionData(null);
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const loadSeatsData = async () => {
-    if (!organization?.id) return;
-    
-    try {
-      const token = await getToken();
-      console.log('🔍 DEBUG: Got auth token for seats call:', token ? 'Present' : 'Missing');
-      
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-      };
-      
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-      
-      const API_BASE = import.meta.env.VITE_API_URL || '';
-      const response = await fetch(`${API_BASE}/api/organizations/seats?org_id=${organization.id}`, {
-        headers
-      });
-      if (!response.ok) {
-        throw new Error(`Failed to fetch seats: ${response.statusText}`);
-      }
-      const data = await response.json();
-      setSeatsData(data);
-    } catch (error) {
-      console.error('Error loading seats data:', error);
     }
   };
 
@@ -315,80 +263,6 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
       });
     } finally {
       setIsUpdatingSeats(false);
-    }
-  };
-
-  const handleInviteMember = async () => {
-    if (!organization?.id || !newMemberEmail.trim()) return;
-    
-    if (availableSeats <= 0) {
-      toast({
-        title: "Cannot Send Invitation",
-        description: "No available seats. Upgrade your subscription to add more members.",
-        variant: "destructive",
-      });
-      return;
-    }
-  
-    try {
-      setIsInviting(true);
-
-      const token = await getToken();
-      console.log('🔍 DEBUG: Got auth token for invite:', token ? 'Present' : 'Missing');
-      
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-      };
-      
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-      
-      const API_BASE = import.meta.env.VITE_API_URL || '';
-      
-      // Use backend API for invitation + seat assignment
-      const response = await fetch(`${API_BASE}/api/organizations/invite`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          orgId: organization.id,
-          email: newMemberEmail,
-          role: 'member',
-        }),
-      });
-  
-      let result;
-      try {
-        result = await response.json();
-      } catch (e) {
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-        // If ok but not JSON, maybe success? But we expect JSON.
-        console.error('Failed to parse invite response:', e);
-      }
-      
-      if (!response.ok) {
-        throw new Error(result?.error || `Failed to send invitation (${response.status})`);
-      }
-  
-      toast({
-        title: "Invitation Sent!",
-        description: `Invitation sent to ${newMemberEmail}. A seat has been reserved.`,
-      });
-      
-      setNewMemberEmail('');
-      // Refresh data to show updated seat count
-      await loadBillingInfo();
-    } catch (error) {
-      console.error('Error sending invitation:', error);
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : 'Failed to send invitation',
-        variant: "destructive",
-      });
-    } finally {
-      setIsInviting(false);
     }
   };
 
@@ -654,225 +528,6 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
         </div>
       </Card>
 
-      {/* Current Members and Seats */}
-      <Card className="bg-[#2a2a2a] border-white/10 p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-white">Organization Members</h3>
-          <div className="text-sm text-gray-400">
-            {availableSeats} seats available
-          </div>
-        </div>
-
-        <div className="space-y-3">
-          {/* Active Members */}
-          {memberships?.data?.map((membershipData) => (
-            <div
-              key={membershipData.id}
-              className="flex items-center justify-between p-3 bg-[#1a1a1a] rounded-lg"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
-                  {membershipData.role === 'org:admin' ? (
-                    <Crown className="w-4 h-4 text-white" />
-                  ) : (
-                    <Users className="w-4 h-4 text-white" />
-                  )}
-                </div>
-                <div>
-                  <div className="text-white font-medium">
-                    {membershipData.publicUserData?.firstName} {membershipData.publicUserData?.lastName}
-                  </div>
-                  <div className="text-gray-400 text-sm">
-                    {membershipData.publicUserData?.identifier || 'No email available'}
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge
-                  variant={membershipData.role === 'org:admin' ? 'default' : 'secondary'}
-                  className={membershipData.role === 'org:admin' ? 'bg-blue-600 text-white' : ''}
-                >
-                  {membershipData.role === 'org:admin' ? 'Admin' : 'Member'}
-                </Badge>
-                <Badge variant="outline" className="text-xs border-green-500/50 text-green-400">
-                  Active
-                </Badge>
-                {isAdmin && membershipData.role !== 'org:admin' && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="text-gray-400 hover:text-red-400 p-1 ml-2"
-                    onClick={async () => {
-                      if (!confirm(`Are you sure you want to remove ${membershipData.publicUserData?.identifier} from the organization?`)) return;
-                      
-                      try {
-                        // Remove from our DB seat tracking
-                        await removeSeatFromMember(organization.id, membershipData.publicUserData?.userId || '');
-                        
-                        // Also remove from Clerk (using Clerk's hook if available, or just let the webhook handle it)
-                        // membership.destroy() is available on the membership object
-                        await membershipData.destroy();
-
-                        toast({
-                          title: "Member Removed",
-                          description: "The member has been removed from the organization.",
-                        });
-                        await loadBillingInfo();
-                      } catch (error) {
-                        console.error('Error removing member:', error);
-                        toast({
-                          title: "Error",
-                          description: "Failed to remove member",
-                          variant: "destructive",
-                        });
-                      }
-                    }}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                )}
-              </div>
-            </div>
-          )) || []}
-
-          {/* Pending Invitations */}
-          {invitations?.data?.map((invitation) => (
-            <div
-              key={invitation.id}
-              className="flex items-center justify-between p-3 bg-[#1a1a1a] rounded-lg border border-yellow-500/20"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-yellow-600 rounded-full flex items-center justify-center">
-                  <Clock className="w-4 h-4 text-white" />
-                </div>
-                <div>
-                  <div className="text-white font-medium">{invitation.emailAddress}</div>
-                  <div className="text-gray-400 text-sm">
-                    Invited {new Date(invitation.createdAt).toLocaleDateString()}
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge variant="outline" className="text-xs border-yellow-500/50 text-yellow-400">
-                  Pending
-                </Badge>
-                {isAdmin && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="text-gray-400 hover:text-red-400 p-1"
-                    onClick={async () => {
-                      if (!confirm('Are you sure you want to revoke this invitation?')) return;
-                      
-                      try {
-                        // For invitations, we might need a different API or just revoke via Clerk
-                        // But if it's a pending seat in our DB, we can remove it
-                        // Assuming invitation.id maps to something we can use, or we use email
-                        // Actually, for Clerk invitations, we should use Clerk's useOrganization hook
-                        // But here we are just removing the seat reservation if any
-                        
-                        // If it's just a visual thing from Clerk, we use Clerk's revokeInvitation
-                        await invitation.revoke();
-                        toast({
-                          title: "Invitation Revoked",
-                          description: "The invitation has been revoked.",
-                        });
-                      } catch (error) {
-                        toast({
-                          title: "Error",
-                          description: "Failed to revoke invitation",
-                          variant: "destructive",
-                        });
-                      }
-                    }}
-                  >
-                    <X className="w-4 h-4" />
-                  </Button>
-                )}
-              </div>
-            </div>
-          )) || []}
-        </div>
-
-        {/* Invite New Member */}
-        {isAdmin && availableSeats > 0 && (
-          <div className="mt-4 p-4 bg-[#1a1a1a] rounded-lg">
-            <div className="flex items-center gap-2 mb-3">
-              <UserPlus className="w-4 h-4 text-blue-400" />
-              <span className="text-white font-medium">Invite New Member</span>
-            </div>
-            <div className="flex gap-2">
-              <Input
-                type="email"
-                placeholder="Enter email address"
-                value={newMemberEmail}
-                onChange={(e) => setNewMemberEmail(e.target.value)}
-                className="bg-[#2a2a2a] border-white/10 text-white placeholder-gray-500 flex-1"
-                disabled={isInviting}
-              />
-              <Button
-                onClick={handleInviteMember}
-                disabled={isInviting || !newMemberEmail.trim()}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
-              >
-                {isInviting ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  'Invite'
-                )}
-              </Button>
-            </div>
-            <div className="text-xs text-gray-500 mt-2">
-              This will consume 1 seat from your subscription
-            </div>
-          </div>
-        )}
-
-        {/* Seat Usage Warning */}
-        {percentUsed > 80 && (
-          <div className="mt-4 p-4 bg-yellow-600/10 border border-yellow-600/20 rounded-lg">
-            <div className="flex items-start gap-2">
-              <AlertTriangle className="w-5 h-5 text-yellow-400 mt-0.5 shrink-0" />
-              <div>
-                <div className="text-yellow-400 font-medium">Approaching Seat Limit</div>
-                <div className="text-gray-400 text-sm">
-                  You're using {memberCount} of {maxSeats} seats. Consider upgrading your plan to add more team members.
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Available Seats Info */}
-        {availableSeats > 0 && (
-          <div className="mt-4 p-4 bg-[#1a1a1a] rounded-lg border border-dashed border-white/20">
-            <div className="text-center text-gray-400">
-              <Plus className="w-6 h-6 mx-auto mb-2" />
-              <p className="text-sm">
-                {availableSeats} more seats available for team members
-              </p>
-              <p className="text-xs text-gray-500 mt-1">
-                Invite new members through the Organization Settings tab
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* No Seats Available */}
-        {availableSeats === 0 && memberCount >= maxSeats && (
-          <div className="mt-4 p-4 bg-red-600/10 border border-red-600/20 rounded-lg">
-            <div className="flex items-start gap-2">
-              <AlertTriangle className="w-5 h-5 text-red-400 mt-0.5 shrink-0" />
-              <div>
-                <div className="text-red-400 font-medium">All Seats Used</div>
-                <div className="text-gray-400 text-sm">
-                  You've reached your seat limit. Upgrade your subscription to add more team members.
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </Card>
 
     </div>
   );

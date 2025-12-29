@@ -707,7 +707,7 @@ export const organizationSeatOperations = {
 
       // Check seat availability
       if (subscription.seats_used >= subscription.seats_total + subscription.overage_seats) {
-        return { data: null, error: 'No available seats. Please upgrade your plan.' };
+        return { data: null, error: 'To invite additional members you need to purchase more seats.' };
       }
 
       const normalizedRole = role === 'admin' ? 'admin' : 'member';
