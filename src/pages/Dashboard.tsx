@@ -1,6 +1,7 @@
 import { useUser, UserButton, useAuth, useOrganization, OrganizationSwitcher, OrganizationProfile } from '@clerk/clerk-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -23,6 +24,8 @@ import {
   Home,
   DollarSign,
   Loader2,
+  History as HistoryIcon,
+  Minus,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
@@ -86,8 +89,10 @@ const clerkAppearance = {
 const Dashboard = () => {
   const { user, isLoaded: userLoaded } = useUser();
   const { getToken } = useAuth();
-  const { organization, isLoaded: orgLoaded } = useOrganization();
+  const { organization, isLoaded: orgLoaded, membership } = useOrganization();
   const { toast } = useToast();
+  
+  const isAdmin = membership?.role === 'org:admin';
   
   // User data from Supabase
   const [dbUser, setDbUser] = useState<User | null>(null);
@@ -106,6 +111,15 @@ const Dashboard = () => {
   const [creditAmount, setCreditAmount] = useState<string>('');
   const [isAddingCredits, setIsAddingCredits] = useState(false);
   const [validationError, setValidationError] = useState<string>('');
+  const [activePool, setActivePool] = useState<'personal' | 'organization'>('personal');
+  const [orgCredits, setOrgCredits] = useState<{
+    total_credits: number;
+    used_credits: number;
+    remaining_credits: number;
+  } | null>(null);
+  const [isLoadingOrgCredits, setIsLoadingOrgCredits] = useState(false);
+  const [creditHistory, setCreditHistory] = useState<any[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
   // Billing portal state
   const [isBillingPortalLoading, setIsBillingPortalLoading] = useState(false);
@@ -207,6 +221,30 @@ const Dashboard = () => {
     fetchDbUser();
   }, [userLoaded, user?.id, toast]);
 
+  // Fetch organization credits if user is in an organization
+  useEffect(() => {
+    const fetchOrgCredits = async () => {
+      if (organization?.id) {
+        setIsLoadingOrgCredits(true);
+        try {
+          const token = await getToken();
+          const { getOrgCredits } = await import('@/utils/organization/billing');
+          const data = await getOrgCredits(organization.id, token);
+          setOrgCredits(data);
+        } catch (error) {
+          console.error('Error fetching organization credits:', error);
+        } finally {
+          setIsLoadingOrgCredits(false);
+        }
+      } else {
+        setOrgCredits(null);
+        setActivePool('personal');
+      }
+    };
+
+    fetchOrgCredits();
+  }, [organization?.id, getToken]);
+
 
   // Check for active long-lived token
   const checkActiveLongLivedToken = async () => {
@@ -236,6 +274,32 @@ const Dashboard = () => {
   useEffect(() => {
     checkActiveLongLivedToken();
   }, [user?.id]);
+
+  // Fetch credit history based on active pool
+  useEffect(() => {
+    const fetchHistory = async () => {
+      if (!user?.id) return;
+      
+      setIsLoadingHistory(true);
+      try {
+        const { creditOperations } = await import('@/utils/supabase/database');
+        const result = await creditOperations.getCreditHistory(
+          user.id,
+          activePool === 'organization' ? organization?.id : undefined
+        );
+        
+        if (result.data) {
+          setCreditHistory(result.data);
+        }
+      } catch (error) {
+        console.error('Error fetching credit history:', error);
+      } finally {
+        setIsLoadingHistory(false);
+      }
+    };
+
+    fetchHistory();
+  }, [user?.id, activePool, organization?.id]);
 
   const generateToken = async () => {
     if (!user?.id) {
@@ -429,34 +493,45 @@ const Dashboard = () => {
 
     try {
       const creditsToAdd = parseInt(creditAmount);
-      const amount = CREDIT_CONVERSION.creditsToDollars(creditsToAdd);
+      const token = await getToken();
 
-      // Create Stripe checkout session for credit purchase
-      const response = await fetch('/api/billing/credit-purchase', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          clerkUserId: user.id,
-          credits: creditsToAdd,
-          amount: amount,
-          currency: 'EUR', // Default to EUR, can be made configurable later
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Failed to create checkout session');
-      }
-
-      const data = await response.json();
-
-      if (data.url) {
-        // Redirect to Stripe checkout
-        window.location.href = data.url;
+      if (activePool === 'organization' && organization?.id) {
+        // Organization top-up
+        const { createOrgCreditTopup } = await import('@/utils/organization/billing');
+        const result = await createOrgCreditTopup(organization.id, creditsToAdd, token);
+        
+        if (result.success && result.checkout_url) {
+          window.location.href = result.checkout_url;
+        } else {
+          throw new Error(result.error || 'Failed to create top-up session');
+        }
       } else {
-        throw new Error('No checkout URL received');
+        // Individual purchase
+        const amount = CREDIT_CONVERSION.creditsToDollars(creditsToAdd);
+        const response = await fetch('/api/billing/credit-purchase', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            clerkUserId: user.id,
+            credits: creditsToAdd,
+            amount: amount,
+            currency: 'EUR',
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || 'Failed to create checkout session');
+        }
+
+        const data = await response.json();
+        if (data.url) {
+          window.location.href = data.url;
+        } else {
+          throw new Error('No checkout URL received');
+        }
       }
     } catch (error) {
       console.error('Error adding credits:', error);
@@ -787,15 +862,45 @@ const Dashboard = () => {
 
               {/* Credits Card */}
               <Card className="bg-[#2a2a2a] border-white/10 p-6">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-gray-400">Available Credits</span>
-                  <MoreHorizontal className="w-4 h-4 text-gray-400" />
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex flex-col">
+                    <span className="text-sm text-gray-400">Available Credits</span>
+                    <span className="text-xs text-gray-500 capitalize">{activePool} Pool</span>
+                  </div>
+                  {organization && (
+                    <div className="flex bg-[#1a1a1a] p-1 rounded-md border border-white/5">
+                      <Button
+                        size="sm"
+                        variant={activePool === 'personal' ? 'secondary' : 'ghost'}
+                        className={`h-7 px-2 text-xs ${activePool === 'personal' ? 'bg-blue-600 text-white hover:bg-blue-700' : 'text-gray-400 hover:text-white'}`}
+                        onClick={() => setActivePool('personal')}
+                      >
+                        Personal
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={activePool === 'organization' ? 'secondary' : 'ghost'}
+                        className={`h-7 px-2 text-xs ${activePool === 'organization' ? 'bg-blue-600 text-white hover:bg-blue-700' : 'text-gray-400 hover:text-white'}`}
+                        onClick={() => setActivePool('organization')}
+                      >
+                        Team
+                      </Button>
+                    </div>
+                  )}
                 </div>
-                {isDbUserLoading ? (
+                {isDbUserLoading || (activePool === 'organization' && isLoadingOrgCredits) ? (
                   <div className="h-8 bg-gray-600 rounded w-32 animate-pulse mb-1"></div>
                 ) : (
                   <div className="text-2xl font-bold text-white mb-1">
-                    {dbUser ? currentBalance.toLocaleString() : 'Loading...'}
+                    {activePool === 'personal'
+                      ? (dbUser ? currentBalance.toLocaleString() : '0')
+                      : (orgCredits ? orgCredits.remaining_credits.toLocaleString() : '0')
+                    }
+                  </div>
+                )}
+                {activePool === 'organization' && orgCredits && (
+                  <div className="text-xs text-gray-500">
+                    {orgCredits.used_credits} used of {orgCredits.total_credits}
                   </div>
                 )}
               </Card>
@@ -818,12 +923,29 @@ const Dashboard = () => {
 
 
             {/* Add Credits Section */}
+            {/* Add Credits Section */}
             <Card className="bg-[#2a2a2a] border-white/10 p-6 mb-8">
-              <div className="flex items-center gap-2 mb-4">
-                <DollarSign className="w-5 h-5 text-blue-500" />
-                <h3 className="text-lg font-semibold text-white">Add Credits</h3>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <DollarSign className="w-5 h-5 text-blue-500" />
+                  <h3 className="text-lg font-semibold text-white">
+                    Add {activePool === 'organization' ? 'Team' : 'Personal'} Credits
+                  </h3>
+                </div>
+                {activePool === 'organization' && !isAdmin && (
+                  <Badge variant="outline" className="text-orange-400 border-orange-400/20">
+                    Admin Only
+                  </Badge>
+                )}
               </div>
               
+              {activePool === 'organization' && !isAdmin ? (
+                <div className="p-4 bg-orange-500/5 border border-orange-500/10 rounded-lg text-center">
+                  <p className="text-sm text-gray-400">
+                    Only organization administrators can top up the team credit pool.
+                  </p>
+                </div>
+              ) : (
               <div className="space-y-4">
                 {/* Credits Input */}
                 <div>
@@ -904,6 +1026,68 @@ const Dashboard = () => {
                   )}
                 </Button>
 
+              </div>
+              )}
+            </Card>
+
+            {/* Transaction History Section */}
+            <Card className="bg-[#2a2a2a] border-white/10 p-6 mb-8">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-2">
+                  <HistoryIcon className="w-5 h-5 text-blue-500" />
+                  <h3 className="text-lg font-semibold text-white">
+                    {activePool === 'organization' ? 'Team' : 'Personal'} Usage History
+                  </h3>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {isLoadingHistory ? (
+                  [1, 2, 3].map((i) => (
+                    <div key={i} className="h-16 bg-gray-600/20 rounded-lg animate-pulse"></div>
+                  ))
+                ) : creditHistory.length > 0 ? (
+                  creditHistory.map((transaction) => (
+                    <div
+                      key={transaction.id}
+                      className="flex items-center justify-between p-4 bg-[#1a1a1a] rounded-lg border border-white/5"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                          transaction.credits_amount > 0 ? 'bg-green-600/20 text-green-400' : 'bg-red-600/20 text-red-400'
+                        }`}>
+                          {transaction.credits_amount > 0 ? (
+                            <Plus className="w-4 h-4" />
+                          ) : (
+                            <Minus className="w-4 h-4" />
+                          )}
+                        </div>
+                        <div>
+                          <div className="text-white font-medium text-sm">{transaction.description}</div>
+                          <div className="text-gray-500 text-xs">
+                            {new Date(transaction.created_at).toLocaleDateString()}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className={`font-bold text-sm ${
+                          transaction.credits_amount > 0 ? 'text-green-400' : 'text-red-400'
+                        }`}>
+                          {transaction.credits_amount > 0 ? '+' : ''}{transaction.credits_amount}
+                        </div>
+                        {transaction.metadata?.pool === 'organization' && (
+                          <div className="text-[10px] text-blue-400 uppercase tracking-wider font-semibold">
+                            Team Pool
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    <p className="text-sm">No transactions found for this pool.</p>
+                  </div>
+                )}
               </div>
             </Card>
 

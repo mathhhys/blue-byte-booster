@@ -449,7 +449,10 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
         {orgCredits && (
           <div className="mt-6 p-4 bg-[#1a1a1a] rounded-lg">
             <div className="flex items-center justify-between mb-3">
-              <h4 className="text-white font-medium">Organization Credit Pool</h4>
+              <div className="space-y-1">
+                <h4 className="text-white font-medium">Organization Credit Pool</h4>
+                <p className="text-xs text-gray-400">Shared by all team members with an active seat.</p>
+              </div>
               <Badge variant="secondary" className="text-xs">
                 {orgCredits.remaining_credits} remaining
               </Badge>

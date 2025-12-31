@@ -298,42 +298,64 @@ export const creditOperations = {
 
   // Deduct credits from user
   async deductCredits(
-    clerkId: string, 
-    amount: number, 
+    clerkId: string,
+    amount: number,
     description: string = 'Credits used',
-    referenceId?: string
+    referenceId?: string,
+    orgId?: string
   ): Promise<{ success: boolean; error?: any }> {
     try {
       const client = await getAuthenticatedClient();
-      const { data, error } = await client.rpc('deduct_credits', {
-        p_clerk_id: clerkId,
+      
+      // Use the pooled deduction RPC which handles both personal and organization credits
+      const { data, error } = await client.rpc('deduct_credits_pooled', {
+        p_clerk_user_id: clerkId,
         p_amount: amount,
+        p_clerk_org_id: orgId || null,
         p_description: description,
         p_reference_id: referenceId || null
       });
 
-      return { success: data === true, error };
+      if (error) throw error;
+
+      return { success: data === true, error: data === true ? null : 'Insufficient credits' };
     } catch (error) {
+      console.error('Error in deductCredits:', error);
       return { success: false, error };
     }
   },
 
   // Get credit history
-  async getCreditHistory(clerkId: string): Promise<{ data: CreditTransaction[] | null; error: any }> {
+  async getCreditHistory(clerkId: string, orgId?: string): Promise<{ data: CreditTransaction[] | null; error: any }> {
     try {
-      // First get user ID
-      const { data: user } = await userOperations.getUserByClerkId(clerkId);
-      if (!user) return { data: null, error: 'User not found' };
-
       const client = await getAuthenticatedClient();
-      const { data, error } = await client
-        .from('credit_transactions')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
 
-      return { data, error };
+      if (orgId) {
+        // Fetch organization-wide credit history
+        // We filter by metadata->>clerk_org_id
+        const { data, error } = await client
+          .from('credit_transactions')
+          .select('*')
+          .eq('metadata->>clerk_org_id', orgId)
+          .order('created_at', { ascending: false });
+
+        return { data, error };
+      } else {
+        // Fetch personal credit history
+        const { data: user } = await userOperations.getUserByClerkId(clerkId);
+        if (!user) return { data: null, error: 'User not found' };
+
+        const { data, error } = await client
+          .from('credit_transactions')
+          .select('*')
+          .eq('user_id', user.id)
+          .is('metadata->>clerk_org_id', null) // Only personal transactions
+          .order('created_at', { ascending: false });
+
+        return { data, error };
+      }
     } catch (error) {
+      console.error('Error in getCreditHistory:', error);
       return { data: null, error };
     }
   }
