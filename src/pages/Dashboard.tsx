@@ -7,6 +7,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { User } from '@/utils/supabase/database';
+import { SeatManager } from '@/components/teams/SeatManager';
 import {
   Settings,
   CreditCard,
@@ -111,13 +112,21 @@ const Dashboard = () => {
   const [creditAmount, setCreditAmount] = useState<string>('');
   const [isAddingCredits, setIsAddingCredits] = useState(false);
   const [validationError, setValidationError] = useState<string>('');
-  const [activePool, setActivePool] = useState<'personal' | 'organization'>('personal');
+  // Derive active pool from organization context
+  const activePool = organization ? 'organization' : 'personal';
   const [orgCredits, setOrgCredits] = useState<{
     total_credits: number;
     used_credits: number;
     remaining_credits: number;
   } | null>(null);
   const [isLoadingOrgCredits, setIsLoadingOrgCredits] = useState(false);
+  const [orgSubscription, setOrgSubscription] = useState<{
+    plan_type: string;
+    status: string;
+    seats_total: number;
+    seats_used: number;
+  } | null>(null);
+  const [isLoadingOrgSubscription, setIsLoadingOrgSubscription] = useState(false);
   const [creditHistory, setCreditHistory] = useState<any[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
@@ -238,11 +247,33 @@ const Dashboard = () => {
         }
       } else {
         setOrgCredits(null);
-        setActivePool('personal');
       }
     };
 
     fetchOrgCredits();
+  }, [organization?.id, getToken]);
+
+  // Fetch organization subscription if user is in an organization
+  useEffect(() => {
+    const fetchOrgSubscription = async () => {
+      if (organization?.id) {
+        setIsLoadingOrgSubscription(true);
+        try {
+          const token = await getToken();
+          const { getOrganizationSubscription } = await import('@/utils/organization/billing');
+          const data = await getOrganizationSubscription(organization.id, token);
+          setOrgSubscription(data);
+        } catch (error) {
+          console.error('Error fetching organization subscription:', error);
+        } finally {
+          setIsLoadingOrgSubscription(false);
+        }
+      } else {
+        setOrgSubscription(null);
+      }
+    };
+
+    fetchOrgSubscription();
   }, [organization?.id, getToken]);
 
 
@@ -867,26 +898,6 @@ const Dashboard = () => {
                     <span className="text-sm text-gray-400">Available Credits</span>
                     <span className="text-xs text-gray-500 capitalize">{activePool} Pool</span>
                   </div>
-                  {organization && (
-                    <div className="flex bg-[#1a1a1a] p-1 rounded-md border border-white/5">
-                      <Button
-                        size="sm"
-                        variant={activePool === 'personal' ? 'secondary' : 'ghost'}
-                        className={`h-7 px-2 text-xs ${activePool === 'personal' ? 'bg-blue-600 text-white hover:bg-blue-700' : 'text-gray-400 hover:text-white'}`}
-                        onClick={() => setActivePool('personal')}
-                      >
-                        Personal
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant={activePool === 'organization' ? 'secondary' : 'ghost'}
-                        className={`h-7 px-2 text-xs ${activePool === 'organization' ? 'bg-blue-600 text-white hover:bg-blue-700' : 'text-gray-400 hover:text-white'}`}
-                        onClick={() => setActivePool('organization')}
-                      >
-                        Team
-                      </Button>
-                    </div>
-                  )}
                 </div>
                 {isDbUserLoading || (activePool === 'organization' && isLoadingOrgCredits) ? (
                   <div className="h-8 bg-gray-600 rounded w-32 animate-pulse mb-1"></div>
@@ -911,12 +922,34 @@ const Dashboard = () => {
                   <span className="text-sm text-gray-400">Current Plan</span>
                   <MoreHorizontal className="w-4 h-4 text-gray-400" />
                 </div>
-                {isDbUserLoading ? (
-                  <div className="h-8 bg-gray-600 rounded w-24 animate-pulse mb-1"></div>
+                {activePool === 'organization' ? (
+                  isLoadingOrgSubscription ? (
+                    <div className="h-8 bg-gray-600 rounded w-24 animate-pulse mb-1"></div>
+                  ) : (
+                    <div className="space-y-1">
+                      <div className="text-2xl font-bold text-white">
+                        {orgSubscription?.plan_type ? orgSubscription.plan_type.charAt(0).toUpperCase() + orgSubscription.plan_type.slice(1) : 'No Subscription'}
+                      </div>
+                      {orgSubscription?.status && (
+                        <div className="text-xs text-gray-400 capitalize">
+                          Status: {orgSubscription.status}
+                        </div>
+                      )}
+                      {orgSubscription?.seats_total && (
+                        <div className="text-xs text-gray-400">
+                          {orgSubscription.seats_used || 0} / {orgSubscription.seats_total} seats
+                        </div>
+                      )}
+                    </div>
+                  )
                 ) : (
-                  <div className="text-2xl font-bold text-white mb-1">
-                    {dbUser?.plan_type ? dbUser.plan_type.charAt(0).toUpperCase() + dbUser.plan_type.slice(1) : 'Loading...'}
-                  </div>
+                  isDbUserLoading ? (
+                    <div className="h-8 bg-gray-600 rounded w-24 animate-pulse mb-1"></div>
+                  ) : (
+                    <div className="text-2xl font-bold text-white mb-1">
+                      {dbUser?.plan_type ? dbUser.plan_type.charAt(0).toUpperCase() + dbUser.plan_type.slice(1) : 'Loading...'}
+                    </div>
+                  )
                 )}
               </Card>
             </div>
@@ -1090,6 +1123,13 @@ const Dashboard = () => {
                 )}
               </div>
             </Card>
+
+            {/* Organization-specific features - only show when in organization view and user is admin */}
+            {activePool === 'organization' && isAdmin && (
+              <div className="grid grid-cols-1 gap-6 mb-8">
+                <SeatManager />
+              </div>
+            )}
 
           </main>
         </SidebarInset>
