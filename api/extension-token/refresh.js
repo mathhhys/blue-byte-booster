@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
-import { verifyToken } from '@clerk/backend';
+import { verifyToken, createClerkClient } from '@clerk/backend';
 import { encryptData } from '../utils/encryption.js';
 import { tokenRateLimitMiddleware } from '../middleware/token-rate-limit.js';
 import { logTokenAudit } from '../middleware/token-validation.js';
@@ -15,12 +15,127 @@ const LONG_LIVED_EXPIRES_SECONDS = 4 * 30 * 24 * 60 * 60; // 4 months
 const REFRESH_THRESHOLD_DAYS = 30; // Allow refresh within 30 days of expiry
 const BCRYPT_SALT_ROUNDS = 12;
 
+let cachedClerkClient = null;
+
+function getClerkClient() {
+  if (!cachedClerkClient) {
+    if (!process.env.CLERK_SECRET_KEY) {
+      throw new Error('Missing CLERK_SECRET_KEY environment variable');
+    }
+    cachedClerkClient = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
+  }
+  return cachedClerkClient;
+}
+
 function getCurrentEpochTime() {
   return Math.floor(Date.now() / 1000);
 }
 
 function epochToISOString(epochTime) {
   return new Date(epochTime * 1000).toISOString();
+}
+
+/**
+ * Best-effort org membership check (claims-first; Clerk API fallback).
+ * Returns { orgRole } if membership is confirmed, otherwise null.
+ */
+async function resolveOrgMembership(clerkUserId, clerkOrgId, claims) {
+  if (!clerkOrgId) {
+    return null;
+  }
+
+  const orgsFromClaims = (claims?.organizations || {});
+  const orgFromClaims = orgsFromClaims?.[clerkOrgId];
+
+  if (orgFromClaims) {
+    return { orgRole: orgFromClaims?.role || 'org:member', source: 'claims' };
+  }
+
+  // Fallback to Clerk API
+  try {
+    const membershipsResponse = await getClerkClient().users.getOrganizationMembershipList({
+      userId: clerkUserId,
+      limit: 100
+    });
+
+    const memberships = Array.isArray(membershipsResponse?.data) ? membershipsResponse.data : [];
+    const apiMembership = memberships.find((m) => {
+      const candidateOrgId = m?.organization?.id ?? m?.organizationId ?? m?.organizationID;
+      return candidateOrgId === clerkOrgId;
+    });
+
+    if (apiMembership) {
+      return { orgRole: apiMembership?.role || 'org:member', source: 'api' };
+    }
+  } catch (apiError) {
+    console.error('Clerk API membership lookup failed:', apiError);
+  }
+
+  return null;
+}
+
+/**
+ * Resolve org attribution claims for a token (seat-gated).
+ * - If the user is not a member or has no active seat, returns null (personal token).
+ */
+async function resolveOrgAttributionClaims(supabase, clerkUserId, clerkOrgId, claims) {
+  if (!clerkOrgId) {
+    return null;
+  }
+
+  const membership = await resolveOrgMembership(clerkUserId, clerkOrgId, claims);
+  if (!membership) {
+    return null;
+  }
+
+  // Seat-gating: only active seat holders receive org-scoped tokens
+  const { data: seat, error: seatError } = await supabase
+    .from('organization_seats')
+    .select('id, role, organization_subscription_id')
+    .eq('clerk_org_id', clerkOrgId)
+    .eq('clerk_user_id', clerkUserId)
+    .eq('status', 'active')
+    .limit(1)
+    .maybeSingle();
+
+  if (seatError) {
+    console.error('Error fetching active seat:', seatError);
+    return null;
+  }
+
+  if (!seat) {
+    return null;
+  }
+
+  const [{ data: organization }, { data: subscription, error: subError }] = await Promise.all([
+    supabase
+      .from('organizations')
+      .select('id, name, stripe_customer_id')
+      .eq('clerk_org_id', clerkOrgId)
+      .maybeSingle(),
+    supabase
+      .from('organization_subscriptions')
+      .select('id, organization_id')
+      .eq('id', seat.organization_subscription_id)
+      .in('status', ['active', 'trialing'])
+      .maybeSingle()
+  ]);
+
+  if (subError) {
+    console.error('Error fetching organization subscription:', subError);
+  }
+
+  return {
+    pool: 'organization',
+    clerk_org_id: clerkOrgId,
+    organization_id: organization?.id || subscription?.organization_id || null,
+    organization_name: organization?.name || null,
+    stripe_customer_id: organization?.stripe_customer_id || null,
+    organization_subscription_id: subscription?.id || seat.organization_subscription_id || null,
+    seat_id: seat.id,
+    seat_role: seat.role || null,
+    org_role: membership.orgRole || 'org:member'
+  };
 }
 
 async function verifyClerkToken(token) {
@@ -43,7 +158,8 @@ async function verifyClerkToken(token) {
       exp: claims.exp,
       email: claims.email,
       firstName: claims.first_name || '',
-      lastName: claims.last_name || ''
+      lastName: claims.last_name || '',
+      claims
     };
   } catch (error) {
     throw new Error('Invalid Clerk token: ' + error.message);
@@ -67,7 +183,7 @@ async function handler(req, res) {
     }
 
     const clerkToken = authHeader.substring(7);
-    const { tokenId } = req.body || {};
+    const { tokenId, clerk_org_id: clerkOrgId } = req.body || {};
     const ipAddress = req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || 'unknown';
     const userAgent = req.headers['user-agent'] || 'unknown';
     
@@ -147,44 +263,42 @@ async function handler(req, res) {
       });
     }
 
-    // Generate new token with enriched payload
+    // Generate new token (same HS256 format as /api/extension-token/generate)
     const iat = getCurrentEpochTime();
-    const lifetime = LONG_LIVED_EXPIRES_SECONDS;
-    const exp = iat + lifetime;
-    const nbf = iat - 5; // Allow 5 seconds clock skew
+    const exp = iat + LONG_LIVED_EXPIRES_SECONDS;
 
-    // Generate unique jti
-    const crypto = await import('crypto');
-    const jti = crypto.randomUUID();
+    if (!process.env.JWT_SECRET) {
+      throw new Error('Missing JWT_SECRET environment variable');
+    }
 
-    const claims = {
-      accountType,
-      exp: exp, // Duplicate in claims as per example
-      firstName: firstName.trim(),
-      iat: iat, // Duplicate in claims
-      lastName,
-      primaryEmail,
-      sessionId,
-      sub: clerkUserId,
-      userId: clerkUserId,
-      vscodeExtension: true
-    };
+    const orgAttribution = await resolveOrgAttributionClaims(supabase, clerkUserId, clerkOrgId, decoded.claims);
 
     const payload = {
-      algorithm: 'RS256',
-      azp: 'https://www.softcodes.ai',
-      claims,
-      exp,
+      sub: clerkUserId,
+      type: 'extension_long_lived',
       iat,
-      iss: 'https://clerk.softcodes.ai', // Match example
-      jti,
-      lifetime,
-      name: 'vscode-extension',
-      nbf,
-      sub: clerkUserId
+      exp,
+      iss: 'softcodes.ai',
+      aud: 'vscode-extension',
+
+      // Useful user fields (non-sensitive)
+      email: primaryEmail,
+      plan_type: accountType,
+      session_id: sessionId,
+
+      // Org attribution (seat-gated). If absent => personal.
+      pool: orgAttribution?.pool === 'organization' ? 'organization' : 'personal',
+      clerk_org_id: orgAttribution?.clerk_org_id || null,
+      organization_id: orgAttribution?.organization_id || null,
+      organization_name: orgAttribution?.organization_name || null,
+      stripe_customer_id: orgAttribution?.stripe_customer_id || null,
+      organization_subscription_id: orgAttribution?.organization_subscription_id || null,
+      seat_id: orgAttribution?.seat_id || null,
+      seat_role: orgAttribution?.seat_role || null,
+      org_role: orgAttribution?.org_role || null
     };
 
-    const newToken = jwt.sign(payload, process.env.JWT_PRIVATE_KEY, { algorithm: 'RS256' });
+    const newToken = jwt.sign(payload, process.env.JWT_SECRET, { algorithm: 'HS256' });
     const tokenHash = await bcrypt.hash(newToken, BCRYPT_SALT_ROUNDS);
     const newExpiresAt = epochToISOString(exp);
 

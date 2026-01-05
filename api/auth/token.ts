@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { createClient } from '@supabase/supabase-js';
 import { generateAccessToken, verifyJWT } from '../utils/jwt.js';
+import { resolveOrgAttributionClaims } from '../utils/org-attribution.js';
 
 /**
  * Token endpoint for refreshing access tokens
@@ -11,7 +12,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { grant_type, refresh_token } = req.body;
+  const { grant_type, refresh_token, clerk_org_id } = req.body;
 
   if (grant_type !== 'refresh_token') {
     return res.status(400).json({ 
@@ -101,8 +102,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
+    // Resolve org attribution (seat-gated)
+    let orgAttribution = null;
+    if (clerk_org_id) {
+      orgAttribution = await resolveOrgAttributionClaims({
+        supabase,
+        clerkUserId: user.clerk_id,
+        clerkOrgId: clerk_org_id,
+        clerkClaims: null
+      });
+    }
+
     // Generate new access token
-    const accessToken = generateAccessToken(user, tokenRecord.session_id);
+    const accessToken = generateAccessToken(user, tokenRecord.session_id, orgAttribution);
 
     // Update last_used_at timestamp
     await supabase

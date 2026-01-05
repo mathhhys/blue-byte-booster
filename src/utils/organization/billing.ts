@@ -325,17 +325,23 @@ export const formatSeatCost = (
   return `$${cost}/${period}`;
 };
 
-// Organization credit pool functions
+/**
+ * Organization credit pool functions
+ *
+ * Notes:
+ * - This endpoint is *member-authorized* but *seat-gated* (403 if the current user has no active seat).
+ * - We attach the HTTP status to thrown errors so the UI can distinguish "no seat" from "network".
+ */
 export const getOrgCredits = async (orgId: string, token?: string) => {
   try {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
-    
+
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
-    
+
     const API_BASE = import.meta.env.VITE_API_URL || '';
     const response = await fetch(`${API_BASE}/api/organizations/credits?org_id=${orgId}`, {
       method: 'GET',
@@ -343,7 +349,10 @@ export const getOrgCredits = async (orgId: string, token?: string) => {
     });
 
     if (!response.ok) {
-      throw new Error('Failed to fetch organization credits');
+      const message = await readErrorMessage(response);
+      const err: any = new Error(message || 'Failed to fetch organization credits');
+      err.status = response.status;
+      throw err;
     }
 
     const data = await response.json();
@@ -363,11 +372,11 @@ export const createOrgCreditTopup = async (
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
-    
+
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
-    
+
     const API_BASE = import.meta.env.VITE_API_URL || '';
     const response = await fetch(`${API_BASE}/api/organizations/credits/topup`, {
       method: 'POST',
@@ -379,8 +388,8 @@ export const createOrgCreditTopup = async (
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to create top-up session');
+      const message = await readErrorMessage(response);
+      throw new Error(message || 'Failed to create top-up session');
     }
 
     const data = await response.json();

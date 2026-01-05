@@ -2,13 +2,14 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { createClient } from '@supabase/supabase-js';
 import { verifyToken } from '@clerk/backend';
 import * as jwt from 'jsonwebtoken';
+import { resolveOrgAttributionClaims } from '../utils/org-attribution.js';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { token } = req.body;  // Expect the access token for refresh
+  const { token, clerk_org_id } = req.body;  // Expect the access token for refresh
 
   if (!token) {
     return res.status(400).json({ error: 'Missing token' });
@@ -85,6 +86,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(404).json({ error: 'User not found' });
     }
 
+    // Resolve org attribution (seat-gated)
+    let orgAttribution = null;
+    if (clerk_org_id) {
+      orgAttribution = await resolveOrgAttributionClaims({
+        supabase,
+        clerkUserId,
+        clerkOrgId: clerk_org_id,
+        clerkClaims: claims
+      });
+    }
+
     // Generate new custom access token (since we can't issue new Clerk token from backend)
     // This maintains compatibility while using Clerk for verification
     const jwtSecret = process.env.JWT_SECRET;
@@ -101,6 +113,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       iss: 'softcodes.ai',
       iat: Math.floor(Date.now() / 1000),
       exp: Math.floor(Date.now() / 1000) + (24 * 60 * 60), // 24 hours
+
+      // Org attribution (seat-gated). If absent => personal.
+      pool: orgAttribution?.pool === 'organization' ? 'organization' : 'personal',
+      clerk_org_id: orgAttribution?.clerk_org_id || null,
+      organization_id: orgAttribution?.organization_id || null,
+      organization_name: orgAttribution?.organization_name || null,
+      stripe_customer_id: orgAttribution?.stripe_customer_id || null,
+      organization_subscription_id: orgAttribution?.organization_subscription_id || null,
+      seat_id: orgAttribution?.seat_id || null,
+      seat_role: orgAttribution?.seat_role || null,
+      org_role: orgAttribution?.org_role || null
     };
 
     const newAccessToken = jwt.sign(accessTokenPayload, jwtSecret, { algorithm: 'HS256' });

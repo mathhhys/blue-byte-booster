@@ -111,15 +111,30 @@ const Dashboard = () => {
   const [creditAmount, setCreditAmount] = useState<string>('');
   const [isAddingCredits, setIsAddingCredits] = useState(false);
   const [validationError, setValidationError] = useState<string>('');
-  const [activePool, setActivePool] = useState<'personal' | 'organization'>('personal');
-  const [orgCredits, setOrgCredits] = useState<{
+
+  type OrgCredits = {
     total_credits: number;
     used_credits: number;
     remaining_credits: number;
-  } | null>(null);
+
+    has_active_seat: boolean;
+    seat_id: string;
+    seat_role: string | null;
+    clerk_org_id: string;
+
+    organization_id: string | null; // Supabase UUID
+    organization_name: string | null;
+    stripe_customer_id: string | null;
+    organization_subscription_id: string | null;
+  };
+
+  const [orgCredits, setOrgCredits] = useState<OrgCredits | null>(null);
+  const [hasActiveSeat, setHasActiveSeat] = useState(false);
   const [isLoadingOrgCredits, setIsLoadingOrgCredits] = useState(false);
   const [creditHistory, setCreditHistory] = useState<any[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+
+  const showTeamPool = Boolean(organization?.id && hasActiveSeat);
 
   // Billing portal state
   const [isBillingPortalLoading, setIsBillingPortalLoading] = useState(false);
@@ -231,14 +246,23 @@ const Dashboard = () => {
           const { getOrgCredits } = await import('@/utils/organization/billing');
           const data = await getOrgCredits(organization.id, token);
           setOrgCredits(data);
-        } catch (error) {
-          console.error('Error fetching organization credits:', error);
+          setHasActiveSeat(!!data?.has_active_seat);
+        } catch (error: any) {
+          // Seat-gated endpoint returns 403 when the user has no active seat.
+          if (error?.status === 403) {
+            setOrgCredits(null);
+            setHasActiveSeat(false);
+          } else {
+            console.error('Error fetching organization credits:', error);
+            setOrgCredits(null);
+            setHasActiveSeat(false);
+          }
         } finally {
           setIsLoadingOrgCredits(false);
         }
       } else {
         setOrgCredits(null);
-        setActivePool('personal');
+        setHasActiveSeat(false);
       }
     };
 
@@ -275,19 +299,19 @@ const Dashboard = () => {
     checkActiveLongLivedToken();
   }, [user?.id]);
 
-  // Fetch credit history based on active pool
+  // Fetch credit history based on the active credit context (team if seat-gated, otherwise personal)
   useEffect(() => {
     const fetchHistory = async () => {
       if (!user?.id) return;
-      
+
       setIsLoadingHistory(true);
       try {
         const { creditOperations } = await import('@/utils/supabase/database');
         const result = await creditOperations.getCreditHistory(
           user.id,
-          activePool === 'organization' ? organization?.id : undefined
+          showTeamPool ? organization?.id : undefined
         );
-        
+
         if (result.data) {
           setCreditHistory(result.data);
         }
@@ -299,7 +323,7 @@ const Dashboard = () => {
     };
 
     fetchHistory();
-  }, [user?.id, activePool, organization?.id]);
+  }, [user?.id, showTeamPool, organization?.id]);
 
   const generateToken = async () => {
     if (!user?.id) {
@@ -325,6 +349,9 @@ const Dashboard = () => {
           'Authorization': `Bearer ${clerkToken}`,
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({
+          clerk_org_id: organization?.id
+        })
       });
 
       if (!response.ok) {
@@ -473,7 +500,7 @@ const Dashboard = () => {
   };
 
   // Add credits function
-  const addCredits = async () => {
+  const addCredits = async (pool: 'personal' | 'organization') => {
     if (!user?.id) {
       toast({
         title: "Error",
@@ -495,11 +522,21 @@ const Dashboard = () => {
       const creditsToAdd = parseInt(creditAmount);
       const token = await getToken();
 
-      if (activePool === 'organization' && organization?.id) {
+      if (pool === 'organization') {
+        if (!organization?.id) {
+          throw new Error('No organization selected');
+        }
+        if (!showTeamPool) {
+          throw new Error('Team credits require an active seat in the selected organization');
+        }
+        if (!isAdmin) {
+          throw new Error('Only organization administrators can top up the team credit pool.');
+        }
+
         // Organization top-up
         const { createOrgCreditTopup } = await import('@/utils/organization/billing');
         const result = await createOrgCreditTopup(organization.id, creditsToAdd, token);
-        
+
         if (result.success && result.checkout_url) {
           window.location.href = result.checkout_url;
         } else {
@@ -865,42 +902,44 @@ const Dashboard = () => {
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex flex-col">
                     <span className="text-sm text-gray-400">Available Credits</span>
-                    <span className="text-xs text-gray-500 capitalize">{activePool} Pool</span>
+                    <span className="text-xs text-gray-500">
+                      {showTeamPool ? 'Team pool (seat-gated)' : 'Personal pool'}
+                    </span>
                   </div>
                   {organization && (
-                    <div className="flex bg-[#1a1a1a] p-1 rounded-md border border-white/5">
-                      <Button
-                        size="sm"
-                        variant={activePool === 'personal' ? 'secondary' : 'ghost'}
-                        className={`h-7 px-2 text-xs ${activePool === 'personal' ? 'bg-blue-600 text-white hover:bg-blue-700' : 'text-gray-400 hover:text-white'}`}
-                        onClick={() => setActivePool('personal')}
-                      >
-                        Personal
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant={activePool === 'organization' ? 'secondary' : 'ghost'}
-                        className={`h-7 px-2 text-xs ${activePool === 'organization' ? 'bg-blue-600 text-white hover:bg-blue-700' : 'text-gray-400 hover:text-white'}`}
-                        onClick={() => setActivePool('organization')}
-                      >
-                        Team
-                      </Button>
-                    </div>
+                    <Badge variant="outline" className="text-blue-400 border-blue-400/20">
+                      {organization.name}
+                    </Badge>
                   )}
                 </div>
-                {isDbUserLoading || (activePool === 'organization' && isLoadingOrgCredits) ? (
+
+                {isDbUserLoading || (organization && isLoadingOrgCredits) ? (
                   <div className="h-8 bg-gray-600 rounded w-32 animate-pulse mb-1"></div>
                 ) : (
                   <div className="text-2xl font-bold text-white mb-1">
-                    {activePool === 'personal'
-                      ? (dbUser ? currentBalance.toLocaleString() : '0')
-                      : (orgCredits ? orgCredits.remaining_credits.toLocaleString() : '0')
-                    }
+                    {showTeamPool
+                      ? (orgCredits ? orgCredits.remaining_credits.toLocaleString() : '0')
+                      : (dbUser ? currentBalance.toLocaleString() : '0')}
                   </div>
                 )}
-                {activePool === 'organization' && orgCredits && (
+
+                {showTeamPool && orgCredits && (
                   <div className="text-xs text-gray-500">
                     {orgCredits.used_credits} used of {orgCredits.total_credits}
+                  </div>
+                )}
+
+                {/* Secondary line: always show personal credits when team is active */}
+                {showTeamPool && (
+                  <div className="text-xs text-gray-500 mt-2">
+                    Personal: {dbUser ? currentBalance.toLocaleString() : '0'}
+                  </div>
+                )}
+
+                {/* Seat-gated hint */}
+                {!showTeamPool && organization && (
+                  <div className="text-xs text-gray-500 mt-2">
+                    Team credits require an active seat in this organization.
                   </div>
                 )}
               </Card>
@@ -923,29 +962,21 @@ const Dashboard = () => {
 
 
             {/* Add Credits Section */}
-            {/* Add Credits Section */}
             <Card className="bg-[#2a2a2a] border-white/10 p-6 mb-8">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                   <DollarSign className="w-5 h-5 text-blue-500" />
                   <h3 className="text-lg font-semibold text-white">
-                    Add {activePool === 'organization' ? 'Team' : 'Personal'} Credits
+                    Add Credits
                   </h3>
                 </div>
-                {activePool === 'organization' && !isAdmin && (
-                  <Badge variant="outline" className="text-orange-400 border-orange-400/20">
-                    Admin Only
+                {organization && (
+                  <Badge variant="outline" className="text-gray-300 border-white/10">
+                    {showTeamPool ? 'Team + Personal' : 'Personal'}
                   </Badge>
                 )}
               </div>
-              
-              {activePool === 'organization' && !isAdmin ? (
-                <div className="p-4 bg-orange-500/5 border border-orange-500/10 rounded-lg text-center">
-                  <p className="text-sm text-gray-400">
-                    Only organization administrators can top up the team credit pool.
-                  </p>
-                </div>
-              ) : (
+
               <div className="space-y-4">
                 {/* Credits Input */}
                 <div>
@@ -1007,27 +1038,48 @@ const Dashboard = () => {
                   </div>
                 </div>
 
-                {/* Add Credits Button */}
-                <Button
-                  onClick={addCredits}
-                  disabled={isAddingCredits || !creditAmount || !!validationError}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isAddingCredits ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Processing...
-                    </>
-                  ) : (
-                    <>
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add Credits
-                    </>
-                  )}
-                </Button>
+                {/* Purchase buttons (no pool toggle) */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <Button
+                    onClick={() => addCredits('personal')}
+                    disabled={isAddingCredits || !creditAmount || !!validationError}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isAddingCredits ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Personal Credits
+                      </>
+                    )}
+                  </Button>
 
+                  <Button
+                    onClick={() => addCredits('organization')}
+                    disabled={!showTeamPool || !isAdmin || isAddingCredits || !creditAmount || !!validationError}
+                    className="w-full bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Team Credits
+                  </Button>
+                </div>
+
+                {organization && showTeamPool && !isAdmin && (
+                  <div className="text-xs text-orange-400">
+                    Only organization administrators can top up the team credit pool.
+                  </div>
+                )}
+
+                {organization && !showTeamPool && (
+                  <div className="text-xs text-gray-500">
+                    Team top-ups require an active seat in this organization.
+                  </div>
+                )}
               </div>
-              )}
             </Card>
 
             {/* Transaction History Section */}
@@ -1036,7 +1088,7 @@ const Dashboard = () => {
                 <div className="flex items-center gap-2">
                   <HistoryIcon className="w-5 h-5 text-blue-500" />
                   <h3 className="text-lg font-semibold text-white">
-                    {activePool === 'organization' ? 'Team' : 'Personal'} Usage History
+                    {showTeamPool ? 'Team' : 'Personal'} Usage History
                   </h3>
                 </div>
               </div>

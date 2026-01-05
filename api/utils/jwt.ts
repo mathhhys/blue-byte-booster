@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
+import type { OrgAttributionClaims } from './org-attribution.js';
 
 /**
  * Generate a unique session ID using UUID v4
@@ -11,20 +12,39 @@ export function generateSessionId(): string {
 /**
  * Generate JWT access token for VSCode extension authentication
  * Token expires in 24 hours
+ *
+ * @param user - User data from Supabase
+ * @param sessionId - Unique session identifier
+ * @param orgAttribution - Optional org attribution claims (seat-gated)
  */
-export function generateAccessToken(user: any, sessionId: string): string {
+export function generateAccessToken(
+  user: any,
+  sessionId: string,
+  orgAttribution?: OrgAttributionClaims | null
+): string {
   const payload = {
     sub: user.clerk_id,
     email: user.email,
     username: user.username,
     session_id: sessionId,
-    organization_id: user.organization_id,
     plan_type: user.plan_type,
     credits: user.credits,
+    type: 'access', // Required by api/extension/auth/validate/route.ts
     iat: Math.floor(Date.now() / 1000),
     exp: Math.floor(Date.now() / 1000) + (24 * 60 * 60), // 24 hours
     iss: 'softcodes.ai',
-    aud: 'vscode-extension'
+    aud: 'vscode-extension',
+
+    // Org attribution (seat-gated). If absent => personal.
+    pool: orgAttribution?.pool === 'organization' ? 'organization' : 'personal',
+    clerk_org_id: orgAttribution?.clerk_org_id || null,
+    organization_id: orgAttribution?.organization_id || null,
+    organization_name: orgAttribution?.organization_name || null,
+    stripe_customer_id: orgAttribution?.stripe_customer_id || null,
+    organization_subscription_id: orgAttribution?.organization_subscription_id || null,
+    seat_id: orgAttribution?.seat_id || null,
+    seat_role: orgAttribution?.seat_role || null,
+    org_role: orgAttribution?.org_role || null
   };
   
   return jwt.sign(payload, process.env.JWT_SECRET!, { algorithm: 'HS256' });
