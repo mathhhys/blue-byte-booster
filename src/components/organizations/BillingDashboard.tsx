@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
+import { getSeatDataFromClerk, formatSeatUsage, getSeatUsageColor } from '@/utils/organization/seat-data';
 import {
   CreditCard,
   Settings,
@@ -66,15 +67,21 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
   const [isSeatDialogOpen, setIsSeatDialogOpen] = useState(false);
 
   const isAdmin = membership?.role === 'org:admin';
-  // Use organization.membersCount for more accurate count as per Clerk docs
-  const memberCount = organization?.membersCount || memberships?.count || 0;
-  const pendingInvitationsCount = organization?.pendingInvitationsCount || invitations?.count || 0;
   
-  // Use Clerk data for seat usage
-  const totalUsedSeats = memberCount + pendingInvitationsCount;
-  const maxSeats = subscriptionData?.seats_total || 0;
-  const availableSeats = Math.max(0, maxSeats - totalUsedSeats);
-  const percentUsed = maxSeats > 0 ? Math.round((totalUsedSeats / maxSeats) * 100) : 0;
+  // Use shared utility to get seat data from Clerk (single source of truth)
+  const seatData = getSeatDataFromClerk(
+    organization,
+    memberships,
+    invitations,
+    subscriptionData?.seats_total || 0
+  );
+  
+  const totalUsedSeats = seatData.seats_used;
+  const maxSeats = seatData.seats_total;
+  const availableSeats = seatData.availableSeats;
+  const percentUsed = seatData.percentUsed;
+  const memberCount = seatData.memberCount;
+  const pendingInvitationsCount = seatData.pendingInvitationsCount;
 
   useEffect(() => {
     if (organization?.id) {
@@ -281,10 +288,6 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
     }
   };
 
-  const formatSeatUsage = (used: number, total: number): string => {
-    return `${used}/${total} seats used`;
-  };
-
   if (!isAdmin) {
     return (
       <Card className="bg-[#2a2a2a] border-white/10 p-6">
@@ -398,7 +401,22 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
       <Card className="bg-[#2a2a2a] border-white/10 p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-white">Subscription Overview</h3>
-          {getStatusBadge(subscriptionData?.status)}
+          <div className="flex items-center gap-2">
+            {getStatusBadge(subscriptionData?.status)}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={loadBillingInfo}
+              disabled={isLoading}
+              className="border-white/20 text-white hover:bg-white/10"
+            >
+              {isLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <RefreshCw className="w-4 h-4" />
+              )}
+            </Button>
+          </div>
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

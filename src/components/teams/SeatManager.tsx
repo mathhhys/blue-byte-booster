@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { getSeatDataFromClerk } from '@/utils/organization/seat-data';
 import {
   Users,
   Plus,
@@ -19,6 +20,7 @@ import {
   CheckCircle,
   XCircle,
   Crown,
+  RefreshCw,
 } from 'lucide-react';
 
 interface Seat {
@@ -33,6 +35,8 @@ interface SeatData {
   seats_used: number;
   seats_total: number;
   seats: Seat[];
+  memberCount?: number;
+  pendingInvitationsCount?: number;
 }
 
 async function readErrorMessage(response: Response): Promise<string> {
@@ -92,9 +96,8 @@ export const SeatManager: React.FC = () => {
     
     setIsLoading(true);
     try {
+      // Fetch seats_total from subscription (Stripe) first
       const token = await getToken();
-      console.log('🔍 DEBUG: SeatManager - Got auth token for seats call:', token ? 'Present' : 'Missing');
-      
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
       };
@@ -104,20 +107,37 @@ export const SeatManager: React.FC = () => {
       }
       
       const API_BASE = import.meta.env.VITE_API_URL || '';
-      const response = await fetch(`${API_BASE}/api/organizations/seats?org_id=${organization.id}`, {
+      const response = await fetch(`${API_BASE}/api/organizations/subscription?orgId=${organization.id}`, {
         headers
       });
       
-      if (!response.ok) {
-        const message = await readErrorMessage(response);
-        throw new Error(message || `Failed to fetch seats: ${response.statusText}`);
+      let seatsTotal = 1; // Default fallback
+      if (response.ok) {
+        const data = await response.json();
+        seatsTotal = data.data?.seats_total || 1;
       }
       
-      const data = await response.json();
-      console.log('🔍 DEBUG: SeatManager - API response data:', data);
-      setSeatsData(data.data);
+      // Get seat data from Clerk (single source of truth)
+      const clerkSeatData = getSeatDataFromClerk(organization, null, null, seatsTotal);
+      
+      // Combine Clerk data with subscription data
+      const seatData: SeatData = {
+        seats_used: clerkSeatData.seats_used,
+        seats_total: seatsTotal,
+        seats: [], // Seats list will be populated from Clerk memberships
+        memberCount: clerkSeatData.memberCount,
+        pendingInvitationsCount: clerkSeatData.pendingInvitationsCount,
+      };
+      
+      console.log('🔍 DEBUG: SeatManager - Clerk-based seat data:', seatData);
+      setSeatsData(seatData);
     } catch (error) {
       console.error('Error loading seats:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load seat data",
+        variant: "destructive",
+      });
     } finally {
       setIsLoading(false);
     }
@@ -160,6 +180,27 @@ export const SeatManager: React.FC = () => {
 
       setInviteEmail('');
       setShowInviteModal(false);
+      
+      // Sync database with Clerk data in background
+      try {
+        const token = await getToken();
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+        };
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+        
+        const API_BASE = import.meta.env.VITE_API_URL || '';
+        await fetch(`${API_BASE}/api/organizations/sync-seats`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ organizationId: organization.id }),
+        });
+      } catch (syncError) {
+        console.error('Background sync failed:', syncError);
+        // Don't show error to user as this is a background operation
+      }
     } catch (error) {
       console.error('Error sending invitation:', error);
       toast({
@@ -218,6 +259,27 @@ export const SeatManager: React.FC = () => {
       setAssignRole('member');
       setShowAssignModal(false);
       await loadSeats();
+      
+      // Sync database with Clerk data in background
+      try {
+        const token = await getToken();
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+        };
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+        
+        const API_BASE = import.meta.env.VITE_API_URL || '';
+        await fetch(`${API_BASE}/api/organizations/sync-seats`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ organizationId: organization.id }),
+        });
+      } catch (syncError) {
+        console.error('Background sync failed:', syncError);
+        // Don't show error to user as this is a background operation
+      }
     } catch (error) {
       console.error('Error assigning seat:', error);
       toast({
@@ -371,6 +433,19 @@ export const SeatManager: React.FC = () => {
         </div>
         
         <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={loadSeats}
+            disabled={isLoading}
+            className="border-white/20 text-white hover:bg-white/10"
+          >
+            {isLoading ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <RefreshCw className="w-4 h-4" />
+            )}
+          </Button>
           <Dialog open={showInviteModal} onOpenChange={setShowInviteModal}>
             <DialogTrigger asChild>
               <Button variant="outline" className="border-white/20 text-white hover:bg-white/10">
