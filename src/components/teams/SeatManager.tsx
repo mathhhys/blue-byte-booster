@@ -69,7 +69,7 @@ async function readErrorMessage(response: Response): Promise<string> {
 }
 
 export const SeatManager: React.FC = () => {
-  const { organization } = useOrganization();
+  const { organization, memberships, invitations } = useOrganization();
   const { userId, getToken } = useAuth();
   const { toast } = useToast();
   const [seatsData, setSeatsData] = useState<SeatData | null>(null);
@@ -118,7 +118,7 @@ export const SeatManager: React.FC = () => {
       }
       
       // Get seat data from Clerk (single source of truth)
-      const clerkSeatData = getSeatDataFromClerk(organization, null, null, seatsTotal);
+      const clerkSeatData = getSeatDataFromClerk(organization, memberships, invitations, seatsTotal);
       
       // Combine Clerk data with subscription data
       const seatData: SeatData = {
