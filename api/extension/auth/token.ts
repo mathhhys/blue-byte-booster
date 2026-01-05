@@ -1,8 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { createClient } from '@supabase/supabase-js';
 import { generateAccessToken, generateRefreshToken, generateSessionId, validatePKCE } from '../../utils/jwt.js';
-import { resolveOrgAttributionClaims } from '../../utils/org-attribution.js';
-import { verifyToken } from '@clerk/backend';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -28,19 +26,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Handle refresh token flow
     if (grant_type === 'refresh_token') {
-      const { clerk_org_id } = req.body;
-      return await handleRefreshToken(supabase, refresh_token, clerk_org_id, res);
+      return await handleRefreshToken(supabase, refresh_token, res);
     }
 
     // Handle authorization code flow
     if (grant_type === 'authorization_code') {
-      const { clerk_org_id } = req.body;
       return await handleAuthorizationCode(
         supabase,
         code,
         code_verifier,
         state,
-        clerk_org_id,
         res
       );
     }
@@ -57,7 +52,6 @@ async function handleAuthorizationCode(
   code: string,
   codeVerifier: string,
   state: string,
-  clerkOrgId: string | undefined,
   res: NextApiResponse
 ) {
   // Retrieve OAuth session
@@ -98,21 +92,9 @@ async function handleAuthorizationCode(
     return res.status(404).json({ error: 'User not found' });
   }
 
-  // Resolve org attribution (seat-gated)
-  let orgAttribution = null;
-  if (clerkOrgId) {
-    // We don't have Clerk claims here, so we'll use null and let it fallback to API
-    orgAttribution = await resolveOrgAttributionClaims({
-      supabase,
-      clerkUserId: user.clerk_id,
-      clerkOrgId,
-      clerkClaims: null
-    });
-  }
-
   // Generate tokens
   const sessionId = generateSessionId();
-  const accessToken = generateAccessToken(user, sessionId, orgAttribution);
+  const accessToken = generateAccessToken(user, sessionId);
   const refreshToken = generateRefreshToken(user, sessionId);
 
   // Store refresh token
@@ -155,7 +137,6 @@ async function handleAuthorizationCode(
 async function handleRefreshToken(
   supabase: any,
   refreshToken: string,
-  clerkOrgId: string | undefined,
   res: NextApiResponse
 ) {
   if (!refreshToken) {
@@ -190,19 +171,8 @@ async function handleRefreshToken(
     return res.status(404).json({ error: 'User not found' });
   }
 
-  // Resolve org attribution (seat-gated)
-  let orgAttribution = null;
-  if (clerkOrgId) {
-    orgAttribution = await resolveOrgAttributionClaims({
-      supabase,
-      clerkUserId: user.clerk_id,
-      clerkOrgId,
-      clerkClaims: null
-    });
-  }
-
   // Generate new access token
-  const accessToken = generateAccessToken(user, tokenRecord.session_id, orgAttribution);
+  const accessToken = generateAccessToken(user, tokenRecord.session_id);
 
   // Update last_used_at for refresh token
   await supabase

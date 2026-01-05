@@ -2,7 +2,6 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { verifyToken } from '@clerk/backend';
 import { createClient } from '@supabase/supabase-js';
 import { generateSessionId, generateAccessToken } from '../../src/utils/jwt.js';
-import { resolveOrgAttributionClaims } from '../utils/org-attribution.js';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -24,8 +23,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!clerkId) {
       return res.status(401).json({ error: 'Invalid Clerk token' });
     }
-
-    const { clerk_org_id } = req.body || {};
 
     // Fetch user data from Supabase (using service role for server-side)
     const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL;
@@ -61,19 +58,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(404).json({ error: 'User not found in database' });
     }
 
-    // Resolve org attribution (seat-gated)
-    let orgAttribution = null;
-    if (clerk_org_id) {
-      orgAttribution = await resolveOrgAttributionClaims({
-        supabase,
-        clerkUserId: clerkId,
-        clerkOrgId: clerk_org_id,
-        clerkClaims: claims
-      });
-    }
-
     const sessionId = generateSessionId();
-    const accessToken = generateAccessToken(userData, sessionId, orgAttribution);
+    const accessToken = generateAccessToken(userData, sessionId);
 
     const expiresIn = 24 * 60 * 60; // 24 hours in seconds
     const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();

@@ -58,27 +58,7 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
   const [isCreatingSubscription, setIsCreatingSubscription] = useState(false);
   const [isOpeningPortal, setIsOpeningPortal] = useState(false);
   const [selectedSeats, setSelectedSeats] = useState(5);
-
-  type OrgCredits = {
-    total_credits: number;
-    used_credits: number;
-    remaining_credits: number;
-
-    // Seat-gating + metadata (may be present depending on API version)
-    has_active_seat?: boolean;
-    seat_id?: string;
-    seat_role?: string | null;
-    clerk_org_id?: string;
-
-    organization_id?: string | null; // Supabase UUID
-    organization_name?: string | null;
-    stripe_customer_id?: string | null;
-    organization_subscription_id?: string | null;
-  };
-
-  const [orgCredits, setOrgCredits] = useState<OrgCredits | null>(null);
-  const [hasActiveSeat, setHasActiveSeat] = useState<boolean | null>(null);
-  const [creditsError, setCreditsError] = useState<string | null>(null);
+  const [orgCredits, setOrgCredits] = useState(null);
   const [isLoadingCredits, setIsLoadingCredits] = useState(false);
   const [isToppingUp, setIsToppingUp] = useState(false);
   const [isUpdatingSeats, setIsUpdatingSeats] = useState(false);
@@ -101,13 +81,6 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
       loadBillingInfo();
     }
   }, [organization?.id, organization?.membersCount, memberships?.count]);
-
-  useEffect(() => {
-    // Auto-load credit pool when subscription is available.
-    if (organization?.id && subscriptionData) {
-      loadOrgCredits();
-    }
-  }, [organization?.id, subscriptionData?.stripe_subscription_id]);
 
   const loadBillingInfo = async () => {
     if (!organization?.id) return;
@@ -148,39 +121,16 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
 
   const loadOrgCredits = async () => {
     if (!organization?.id || !subscriptionData) return;
-
+    
     try {
       setIsLoadingCredits(true);
-      setCreditsError(null);
-
-      const token = await getToken();
-      const credits = await getOrgCredits(organization.id, token);
-
+      const credits = await getOrgCredits(organization.id);
       setOrgCredits(credits);
-      setHasActiveSeat(credits?.has_active_seat ?? true);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error loading organization credits:', error);
-
-      // Seat-gated endpoint returns 403 when the current user has no active seat.
-      if (error?.status === 403) {
-        setOrgCredits(null);
-        setHasActiveSeat(false);
-        setCreditsError(error?.message || 'No active seat in this organization.');
-        toast({
-          title: "Seat required",
-          description: error?.message || "You need an active seat in this organization to view the team credit pool.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      setOrgCredits(null);
-      setHasActiveSeat(null);
-      setCreditsError(error instanceof Error ? error.message : 'Failed to load organization credits');
-
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to load organization credits",
+        description: "Failed to load organization credits",
         variant: "destructive",
       });
     } finally {
@@ -496,99 +446,68 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
         </div>
 
         {/* Organization Credit Pool */}
-        <div className="mt-6 p-4 bg-[#1a1a1a] rounded-lg">
-          <div className="flex items-center justify-between mb-3">
-            <div className="space-y-1">
-              <h4 className="text-white font-medium">Organization Credit Pool</h4>
-              <p className="text-xs text-gray-400">Shared by all team members with an active seat.</p>
-            </div>
-
-            {orgCredits ? (
+        {orgCredits && (
+          <div className="mt-6 p-4 bg-[#1a1a1a] rounded-lg">
+            <div className="flex items-center justify-between mb-3">
+              <div className="space-y-1">
+                <h4 className="text-white font-medium">Organization Credit Pool</h4>
+                <p className="text-xs text-gray-400">Shared by all team members with an active seat.</p>
+              </div>
               <Badge variant="secondary" className="text-xs">
                 {orgCredits.remaining_credits} remaining
               </Badge>
-            ) : hasActiveSeat === false ? (
-              <Badge variant="outline" className="text-xs text-orange-400 border-orange-400/20">
-                Seat required
-              </Badge>
-            ) : (
-              <Badge variant="outline" className="text-xs text-gray-400 border-white/10">
-                —
-              </Badge>
-            )}
-          </div>
-
-          {isLoadingCredits ? (
-            <div className="space-y-3">
-              <div className="h-4 bg-gray-700 rounded w-1/3 animate-pulse"></div>
-              <div className="h-4 bg-gray-700 rounded w-2/3 animate-pulse"></div>
-              <div className="h-2 bg-gray-700 rounded w-full animate-pulse"></div>
             </div>
-          ) : orgCredits ? (
-            <>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                <div>
-                  <div className="text-gray-400">Total Credits</div>
-                  <div className="text-white font-medium">{orgCredits.total_credits}</div>
-                </div>
-                <div>
-                  <div className="text-gray-400">Used</div>
-                  <div className="text-white font-medium">{orgCredits.used_credits}</div>
-                </div>
-                <div>
-                  <div className="text-gray-400">Remaining</div>
-                  <div className="text-white font-medium">{orgCredits.remaining_credits}</div>
-                </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+              <div>
+                <div className="text-gray-400">Total Credits</div>
+                <div className="text-white font-medium">{orgCredits.total_credits}</div>
               </div>
-              <div className="w-full bg-gray-700 rounded-full h-2 mt-3">
-                <div
-                  className="h-2 rounded-full bg-blue-600"
-                  style={{ width: `${(orgCredits.used_credits / orgCredits.total_credits * 100) || 0}%` }}
-                />
+              <div>
+                <div className="text-gray-400">Used</div>
+                <div className="text-white font-medium">{orgCredits.used_credits}</div>
               </div>
-            </>
-          ) : hasActiveSeat === false ? (
-            <div className="text-sm text-gray-400">
-              You don’t currently have an active seat in this organization, so you can’t view the team credit balance.
-              Ask an admin to assign you a seat.
+              <div>
+                <div className="text-gray-400">Remaining</div>
+                <div className="text-white font-medium">{orgCredits.remaining_credits}</div>
+              </div>
             </div>
-          ) : (
-            <div className="text-sm text-gray-400">
-              {creditsError || 'Credit pool data is not available yet.'}
+            <div className="w-full bg-gray-700 rounded-full h-2 mt-3">
+              <div
+                className="h-2 rounded-full bg-blue-600"
+                style={{ width: `${(orgCredits.used_credits / orgCredits.total_credits * 100) || 0}%` }}
+              />
             </div>
-          )}
-
-          <div className="flex gap-2 mt-4">
-            <Button
-              onClick={handleTopupCredits}
-              disabled={isToppingUp}
-              size="sm"
-              className="bg-green-600 hover:bg-green-700 text-white"
-            >
-              {isToppingUp ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <Plus className="w-4 h-4 mr-2" />
-              )}
-              Top-up Credits
-            </Button>
-
-            <Button
-              variant="outline"
-              size="sm"
-              className="border-white/20 text-white hover:bg-white/10"
-              onClick={() => loadOrgCredits()}
-              disabled={isLoadingCredits}
-            >
-              {isLoadingCredits ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <RefreshCw className="w-4 h-4 mr-2" />
-              )}
-              Refresh
-            </Button>
+            <div className="flex gap-2 mt-4">
+              <Button
+                onClick={handleTopupCredits}
+                disabled={isToppingUp}
+                size="sm"
+                className="bg-green-600 hover:bg-green-700 text-white"
+              >
+                {isToppingUp ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Plus className="w-4 h-4 mr-2" />
+                )}
+                Top-up Credits
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-white/20 text-white hover:bg-white/10"
+                onClick={() => loadOrgCredits()}
+                disabled={isLoadingCredits}
+              >
+                {isLoadingCredits ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                )}
+                Refresh
+              </Button>
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="flex gap-3 mt-6">
           <Button

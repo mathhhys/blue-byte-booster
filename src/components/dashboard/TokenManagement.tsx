@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth, useOrganization } from '@clerk/clerk-react';
+import { useAuth } from '@clerk/clerk-react';
 import {
   AlertCircle,
   CheckCircle,
@@ -51,7 +51,6 @@ export function TokenManagement() {
   const [isLoading, setIsLoading] = useState(true);
   const [tokenToRevoke, setTokenToRevoke] = useState<Token | null>(null);
   const { getToken } = useAuth();
-  const { organization } = useOrganization();
   const { toast } = useToast();
 
   const loadTokens = async () => {
@@ -114,10 +113,7 @@ export function TokenManagement() {
           'Authorization': `Bearer ${authToken}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          deviceName: newTokenName,
-          clerk_org_id: organization?.id
-        })
+        body: JSON.stringify({ deviceName: newTokenName })
       });
 
       const data = await response.json();
@@ -151,14 +147,11 @@ export function TokenManagement() {
       const authToken = await getToken();
       const response = await fetch('/api/extension-token/refresh', {
         method: 'POST',
-        headers: {
+        headers: { 
           'Authorization': `Bearer ${authToken}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          tokenId,
-          clerk_org_id: organization?.id
-        })
+        body: JSON.stringify({ tokenId })
       });
 
       const data = await response.json();
