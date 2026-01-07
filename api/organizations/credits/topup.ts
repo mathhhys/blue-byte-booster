@@ -46,17 +46,69 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // 3. Get organization
-    const { data: org, error: orgError } = await supabase
+    let { data: org, error: orgError } = await supabase
       .from('organizations')
-      .select('id, stripe_customer_id, total_credits')
+      .select('id, stripe_customer_id, total_credits, name')
       .eq('clerk_org_id', orgId)
-      .single();
+      .maybeSingle();
 
-    if (orgError || !org?.stripe_customer_id) {
-      console.error('Organization not found or missing billing info:', orgError);
-      return res.status(404).json(
-        { error: 'Active organization subscription with billing info not found' }
-      );
+    // Handle missing organization or missing Stripe Customer ID
+    if (!org || !org.stripe_customer_id) {
+      console.log(`Organization ${orgId} missing Stripe Customer ID or record. Creating...`);
+      
+      try {
+        // Create Stripe Customer
+        const customer = await stripe.customers.create({
+          name: org?.name || `Organization ${orgId}`,
+          metadata: {
+            clerk_org_id: orgId,
+          },
+        });
+
+        const stripeCustomerId = customer.id;
+
+        if (org) {
+          // Update existing organization
+          const { error: updateError } = await supabase
+            .from('organizations')
+            .update({ stripe_customer_id: stripeCustomerId })
+            .eq('id', org.id);
+
+          if (updateError) {
+            console.error('Failed to update organization with Stripe Customer ID:', updateError);
+            throw updateError;
+          }
+          
+          // Update local object
+          org.stripe_customer_id = stripeCustomerId;
+        } else {
+          // Create new organization record
+          const { data: newOrg, error: createError } = await supabase
+            .from('organizations')
+            .insert({
+              clerk_org_id: orgId,
+              name: `Organization ${orgId}`,
+              stripe_customer_id: stripeCustomerId,
+              total_credits: 0,
+            })
+            .select('id, stripe_customer_id, total_credits, name')
+            .single();
+
+          if (createError) {
+            console.error('Failed to create organization record:', createError);
+            throw createError;
+          }
+          
+          org = newOrg;
+        }
+      } catch (err) {
+        console.error('Error ensuring organization/customer exists:', err);
+        return res.status(500).json({ error: 'Failed to initialize organization billing' });
+      }
+    }
+
+    if (!org?.stripe_customer_id) {
+      return res.status(500).json({ error: 'Failed to retrieve Stripe Customer ID' });
     }
 
     // 4. Create Stripe balance transaction
