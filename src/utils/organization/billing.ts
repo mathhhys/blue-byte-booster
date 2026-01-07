@@ -386,7 +386,7 @@ export const createOrgCreditTopup = async (
     const data = await response.json();
     return {
       success: true,
-      checkout_url: data.checkout_url,
+      checkout_url: data.checkout_url || window.location.href,
     };
   } catch (error) {
     console.error('Error creating org credit top-up:', error);

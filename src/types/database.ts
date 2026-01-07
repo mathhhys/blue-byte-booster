@@ -361,6 +361,7 @@ export interface Database {
           transaction_type: 'grant' | 'usage' | 'refund' | 'bonus' | 'purchase';
           description: string | null;
           reference_id: string | null;
+          metadata: Record<string, any> | null;
           created_at: string;
         };
         Insert: {
@@ -370,6 +371,7 @@ export interface Database {
           transaction_type: 'grant' | 'usage' | 'refund' | 'bonus' | 'purchase';
           description?: string | null;
           reference_id?: string | null;
+          metadata?: Record<string, any> | null;
           created_at?: string;
         };
         Update: {
@@ -379,6 +381,7 @@ export interface Database {
           transaction_type?: 'grant' | 'usage' | 'refund' | 'bonus' | 'purchase';
           description?: string | null;
           reference_id?: string | null;
+          metadata?: Record<string, any> | null;
           created_at?: string;
         };
       };

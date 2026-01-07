@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS organization_credit_transactions (
   description text,
   transaction_type text NOT NULL,  -- 'purchase', 'recurring', 'bonus', etc.
   reference_id text,
+  metadata jsonb DEFAULT '{}'::jsonb,
   created_at timestamptz DEFAULT now()
 );
 
