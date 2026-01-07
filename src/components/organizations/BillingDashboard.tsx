@@ -340,7 +340,7 @@ export const BillingDashboard = ({ className }: BillingDashboardProps) => {
             <ul className="text-gray-400 space-y-2 text-sm">
               <li className="flex items-start gap-2">
                 <CheckCircle className="w-4 h-4 text-green-400 mt-0.5 shrink-0" />
-                <span>Seat-based licensing (up to 100 seats, $30/month per seat)</span>
+                <span>Seat-based licensing (up to 100 seats, €40/month per seat)</span>
               </li>
               <li className="flex items-start gap-2">
                 <CheckCircle className="w-4 h-4 text-green-400 mt-0.5 shrink-0" />

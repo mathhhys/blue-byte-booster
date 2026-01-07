@@ -52,7 +52,7 @@ export default async function handler(req: any, res: any) {
       line_items: [
         {
           price_data: {
-            currency: 'usd',
+            currency: 'eur',
             product_data: {
               name: `${credits_amount} API Credits`,
               description: `One-time credit top-up for organization pool`,

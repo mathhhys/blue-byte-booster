@@ -322,7 +322,7 @@ export const formatSeatCost = (
 ): string => {
   const cost = calculateSeatCost(planType, billingFrequency, seats);
   const period = billingFrequency === 'monthly' ? 'month' : 'year';
-  return `$${cost}/${period}`;
+  return `€${cost}/${period}`;
 };
 
 // Organization credit pool functions
