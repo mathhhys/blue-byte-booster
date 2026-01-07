@@ -537,7 +537,7 @@ const Dashboard = () => {
         }
       } else {
         // Individual purchase
-        const amount = CREDIT_CONVERSION.creditsToDollars(creditsToAdd);
+        const amount = CREDIT_CONVERSION.creditsToEuros(creditsToAdd);
         const response = await fetch('/api/billing/credit-purchase', {
           method: 'POST',
           headers: {
@@ -1008,7 +1008,7 @@ const Dashboard = () => {
                   )}
                   {creditAmount && !validationError && (
                     <p className="text-green-400 text-xs mt-1">
-                      Cost: ${CREDIT_CONVERSION.creditsToDollars(parseInt(creditAmount) || 0).toFixed(2)}
+                      Cost: €{CREDIT_CONVERSION.creditsToEuros(parseInt(creditAmount) || 0).toFixed(2)}
                     </p>
                   )}
                 </div>
@@ -1033,7 +1033,7 @@ const Dashboard = () => {
                           </div>
                         )}
                         <div className="text-sm font-medium">{quickAmount.credits.toLocaleString()} credits</div>
-                        <div className="text-lg font-bold text-green-400">${quickAmount.cost.toFixed(2)}</div>
+                        <div className="text-lg font-bold text-green-400">€{quickAmount.cost.toFixed(2)}</div>
                       </Button>
                     ))}
                   </div>
