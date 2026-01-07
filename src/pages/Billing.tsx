@@ -516,7 +516,7 @@ const Billing = () => {
                             disabled={isLoading}
                           >
                             <div className="text-sm font-medium">500 credits</div>
-                            <div className="text-lg font-bold text-green-400">$7.00</div>
+                            <div className="text-lg font-bold text-green-400">€7.00</div>
                           </Button>
                           <Button
                             variant="outline"
@@ -525,7 +525,7 @@ const Billing = () => {
                             disabled={isLoading}
                           >
                             <div className="text-sm font-medium">1,000 credits</div>
-                            <div className="text-lg font-bold text-green-400">$14.00</div>
+                            <div className="text-lg font-bold text-green-400">€14.00</div>
                           </Button>
                           <Button
                             variant="outline"
@@ -534,7 +534,7 @@ const Billing = () => {
                             disabled={isLoading}
                           >
                             <div className="text-sm font-medium">2,500 credits</div>
-                            <div className="text-lg font-bold text-green-400">$35.00</div>
+                            <div className="text-lg font-bold text-green-400">€35.00</div>
                           </Button>
                         </div>
 
