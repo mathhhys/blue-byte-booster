@@ -101,50 +101,37 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 4. Create Stripe balance transaction
-    await stripe.customers.createBalanceTransaction(org.stripe_customer_id, {
-      amount: amount * 100, // amount in cents
-      currency: 'usd',
+    // 4. Create Stripe Checkout Session
+    const origin = request.headers.get('origin') || process.env.NEXT_PUBLIC_APP_URL || 'https://softcodes.ai';
+    
+    const session = await stripe.checkout.sessions.create({
+      customer: org.stripe_customer_id,
+      mode: 'payment',
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: 'Organization Credits Top-up',
+              description: `${amount} credits`,
+            },
+            unit_amount: 100, // $1.00 per credit
+          },
+          quantity: amount,
+        },
+      ],
       metadata: {
+        purchase_type: 'org_credit_topup',
         clerk_org_id: orgId,
-        description: 'Manual topup',
+        credits_to_add: amount,
         admin_user_id: authResult.userId,
       },
+      success_url: `${origin}/dashboard/organization/${orgId}/billing?success=true`,
+      cancel_url: `${origin}/dashboard/organization/${orgId}/billing?canceled=true`,
     });
 
-    // 5. Insert transaction record
-    const { error: txError } = await supabase
-      .from('organization_credit_transactions')
-      .insert({
-        organization_id: org.id,
-        amount: amount,
-        transaction_type: 'purchase',
-        description: 'Manual credit top-up',
-        metadata: {
-          clerk_org_id: orgId,
-          admin_user_id: authResult.userId,
-        },
-      });
-
-    if (txError) {
-      console.error('Failed to insert transaction record:', txError);
-    }
-
-    // 6. Update organization credits
-    const { error: updateError } = await supabase
-      .from('organizations')
-      .update({
-        total_credits: (org.total_credits || 0) + amount,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', org.id);
-
-    if (updateError) {
-      console.error('Failed to update organization credits:', updateError);
-      return NextResponse.json({ error: 'Failed to update credits' }, { status: 500 });
-    }
-
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, checkout_url: session.url });
 
   } catch (error: any) {
     console.error('❌ API: Exception in credit top-up endpoint:', error);
