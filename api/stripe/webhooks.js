@@ -2,7 +2,13 @@
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+let stripe;
+function getStripe() {
+  if (!stripe) {
+    stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+  }
+  return stripe;
+}
 
 export default async function handler(req, res) {
   console.log('=== STRIPE WEBHOOKS API ROUTE ENTRY ===');
@@ -27,7 +33,7 @@ export default async function handler(req, res) {
     
     let event;
     try {
-      event = stripe.webhooks.constructEvent(rawBody, sig, webhookSecret);
+      event = getStripe().webhooks.constructEvent(rawBody, sig, webhookSecret);
       console.log('✅ Webhook signature verified');
     } catch (err) {
       console.log('❌ Webhook signature verification failed:', err.message);
@@ -132,7 +138,7 @@ async function handleInvoicePaymentSucceeded(invoice, supabase) {
     }
 
     // Get subscription details
-    const subscription = await stripe.subscriptions.retrieve(invoice.subscription, {
+    const subscription = await getStripe().subscriptions.retrieve(invoice.subscription, {
       expand: ['customer']
     });
 
@@ -202,17 +208,22 @@ async function handleInvoicePaymentSucceeded(invoice, supabase) {
         invoiceId: invoice.id
       });
 
-      // Update organization credits
-      const newCredits = (orgSubscription.total_credits || 0) + creditsToGrant;
+      // Update organization credits in the organizations table
+      const { data: orgData } = await supabase
+        .from('organizations')
+        .select('total_credits')
+        .eq('clerk_org_id', orgSubscription.clerk_org_id)
+        .single();
+
+      const newCredits = (orgData?.total_credits || 0) + creditsToGrant;
       
       const { error: updateError } = await supabase
-        .from('organization_subscriptions')
+        .from('organizations')
         .update({
           total_credits: newCredits,
-          last_credit_recharge_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         })
-        .eq('id', orgSubscription.id);
+        .eq('clerk_org_id', orgSubscription.clerk_org_id);
 
       if (updateError) {
         console.error('Failed to update organization credits:', updateError);
@@ -369,7 +380,7 @@ async function handleCheckoutSessionCompleted(session, supabase) {
       console.log('🏢 Processing Organization Subscription for:', metadata.clerk_org_id);
       
       // Retrieve full subscription details to get current period end
-      const subscription = await stripe.subscriptions.retrieve(session.subscription);
+      const subscription = await getStripe().subscriptions.retrieve(session.subscription);
       
       const seatsTotal = parseInt((metadata.seats_total || metadata.seats || '1'), 10) || 1;
       const planType = metadata.plan_type || 'teams';
@@ -388,8 +399,6 @@ async function handleCheckoutSessionCompleted(session, supabase) {
           billing_frequency: billingFrequency,
           seats_total: seatsTotal,
           status: 'active',
-          total_credits: creditsToGrant, // Set initial credits
-          used_credits: 0,
           current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
           current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
           updated_at: new Date().toISOString()
@@ -397,6 +406,17 @@ async function handleCheckoutSessionCompleted(session, supabase) {
           // Ensure we keep a single row per Clerk org
           onConflict: 'clerk_org_id'
         });
+
+      // Grant initial credits to the organization
+      if (!subError) {
+        await supabase
+          .from('organizations')
+          .update({
+            total_credits: creditsToGrant,
+            updated_at: new Date().toISOString()
+          })
+          .eq('clerk_org_id', metadata.clerk_org_id);
+      }
 
       if (subError) {
         console.error('Error creating organization subscription:', subError);
@@ -412,26 +432,26 @@ async function handleCheckoutSessionCompleted(session, supabase) {
 
       if (creditsToAdd > 0) {
         // Get current credits
-        const { data: orgSub, error: fetchError } = await supabase
-          .from('organization_subscriptions')
+        const { data: orgData, error: fetchError } = await supabase
+          .from('organizations')
           .select('id, total_credits')
           .eq('clerk_org_id', metadata.clerk_org_id)
           .single();
 
-        if (fetchError || !orgSub) {
-          console.error('❌ Org subscription not found for top-up:', fetchError);
-          throw new Error('Organization subscription not found');
+        if (fetchError || !orgData) {
+          console.error('❌ Organization not found for top-up:', fetchError);
+          throw new Error('Organization not found');
         }
 
-        const newTotal = (orgSub.total_credits || 0) + creditsToAdd;
+        const newTotal = (orgData.total_credits || 0) + creditsToAdd;
 
         const { error: updateError } = await supabase
-          .from('organization_subscriptions')
+          .from('organizations')
           .update({
             total_credits: newTotal,
             updated_at: new Date().toISOString()
           })
-          .eq('id', orgSub.id);
+          .eq('id', orgData.id);
 
         if (updateError) {
           console.error('❌ Failed to update org credits:', updateError);
@@ -554,10 +574,17 @@ async function handleSubscriptionCreated(subscription, supabase) {
       status: subscription.status,
       current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
       current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
-      total_credits: totalCredits,
-      used_credits: 0,
       updated_at: new Date().toISOString()
     };
+
+    // Update organization credits
+    await supabase
+      .from('organizations')
+      .update({
+        total_credits: totalCredits,
+        updated_at: new Date().toISOString()
+      })
+      .eq('clerk_org_id', clerkOrgId);
 
     if (organizationId) {
       subscriptionData.organization_id = organizationId;
@@ -648,7 +675,24 @@ async function handleSubscriptionUpdated(subscription, supabase) {
     // If seats were added, grant bonus credits (500 per seat)
     if (seatDelta > 0) {
       const bonusCredits = calculateCreditsToGrant(orgSubscription.plan_type, orgSubscription.billing_frequency, seatDelta);
-      updateData.total_credits = (orgSubscription.total_credits || 0) + bonusCredits;
+      
+      // Update organization credits in the organizations table
+      const { data: orgData } = await supabase
+        .from('organizations')
+        .select('total_credits')
+        .eq('clerk_org_id', orgSubscription.clerk_org_id)
+        .single();
+
+      const newTotalCredits = (orgData?.total_credits || 0) + bonusCredits;
+      
+      await supabase
+        .from('organizations')
+        .update({
+          total_credits: newTotalCredits,
+          updated_at: new Date().toISOString()
+        })
+        .eq('clerk_org_id', orgSubscription.clerk_org_id);
+
       console.log(`🎁 Granting ${bonusCredits} bonus credits for ${seatDelta} new seats`);
     }
 
@@ -1046,7 +1090,7 @@ async function getUserFromStripeCustomer(customer, supabase) {
 async function determinePaymentType(invoice, subscription) {
   try {
     // Get all invoices for this subscription
-    const invoices = await stripe.invoices.list({
+    const invoices = await getStripe().invoices.list({
       subscription: subscription.id,
       limit: 10
     });

@@ -34,17 +34,14 @@ export default async function handler(req: any, res: any) {
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { data: subscription, error } = await supabase
-      .from('organization_subscriptions')
+    const { data: organization, error } = await supabase
+      .from('organizations')
       .select('total_credits, used_credits')
       .eq('clerk_org_id', org_id)
-      .in('status', ['active', 'trialing'])
-      .order('created_at', { ascending: false })
-      .limit(1)
       .single();
 
     if (error) {
-      // If no subscription found, return 0 credits
+      // If no organization found, return 0 credits
       if (error.code === 'PGRST116') {
         return res.status(200).json({
           total_credits: 0,
@@ -56,8 +53,8 @@ export default async function handler(req: any, res: any) {
       return res.status(500).json({ error: 'Failed to fetch credits' });
     }
 
-    const total = subscription.total_credits || 0;
-    const used = subscription.used_credits || 0;
+    const total = organization.total_credits || 0;
+    const used = organization.used_credits || 0;
     const remaining = Math.max(0, total - used);
 
     return res.status(200).json({

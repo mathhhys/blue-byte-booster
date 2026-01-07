@@ -70,7 +70,7 @@ export interface Database {
           id?: string;
           user_id: string;
           stripe_subscription_id?: string | null;
-          plan_type: 'pro' | 'teams' | 'enterprise';
+          plan_type?: 'pro' | 'teams' | 'enterprise';
           billing_frequency: 'monthly' | 'yearly';
           seats?: number;
           status?: 'active' | 'canceled' | 'past_due' | 'incomplete';
@@ -152,6 +152,38 @@ export interface Database {
           description?: string | null;
           reference_id?: string | null;
           created_at?: string;
+        };
+      };
+      organizations: {
+        Row: {
+          id: string;
+          clerk_org_id: string;
+          name: string | null;
+          stripe_customer_id: string | null;
+          total_credits: number;
+          used_credits: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          clerk_org_id: string;
+          name?: string | null;
+          stripe_customer_id?: string | null;
+          total_credits?: number;
+          used_credits?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          clerk_org_id?: string;
+          name?: string | null;
+          stripe_customer_id?: string | null;
+          total_credits?: number;
+          used_credits?: number;
+          created_at?: string;
+          updated_at?: string;
         };
       };
       organization_members: {
