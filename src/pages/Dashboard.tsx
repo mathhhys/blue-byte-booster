@@ -7,7 +7,6 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { User } from '@/utils/supabase/database';
-import { SeatManager } from '@/components/teams/SeatManager';
 import {
   Settings,
   CreditCard,
@@ -1123,13 +1122,6 @@ const Dashboard = () => {
                 )}
               </div>
             </Card>
-
-            {/* Organization-specific features - only show when in organization view and user is admin */}
-            {activePool === 'organization' && isAdmin && (
-              <div className="grid grid-cols-1 gap-6 mb-8">
-                <SeatManager />
-              </div>
-            )}
 
           </main>
         </SidebarInset>
