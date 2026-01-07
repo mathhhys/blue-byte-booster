@@ -1,17 +1,25 @@
+import type { VercelRequest, VercelResponse } from '@vercel/node';
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
-import { orgAdminMiddleware } from '../../../src/utils/clerk/token-verification';
+import { orgAdminMiddleware } from '../../../src/utils/clerk/token-verification.js';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: '2023-10-16',
-});
+const getStripe = () => {
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key) {
+    throw new Error('STRIPE_SECRET_KEY is not defined');
+  }
+  return new Stripe(key, {
+    apiVersion: '2023-10-16' as any,
+  });
+};
 
-export default async function handler(req, res) {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
+    const stripe = getStripe();
     const body = req.body;
     // Support both camelCase and snake_case from frontend
     const orgId = body.orgId || body.org_id;
@@ -30,6 +38,11 @@ export default async function handler(req, res) {
     // 2. Initialize Supabase with service role
     const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    
+    if (!supabaseUrl || !supabaseKey) {
+        throw new Error('Supabase credentials missing');
+    }
+
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // 3. Get organization
@@ -91,7 +104,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json({ success: true });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ API: Exception in credit top-up endpoint:', error);
     
     if (error.message?.includes('Authorization') || error.message?.includes('Authentication')) {
