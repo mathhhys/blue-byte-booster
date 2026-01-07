@@ -353,6 +353,35 @@ export interface Database {
           created_at?: string;
         };
       };
+      organization_credit_transactions: {
+        Row: {
+          id: string;
+          organization_id: string;
+          amount: number;
+          transaction_type: 'grant' | 'usage' | 'refund' | 'bonus' | 'purchase';
+          description: string | null;
+          reference_id: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          amount: number;
+          transaction_type: 'grant' | 'usage' | 'refund' | 'bonus' | 'purchase';
+          description?: string | null;
+          reference_id?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          amount?: number;
+          transaction_type?: 'grant' | 'usage' | 'refund' | 'bonus' | 'purchase';
+          description?: string | null;
+          reference_id?: string | null;
+          created_at?: string;
+        };
+      };
     };
     Functions: {
       grant_credits: {

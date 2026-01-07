@@ -123,3 +123,18 @@ export interface DeductOrgCreditsResponse {
   remaining_credits?: number;
   error?: string;
 }
+
+export interface OrgCreditTransaction {
+  id: string;
+  organizationId: string;
+  amount: number;
+  euroAmount?: number;
+  description: string;
+  type: 'purchase' | 'usage' | 'refund' | 'bonus';
+  status: 'pending' | 'completed' | 'failed' | 'cancelled';
+  transactionId?: string;
+  stripePaymentIntentId?: string;
+  createdAt: Date;
+  updatedAt?: Date;
+  metadata?: Record<string, any>;
+}
