@@ -867,13 +867,6 @@ async function handlePaymentIntentSucceeded(paymentIntent, supabase) {
   console.log('💰 Processing payment intent succeeded:', paymentIntent.id);
 
   try {
-    // Get user from Stripe customer
-    const clerkUserId = await getUserFromStripeCustomer(paymentIntent.customer, supabase);
-    if (!clerkUserId) {
-      console.log('❌ Could not find user for customer:', paymentIntent.customer);
-      return;
-    }
-
     // Check if this is a credit purchase by looking at metadata
     let metadata = paymentIntent.metadata || {};
     let metadataSource = 'payment_intent';
@@ -918,6 +911,16 @@ async function handlePaymentIntentSucceeded(paymentIntent, supabase) {
     }
 
     console.log(`Using metadata from: ${metadataSource}`);
+
+    // Get user from Stripe customer (only required for personal credit purchase)
+    let clerkUserId = null;
+    if (metadata.purchase_type === 'credit_purchase') {
+      clerkUserId = await getUserFromStripeCustomer(paymentIntent.customer, supabase);
+      if (!clerkUserId) {
+        console.log('❌ Could not find user for customer:', paymentIntent.customer);
+        return;
+      }
+    }
 
     // --- Organization Credit Top-up Handling ---
     if (metadata.purchase_type === 'org_credit_topup' && metadata.clerk_org_id) {

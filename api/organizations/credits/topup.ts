@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
+import { createClerkClient } from '@clerk/backend';
 import { orgAdminMiddleware } from '../../../src/utils/clerk/token-verification.js';
 
 const getStripe = () => {
@@ -57,9 +58,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       console.log(`Organization ${orgId} missing Stripe Customer ID or record. Creating...`);
       
       try {
+        // Fetch admin email from Clerk to avoid email prompt at checkout
+        const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
+        const user = await clerk.users.getUser(authResult.userId);
+        const adminEmail = user.emailAddresses[0]?.emailAddress;
+
         // Create Stripe Customer
         const customer = await stripe.customers.create({
           name: org?.name || `Organization ${orgId}`,
+          email: adminEmail,
           metadata: {
             clerk_org_id: orgId,
           },
