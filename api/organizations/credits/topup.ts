@@ -121,14 +121,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       line_items: [
         {
           price_data: {
-            currency: 'usd',
+            currency: 'eur',
             product_data: {
               name: 'Organization Credits Top-up',
               description: `${amount} credits`,
             },
-            unit_amount: 100, // $1.00 per credit
+            unit_amount: Math.round(amount * 1.4), // 1.4 cents per credit
           },
-          quantity: amount,
+          quantity: 1,
         },
       ],
       metadata: {
