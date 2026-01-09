@@ -51,7 +51,7 @@ async function verifyClerkToken(token) {
 }
 
 // Generate long-lived token
-async function generateLongLivedToken(clerkUserId, deviceName, ipAddress, userAgent) {
+async function generateLongLivedToken(clerkUserId, deviceName, ipAddress, userAgent, orgId) {
   // Fetch user ID
   const { data: userData, error: userError } = await supabase
     .from('users')
@@ -64,6 +64,22 @@ async function generateLongLivedToken(clerkUserId, deviceName, ipAddress, userAg
   }
 
   const userId = userData.id;
+
+  // Resolve Supabase Organization ID if orgId (Clerk ID) is provided
+  let supabaseOrgId = null;
+  if (orgId) {
+    const { data: orgData, error: orgError } = await supabase
+      .from('organizations')
+      .select('id')
+      .eq('clerk_org_id', orgId)
+      .single();
+    
+    if (orgError) {
+      console.error('Error resolving organization:', orgError);
+    } else if (orgData) {
+      supabaseOrgId = orgData.id;
+    }
+  }
 
   // Check number of active tokens
   const { data: existingTokens, error: countError } = await supabase
@@ -89,6 +105,7 @@ async function generateLongLivedToken(clerkUserId, deviceName, ipAddress, userAg
 
   const payload = {
     sub: clerkUserId,
+    org_id: supabaseOrgId,
     type: 'extension_long_lived',
     iat,
     exp,
@@ -125,6 +142,7 @@ async function generateLongLivedToken(clerkUserId, deviceName, ipAddress, userAg
   let newToken;
   let insertData = {
     user_id: userId,
+    organization_id: supabaseOrgId,
     token_hash: tokenHash,
     name: 'VSCode Long-Lived Token',
     expires_at: expiresAtISO
@@ -211,7 +229,7 @@ async function handler(req, res) {
     }
 
     const token = authHeader.substring(7);
-    const { deviceName } = req.body || {};
+    const { deviceName, orgId } = req.body || {};
     const ipAddress = req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || 'unknown';
     const userAgent = req.headers['user-agent'] || 'unknown';
 
@@ -236,7 +254,8 @@ async function handler(req, res) {
         clerkUserId,
         deviceName || 'Development Token',
         ipAddress,
-        userAgent
+        userAgent,
+        orgId
       );
       
       return res.status(200).json({
@@ -287,7 +306,8 @@ async function handler(req, res) {
       clerkUserId,
       deviceName || 'VSCode Extension',
       ipAddress,
-      userAgent
+      userAgent,
+      orgId
     );
 
     res.status(200).json({

@@ -355,6 +355,10 @@ const Dashboard = () => {
           'Authorization': `Bearer ${clerkToken}`,
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({
+          orgId: activePool === 'organization' ? organization?.id : null,
+          deviceName: 'VSCode Extension'
+        }),
       });
 
       if (!response.ok) {
