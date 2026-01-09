@@ -864,19 +864,21 @@ async function handleSubscriptionDeleted(subscription, supabase) {
 
 // Handle credit purchase payment success
 async function handlePaymentIntentSucceeded(paymentIntent, supabase) {
-  console.log('💰 Processing payment intent succeeded:', paymentIntent.id);
+  console.log('💰 [DEBUG] Processing payment intent succeeded:', paymentIntent.id);
+  console.log('💰 [DEBUG] Full paymentIntent:', JSON.stringify(paymentIntent, null, 2));
 
   try {
     // Check if this is a credit purchase by looking at metadata
     let metadata = paymentIntent.metadata || {};
     let metadataSource = 'payment_intent';
+    console.log('💰 [DEBUG] Initial metadata from payment_intent:', JSON.stringify(metadata, null, 2));
     
     console.log('Payment intent metadata:', metadata);
     
     // If payment intent metadata is missing or doesn't indicate credit purchase,
     // try to get metadata from the associated checkout session
     if (!metadata.purchase_type || (metadata.purchase_type !== 'credit_purchase' && metadata.purchase_type !== 'org_credit_topup')) {
-      console.log('Payment intent metadata missing or not a credit purchase, checking checkout session...');
+      console.log('💰 [DEBUG] Payment intent metadata missing/not credit purchase, checking checkout session...');
       
       try {
         // Find checkout session associated with this payment intent
@@ -906,7 +908,8 @@ async function handlePaymentIntentSucceeded(paymentIntent, supabase) {
     
     // Final check: if still not a credit purchase, skip
     if (metadata.purchase_type !== 'credit_purchase' && metadata.purchase_type !== 'org_credit_topup') {
-      console.log('Skipping non-credit purchase payment - no valid metadata found');
+      console.log('💰 [DEBUG] Skipping non-credit purchase payment - no valid metadata found');
+      console.log('💰 [DEBUG] Final metadata:', JSON.stringify(metadata, null, 2));
       return;
     }
 
@@ -924,60 +927,74 @@ async function handlePaymentIntentSucceeded(paymentIntent, supabase) {
 
     // --- Organization Credit Top-up Handling ---
     if (metadata.purchase_type === 'org_credit_topup' && metadata.clerk_org_id) {
-      console.log('🏢 Processing org credit top-up payment intent:', paymentIntent.id);
+      console.log('🏢 [DEBUG] Processing org credit top-up payment intent:', paymentIntent.id);
+      console.log('🏢 [DEBUG] Org top-up metadata:', JSON.stringify(metadata, null, 2));
+      console.log('🏢 [DEBUG] clerk_org_id:', metadata.clerk_org_id);
       
       // Check for idempotency
+      console.log('🏢 [DEBUG] Checking idempotency...');
       const alreadyProcessed = await checkOrgCreditPurchaseIdempotency(paymentIntent.id, metadata.clerk_org_id, supabase);
       if (alreadyProcessed) {
-        console.log('Org credit top-up already processed, skipping');
+        console.log('🏢 [DEBUG] Org credit top-up already processed (webhook+transaction), skipping');
         return;
       }
+      console.log('🏢 [DEBUG] Idempotency check passed - proceeding');
 
-      const creditsToAdd = parseInt(metadata.credits_to_add || '0', 10);
+      const creditsToAddRaw = metadata.credits_to_add;
+      const creditsToAdd = parseInt(creditsToAddRaw || '0', 10);
+      console.log('🏢 [DEBUG] credits_to_add raw:', creditsToAddRaw, 'parsed:', creditsToAdd);
       if (creditsToAdd <= 0) {
-        console.log('❌ Invalid credits amount in metadata:', metadata.credits_to_add);
+        console.error('🏢 [ERROR] Invalid credits amount in metadata:', creditsToAddRaw, '(parsed:', creditsToAdd, ')');
         return;
       }
 
-      console.log('Granting org credits:', {
+      console.log('🏢 [DEBUG] Granting org credits:', {
         clerkOrgId: metadata.clerk_org_id,
         creditsToAdd,
         paymentIntentId: paymentIntent.id
       });
 
       // Get organization by clerk_org_id
+      console.log('🏢 [DEBUG] Fetching org by clerk_org_id:', metadata.clerk_org_id);
       const { data: orgData, error: orgError } = await supabase
         .from('organizations')
         .select('id, total_credits')
         .eq('clerk_org_id', metadata.clerk_org_id)
         .single();
+      console.log('🏢 [DEBUG] Org lookup result:', { data: orgData, error: orgError?.message });
 
       if (orgError || !orgData) {
-        console.error('Organization not found for top-up:', orgError);
+        console.error('🏢 [ERROR] Organization not found for top-up:', orgError);
         throw new Error(`Organization not found for clerk_org_id: ${metadata.clerk_org_id}`);
       }
 
       const orgId = orgData.id;
+      console.log('🏢 [DEBUG] Found org_id:', orgId, 'current total_credits:', orgData.total_credits);
 
       // Update total_credits
-      const newCredits = (orgData.total_credits || 0) + creditsToAdd;
-      const { error: creditError } = await supabase
+      const currentCredits = orgData.total_credits || 0;
+      const newCredits = currentCredits + creditsToAdd;
+      console.log('🏢 [DEBUG] Updating total_credits:', currentCredits, '+=', creditsToAdd, '=>', newCredits);
+      const { error: creditError, data: updateData } = await supabase
         .from('organizations')
         .update({
           total_credits: newCredits,
           updated_at: new Date().toISOString()
         })
-        .eq('id', orgId);
+        .eq('id', orgId)
+        .select();
+      console.log('🏢 [DEBUG] Credit update result:', { error: creditError?.message, data: updateData });
 
       if (creditError) {
-        console.error('Failed to update org credits:', creditError);
+        console.error('🏢 [ERROR] Failed to update org credits:', creditError);
         throw new Error(`Failed to grant org credits: ${creditError.message}`);
       }
 
-      console.log('✅ Org credits updated successfully');
+      console.log('✅ [DEBUG] Org credits updated successfully to:', newCredits);
 
       // Record credit transaction
-      const { error: transactionError } = await supabase
+      console.log('🏢 [DEBUG] Inserting transaction...');
+      const { error: transactionError, data: txData } = await supabase
         .from('organization_credit_transactions')
         .insert({
           organization_id: orgId,
@@ -985,21 +1002,26 @@ async function handlePaymentIntentSucceeded(paymentIntent, supabase) {
           description: `Credit purchase: ${creditsToAdd} credits`,
           transaction_type: 'purchase',
           reference_id: paymentIntent.id
-        });
+        })
+        .select();
+      console.log('🏢 [DEBUG] Transaction insert result:', { error: transactionError?.message, data: txData });
 
       if (transactionError) {
         console.error('Failed to record org credit transaction:', transactionError);
       }
 
       // Record webhook processing
+      console.log('🏢 [DEBUG] Recording webhook processing...');
       await recordWebhookProcessing(paymentIntent.id, 'payment_intent.succeeded', {
         clerkOrgId: metadata.clerk_org_id,
         organization_id: orgId,
         creditsGranted: creditsToAdd,
-        purchaseType: 'org_credit_topup'
+        purchaseType: 'org_credit_topup',
+        newTotalCredits: newCredits
       }, supabase);
+      console.log('🏢 [DEBUG] Webhook processing recorded');
 
-      console.log('✅ Org credit purchase processed successfully');
+      console.log('✅ [DEBUG] Org credit purchase processed successfully');
       return;
     }
 

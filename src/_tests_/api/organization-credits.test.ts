@@ -1,22 +1,25 @@
 import { createClient } from '@supabase/supabase-js';
 import handler from '../../../api/stripe/webhooks';
 
+// Mock Stripe instance
+const mockStripe = {
+  webhooks: {
+    constructEvent: jest.fn((body) => JSON.parse(body.toString()))
+  },
+  subscriptions: {
+    retrieve: jest.fn()
+  },
+  invoices: {
+    list: jest.fn()
+  },
+  customers: {
+    retrieve: jest.fn()
+  }
+};
+
 // Mock dependencies
 jest.mock('stripe', () => {
-  return jest.fn().mockImplementation(() => ({
-    webhooks: {
-      constructEvent: jest.fn((body) => JSON.parse(body))
-    },
-    subscriptions: {
-      retrieve: jest.fn()
-    },
-    invoices: {
-      list: jest.fn()
-    },
-    customers: {
-      retrieve: jest.fn()
-    }
-  }));
+  return jest.fn(() => mockStripe);
 });
 
 const mockSupabase = {
@@ -67,7 +70,7 @@ describe('Organization Credits Webhook', () => {
       },
       on: jest.fn((event, callback) => {
         if (event === 'data') {
-          callback(JSON.stringify({ type: 'test' })); // Dummy body
+          callback(Buffer.from(JSON.stringify({ type: 'test' }))); // Dummy body as Buffer
         }
         if (event === 'end') {
           callback();
@@ -99,7 +102,7 @@ describe('Organization Credits Webhook', () => {
 
     // Mock raw body for constructEvent
     req.on = jest.fn((event, callback) => {
-      if (event === 'data') callback(JSON.stringify(event));
+      if (event === 'data') callback(Buffer.from(JSON.stringify(event)));
       if (event === 'end') callback();
     });
     stripe.webhooks.constructEvent.mockReturnValue(event);
