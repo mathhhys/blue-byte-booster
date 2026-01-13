@@ -121,9 +121,6 @@ async function syncSubscriptionFromStripe(clerkOrgId: string) {
     const planType = metadata.plan_type || 'teams';
     const billingFrequency = metadata.billing_frequency || 'monthly';
     
-    // Calculate credits
-    const totalCredits = calculateCreditsToGrant(planType, billingFrequency, seatsTotal);
-
     const subscriptionData: any = {
       clerk_org_id: clerkOrgId,
       stripe_subscription_id: subscription.id,
@@ -135,9 +132,6 @@ async function syncSubscriptionFromStripe(clerkOrgId: string) {
       current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
       current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
       updated_at: new Date().toISOString(),
-      // Initialize credits if creating new record
-      total_credits: totalCredits,
-      // used_credits: 0 // Default is 0 in DB
     };
 
     if (org) {

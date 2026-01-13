@@ -407,12 +407,21 @@ async function handleCheckoutSessionCompleted(session, supabase) {
           onConflict: 'clerk_org_id'
         });
 
-      // Grant initial credits to the organization
+      // Grant initial credits to the organization (add to existing if any)
       if (!subError) {
+        const { data: orgData } = await supabase
+          .from('organizations')
+          .select('total_credits')
+          .eq('clerk_org_id', metadata.clerk_org_id)
+          .single();
+
+        const currentCredits = orgData?.total_credits || 0;
+        const newCredits = currentCredits + creditsToGrant;
+
         await supabase
           .from('organizations')
           .update({
-            total_credits: creditsToGrant,
+            total_credits: newCredits,
             updated_at: new Date().toISOString()
           })
           .eq('clerk_org_id', metadata.clerk_org_id);
@@ -542,11 +551,20 @@ async function handleSubscriptionCreated(subscription, supabase) {
       updated_at: new Date().toISOString()
     };
 
-    // Update organization credits
+    // Update organization credits (add to existing if any)
+    const { data: orgData } = await supabase
+      .from('organizations')
+      .select('total_credits')
+      .eq('clerk_org_id', clerkOrgId)
+      .single();
+
+    const currentCredits = orgData?.total_credits || 0;
+    const newCredits = currentCredits + totalCredits;
+
     await supabase
       .from('organizations')
       .update({
-        total_credits: totalCredits,
+        total_credits: newCredits,
         updated_at: new Date().toISOString()
       })
       .eq('clerk_org_id', clerkOrgId);

@@ -186,10 +186,6 @@ async function syncSubscriptionFromStripe(clerkOrgId: string) {
     const planType = metadata.plan_type || 'teams';
     const billingFrequency = metadata.billing_frequency || 'monthly';
     
-    // Calculate credits (500 per seat for monthly, 6000 for yearly)
-    const baseCredits = billingFrequency === 'yearly' ? 6000 : 500;
-    const totalCredits = baseCredits * seatsTotal;
-
     // 5. Upsert subscription data
     const subscriptionData: any = {
       clerk_org_id: clerkOrgId,
@@ -203,8 +199,6 @@ async function syncSubscriptionFromStripe(clerkOrgId: string) {
       status: subscription.status,
       current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
       current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
-      total_credits: totalCredits,
-      used_credits: 0,
       updated_at: new Date().toISOString()
     };
 
@@ -220,14 +214,13 @@ async function syncSubscriptionFromStripe(clerkOrgId: string) {
     }
 
     console.log('✅ Organization subscription synced successfully');
-    return { 
-      success: true, 
+    return {
+      success: true,
       subscription: {
         id: subscription.id,
         seats_total: seatsTotal,
         plan_type: planType,
-        billing_frequency: billingFrequency,
-        total_credits: totalCredits
+        billing_frequency: billingFrequency
       }
     };
   } catch (error: any) {
