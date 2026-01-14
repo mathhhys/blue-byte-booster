@@ -804,7 +804,7 @@ const Dashboard = () => {
 {/* VSCode Extension Integration */}
 <Card className="bg-[#2a2a2a] border-white/10 p-6 mb-8 flex flex-col min-h-[200px]">
   <div className="flex items-center justify-between mb-4">
-    <h3 className="text-lg font-semibold text-white">VSCode Extension</h3>
+    <h3 className="text-lg font-semibold text-white">Authentication Token</h3>
     <div className="flex items-center gap-2">
       <Button
         size="sm"
@@ -826,7 +826,7 @@ const Dashboard = () => {
 
     {/* Warning for Long-Lived */}
     <div className="p-3 bg-orange-500/10 border border-orange-500/20 rounded-md text-orange-300 text-xs">
-      Long-lived tokens grant extended access. Store securely and revoke if compromised.
+      Tokens grant extended access to Softcodes. Store securely and revoke if compromised.
     </div>
     
     {!extensionToken ? (
@@ -838,19 +838,19 @@ const Dashboard = () => {
         {isGenerating ? (
           <>
             <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-            Generating Long-Lived Token...
+            Generating Authentication Token...
           </>
         ) : (
           <>
             <Code className="w-4 h-4 mr-2" />
-            Generate Long-Lived (4 months) Token
+            Generate Authentication Token
           </>
         )}
       </Button>
     ) : (
       <div className="space-y-3">
         <div className="text-sm font-medium text-white">
-          Your Long-Lived Extension Token:
+          Your Authentication Token:
         </div>
         <div className="flex gap-2">
           <Input
