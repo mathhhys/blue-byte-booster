@@ -912,11 +912,6 @@ const Dashboard = () => {
                     }
                   </div>
                 )}
-                {activePool === 'organization' && orgCredits && (
-                  <div className="text-xs text-gray-500">
-                    {orgCredits.used_credits} used of {orgCredits.total_credits}
-                  </div>
-                )}
               </Card>
 
               {/* Current Plan Card */}
