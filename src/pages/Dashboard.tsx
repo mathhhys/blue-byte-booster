@@ -55,6 +55,13 @@ import {
 // Mock data for the dashboard
 import { createStripeCustomerPortalSession } from '@/api/stripe';
 import { TokenManagement } from '@/components/dashboard/TokenManagement';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { DataTable } from '@/components/AnalyticsTable';
+import { DateRangePicker } from '@/components/DateRangePicker';
+import { getOrgAnalytics, getOrgUsersAnalytics } from '@/api/analytics';
+import { OrgAnalytics, UserAnalytics } from '@/types/analytics';
+import { ColumnDef } from '@tanstack/react-table';
 
 // Dark theme appearance configuration for Clerk components
 const clerkAppearance = {
@@ -131,6 +138,13 @@ const Dashboard = () => {
 
   // Billing portal state
   const [isBillingPortalLoading, setIsBillingPortalLoading] = useState(false);
+  const [currentView, setCurrentView] = useState<'dashboard' | 'usage'>('dashboard');
+
+  // Analytics state
+  const [dateRange, setDateRange] = useState({ start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(), end: new Date().toISOString() });
+  const [orgAnalytics, setOrgAnalytics] = useState<OrgAnalytics | null>(null);
+  const [usersAnalytics, setUsersAnalytics] = useState<UserAnalytics[]>([]);
+  const [isLoadingAnalytics, setIsLoadingAnalytics] = useState(false);
 
   // Backend URL - adjust based on environment
   // const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
@@ -138,6 +152,59 @@ const Dashboard = () => {
   useEffect(() => {
     setAuthPageMeta('dashboard');
   }, []);
+
+  // Fetch analytics data
+  useEffect(() => {
+    const fetchAnalytics = async () => {
+      if (organization?.id && activePool === 'organization') {
+        setIsLoadingAnalytics(true);
+        try {
+          const [orgData, usersData] = await Promise.all([
+            getOrgAnalytics(organization.id, dateRange.start, dateRange.end),
+            getOrgUsersAnalytics(organization.id, dateRange.start, dateRange.end)
+          ]);
+          setOrgAnalytics(orgData);
+          setUsersAnalytics(usersData);
+        } catch (error) {
+          console.error('Error fetching analytics:', error);
+        } finally {
+          setIsLoadingAnalytics(false);
+        }
+      }
+    };
+
+    fetchAnalytics();
+  }, [organization?.id, activePool, dateRange]);
+
+  const userColumns: ColumnDef<UserAnalytics>[] = [
+    {
+      accessorKey: "user_id",
+      header: "User ID",
+    },
+    {
+      accessorKey: "total_requests",
+      header: "Requests",
+    },
+    {
+      accessorKey: "total_credits",
+      header: "Credits Spent",
+    },
+    {
+      accessorKey: "total_input_tokens",
+      header: "Input Tokens",
+    },
+    {
+      accessorKey: "total_output_tokens",
+      header: "Output Tokens",
+    },
+    {
+      accessorKey: "last_active",
+      header: "Last Active",
+      cell: ({ row }) => {
+        return new Date(row.getValue("last_active")).toLocaleDateString()
+      },
+    },
+  ];
 
   // Fetch user data from Supabase database using Clerk ID
   useEffect(() => {
@@ -692,12 +759,30 @@ const Dashboard = () => {
             {/* Navigation Menu */}
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton isActive className="bg-blue-600/20 text-white">
+                <SidebarMenuButton
+                  isActive={currentView === 'dashboard'}
+                  onClick={() => setCurrentView('dashboard')}
+                  className={currentView === 'dashboard' ? "bg-blue-600/20 text-white" : "text-white/70 hover:text-white hover:bg-white/10"}
+                >
                   <Home className="w-4 h-4" />
                   <span>Dashboard</span>
                   <SidebarMenuBadge></SidebarMenuBadge>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+
+              {activePool === 'organization' && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    isActive={currentView === 'usage'}
+                    onClick={() => setCurrentView('usage')}
+                    className={currentView === 'usage' ? "bg-blue-600/20 text-white" : "text-white/70 hover:text-white hover:bg-white/10"}
+                  >
+                    <Zap className="w-4 h-4" />
+                    <span>Usage</span>
+                    <SidebarMenuBadge></SidebarMenuBadge>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
               
               <SidebarMenuItem>
                 <SidebarMenuButton
@@ -801,6 +886,8 @@ const Dashboard = () => {
 
           {/* Main Content */}
           <main className="flex-1 p-6">
+            {currentView === 'dashboard' ? (
+              <>
 {/* VSCode Extension Integration */}
 <Card className="bg-[#2a2a2a] border-white/10 p-6 mb-8 flex flex-col min-h-[200px]">
   <div className="flex items-center justify-between mb-4">
@@ -1121,6 +1208,136 @@ const Dashboard = () => {
                 )}
               </div>
             </Card>
+            </>
+            ) : (
+              // Usage View
+              <div className="mb-8">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold text-white">Analytics</h2>
+                  <DateRangePicker onChange={setDateRange} />
+                </div>
+
+                <Tabs defaultValue="org" className="space-y-4">
+                  <TabsList className="bg-[#1a1a1a] border border-white/10">
+                    <TabsTrigger value="org" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white text-gray-400">Organization Overview</TabsTrigger>
+                    <TabsTrigger value="per-seat" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white text-gray-400">Per-Seat Usage</TabsTrigger>
+                  </TabsList>
+                  
+                  <TabsContent value="org" className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      <Card className="bg-[#2a2a2a] border-white/10">
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm font-medium text-gray-400">Total Requests</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-2xl font-bold text-white">
+                            {isLoadingAnalytics ? (
+                              <div className="h-8 w-24 bg-gray-600/20 rounded animate-pulse" />
+                            ) : (
+                              orgAnalytics?.total_requests.toLocaleString() || 0
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                      <Card className="bg-[#2a2a2a] border-white/10">
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm font-medium text-gray-400">Credits Spent</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-2xl font-bold text-white">
+                            {isLoadingAnalytics ? (
+                              <div className="h-8 w-24 bg-gray-600/20 rounded animate-pulse" />
+                            ) : (
+                              orgAnalytics?.total_credits.toLocaleString() || 0
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                      <Card className="bg-[#2a2a2a] border-white/10">
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm font-medium text-gray-400">Input Tokens</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-2xl font-bold text-white">
+                            {isLoadingAnalytics ? (
+                              <div className="h-8 w-24 bg-gray-600/20 rounded animate-pulse" />
+                            ) : (
+                              orgAnalytics?.total_input_tokens.toLocaleString() || 0
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                      <Card className="bg-[#2a2a2a] border-white/10">
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm font-medium text-gray-400">Output Tokens</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-2xl font-bold text-white">
+                            {isLoadingAnalytics ? (
+                              <div className="h-8 w-24 bg-gray-600/20 rounded animate-pulse" />
+                            ) : (
+                              orgAnalytics?.total_output_tokens.toLocaleString() || 0
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    {/* Top Models */}
+                    <Card className="bg-[#2a2a2a] border-white/10">
+                      <CardHeader>
+                        <CardTitle className="text-lg font-medium text-white">Top Models</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {isLoadingAnalytics ? (
+                          <div className="space-y-2">
+                            {[1, 2, 3].map((i) => (
+                              <div key={i} className="h-12 bg-gray-600/20 rounded animate-pulse" />
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="space-y-4">
+                            {orgAnalytics?.top_models?.map((model) => (
+                              <div key={model.model_id} className="flex items-center justify-between p-3 bg-[#1a1a1a] rounded-lg border border-white/5">
+                                <div>
+                                  <div className="font-medium text-white">{model.model_id}</div>
+                                  <div className="text-xs text-gray-500">{model.requests} requests</div>
+                                </div>
+                                <div className="text-right">
+                                  <div className="font-bold text-white">€{model.cost.toFixed(4)}</div>
+                                </div>
+                              </div>
+                            ))}
+                            {(!orgAnalytics?.top_models || orgAnalytics.top_models.length === 0) && (
+                              <div className="text-center text-gray-500 py-4">No usage data available</div>
+                            )}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+
+                  <TabsContent value="per-seat">
+                    <Card className="bg-[#2a2a2a] border-white/10">
+                      <CardHeader>
+                        <CardTitle className="text-lg font-medium text-white">Per-Seat Usage</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {isLoadingAnalytics ? (
+                          <div className="space-y-2">
+                            {[1, 2, 3].map((i) => (
+                              <div key={i} className="h-12 bg-gray-600/20 rounded animate-pulse" />
+                            ))}
+                          </div>
+                        ) : (
+                          <DataTable columns={userColumns} data={usersAnalytics} />
+                        )}
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+                </Tabs>
+              </div>
+            )}
 
           </main>
         </SidebarInset>
