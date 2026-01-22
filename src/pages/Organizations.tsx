@@ -16,6 +16,7 @@ import {
   DollarSign,
   RefreshCw,
   Loader2,
+  Zap,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
@@ -36,6 +37,12 @@ import {
 } from '@/components/ui/sidebar';
 import { BillingDashboard } from '@/components/organizations/BillingDashboard';
 import { createStripeCustomerPortalSession } from '@/api/stripe';
+import { DateRangePicker } from '@/components/DateRangePicker';
+import { DataTable } from '@/components/AnalyticsTable';
+import { CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { getOrgAnalytics, getOrgUsersAnalytics } from '@/api/analytics';
+import { OrgAnalytics, UserAnalytics } from '@/types/analytics';
+import { ColumnDef } from '@tanstack/react-table';
 
 // Dark theme appearance configuration for Clerk components
 const clerkAppearance = {
@@ -76,6 +83,12 @@ const Organizations = () => {
 
   const isAdmin = membership?.role === 'org:admin';
 
+  // Analytics state
+  const [dateRange, setDateRange] = useState({ start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(), end: new Date().toISOString() });
+  const [orgAnalytics, setOrgAnalytics] = useState<OrgAnalytics | null>(null);
+  const [usersAnalytics, setUsersAnalytics] = useState<UserAnalytics[]>([]);
+  const [isLoadingAnalytics, setIsLoadingAnalytics] = useState(false);
+
   useEffect(() => {
     setAuthPageMeta('organizations');
   }, []);
@@ -86,6 +99,59 @@ const Organizations = () => {
       setActiveTab('settings');
     }
   }, [organization, isAdmin]);
+
+  // Fetch analytics data
+  useEffect(() => {
+    const fetchAnalytics = async () => {
+      if (organization?.id) {
+        setIsLoadingAnalytics(true);
+        try {
+          const [orgData, usersData] = await Promise.all([
+            getOrgAnalytics(organization.id, dateRange.start, dateRange.end),
+            getOrgUsersAnalytics(organization.id, dateRange.start, dateRange.end)
+          ]);
+          setOrgAnalytics(orgData);
+          setUsersAnalytics(usersData);
+        } catch (error) {
+          console.error('Error fetching analytics:', error);
+        } finally {
+          setIsLoadingAnalytics(false);
+        }
+      }
+    };
+
+    fetchAnalytics();
+  }, [organization?.id, dateRange]);
+
+  const userColumns: ColumnDef<UserAnalytics>[] = [
+    {
+      accessorKey: "user_id",
+      header: "User ID",
+    },
+    {
+      accessorKey: "total_requests",
+      header: "Requests",
+    },
+    {
+      accessorKey: "total_credits",
+      header: "Credits Spent",
+    },
+    {
+      accessorKey: "total_input_tokens",
+      header: "Input Tokens",
+    },
+    {
+      accessorKey: "total_output_tokens",
+      header: "Output Tokens",
+    },
+    {
+      accessorKey: "last_active",
+      header: "Last Active",
+      cell: ({ row }) => {
+        return new Date(row.getValue("last_active")).toLocaleDateString()
+      },
+    },
+  ];
 
   // Billing portal redirect function
   const handleBillingPortalRedirect = async () => {
@@ -333,7 +399,7 @@ const Organizations = () => {
                   </Card>
                 ) : organization ? (
                   <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                    <TabsList className="grid w-full grid-cols-2 bg-[#2a2a2a] border-white/10">
+                    <TabsList className="grid w-full grid-cols-3 bg-[#2a2a2a] border-white/10">
                       <TabsTrigger
                         value="settings"
                         className="data-[state=active]:bg-blue-600 data-[state=active]:text-white text-gray-400"
@@ -349,6 +415,13 @@ const Organizations = () => {
                         <DollarSign className="w-4 h-4 mr-2" />
                         Billing
                         {!isAdmin && <span className="ml-1 text-xs">(Admin Only)</span>}
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="usage"
+                        className="data-[state=active]:bg-blue-600 data-[state=active]:text-white text-gray-400"
+                      >
+                        <Zap className="w-4 h-4 mr-2" />
+                        Usage
                       </TabsTrigger>
                     </TabsList>
 
@@ -370,6 +443,152 @@ const Organizations = () => {
 
                     <TabsContent value="billing" className="mt-6">
                       <BillingDashboard />
+                    </TabsContent>
+
+                    <TabsContent value="usage" className="mt-6">
+                      <Card className="bg-[#2a2a2a] border-white/10">
+                        <CardHeader>
+                          <div className="flex items-center justify-between">
+                            <CardTitle className="text-white">Organization Usage</CardTitle>
+                            <DateRangePicker
+                              onChange={setDateRange}
+                            />
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          {isLoadingAnalytics ? (
+                            <div className="flex items-center justify-center py-8">
+                              <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+                            </div>
+                          ) : (
+                            <Tabs defaultValue="overview" className="w-full">
+                              <TabsList className="grid w-full grid-cols-2 bg-[#1a1a1a] border-white/10">
+                                <TabsTrigger
+                                  value="overview"
+                                  className="data-[state=active]:bg-blue-600 data-[state=active]:text-white text-gray-400"
+                                >
+                                  Organization Overview
+                                </TabsTrigger>
+                                <TabsTrigger
+                                  value="per-seat"
+                                  className="data-[state=active]:bg-blue-600 data-[state=active]:text-white text-gray-400"
+                                >
+                                  Per-Seat Usage
+                                </TabsTrigger>
+                              </TabsList>
+
+                              <TabsContent value="overview" className="mt-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                                  <Card className="bg-[#1a1a1a] border-white/10">
+                                    <CardContent className="p-6">
+                                      <div className="flex items-center justify-between">
+                                        <div>
+                                          <p className="text-sm text-gray-400 mb-1">Total Requests</p>
+                                          <p className="text-2xl font-bold text-white">
+                                            {orgAnalytics?.total_requests || 0}
+                                          </p>
+                                        </div>
+                                        <Zap className="w-8 h-8 text-blue-500" />
+                                      </div>
+                                    </CardContent>
+                                  </Card>
+
+                                  <Card className="bg-[#1a1a1a] border-white/10">
+                                    <CardContent className="p-6">
+                                      <div className="flex items-center justify-between">
+                                        <div>
+                                          <p className="text-sm text-gray-400 mb-1">Credits Spent</p>
+                                          <p className="text-2xl font-bold text-white">
+                                            {orgAnalytics?.total_credits || 0}
+                                          </p>
+                                        </div>
+                                        <DollarSign className="w-8 h-8 text-green-500" />
+                                      </div>
+                                    </CardContent>
+                                  </Card>
+
+                                  <Card className="bg-[#1a1a1a] border-white/10">
+                                    <CardContent className="p-6">
+                                      <div className="flex items-center justify-between">
+                                        <div>
+                                          <p className="text-sm text-gray-400 mb-1">Input Tokens</p>
+                                          <p className="text-2xl font-bold text-white">
+                                            {orgAnalytics?.total_input_tokens || 0}
+                                          </p>
+                                        </div>
+                                        <Code className="w-8 h-8 text-purple-500" />
+                                      </div>
+                                    </CardContent>
+                                  </Card>
+
+                                  <Card className="bg-[#1a1a1a] border-white/10">
+                                    <CardContent className="p-6">
+                                      <div className="flex items-center justify-between">
+                                        <div>
+                                          <p className="text-sm text-gray-400 mb-1">Output Tokens</p>
+                                          <p className="text-2xl font-bold text-white">
+                                            {orgAnalytics?.total_output_tokens || 0}
+                                          </p>
+                                        </div>
+                                        <Code className="w-8 h-8 text-orange-500" />
+                                      </div>
+                                    </CardContent>
+                                  </Card>
+                                </div>
+
+                                <Card className="bg-[#1a1a1a] border-white/10">
+                                  <CardHeader>
+                                    <CardTitle className="text-white">Top Models</CardTitle>
+                                  </CardHeader>
+                                  <CardContent>
+                                    {orgAnalytics?.top_models && orgAnalytics.top_models.length > 0 ? (
+                                      <div className="space-y-3">
+                                        {orgAnalytics.top_models.map((model, index) => (
+                                          <div
+                                            key={index}
+                                            className="flex items-center justify-between p-3 bg-[#2a2a2a] rounded-lg"
+                                          >
+                                            <div className="flex items-center gap-3">
+                                              <span className="text-sm font-medium text-white">
+                                                {model.model_id}
+                                              </span>
+                                            </div>
+                                            <div className="flex items-center gap-4">
+                                              <span className="text-sm text-gray-400">
+                                                {model.requests} requests
+                                              </span>
+                                              <span className="text-sm text-gray-400">
+                                                {model.cost} credits
+                                              </span>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    ) : (
+                                      <p className="text-gray-400 text-center py-4">No model data available</p>
+                                    )}
+                                  </CardContent>
+                                </Card>
+                              </TabsContent>
+
+                              <TabsContent value="per-seat" className="mt-6">
+                                <Card className="bg-[#1a1a1a] border-white/10">
+                                  <CardContent className="p-6">
+                                    {usersAnalytics && usersAnalytics.length > 0 ? (
+                                      <DataTable
+                                        columns={userColumns}
+                                        data={usersAnalytics}
+                                      />
+                                    ) : (
+                                      <p className="text-gray-400 text-center py-4">No user data available</p>
+                                    )}
+                                  </CardContent>
+                                </Card>
+                              </TabsContent>
+                            </Tabs>
+                          )}
+                        </CardContent>
+                      </Card>
                     </TabsContent>
 
                   </Tabs>
