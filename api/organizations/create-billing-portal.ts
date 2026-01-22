@@ -38,13 +38,35 @@ export default async function handler(req: any, res: any) {
     }
     const return_url = `${origin}/organizations`;
 
-    // Find or create Stripe customer
+    // Find or create Stripe customer using search for better reliability
     let customer;
-    const customers = await stripe.customers.list({ limit: 100 });
-    customer = customers.data.find(c => c.metadata?.clerk_org_id === orgId);
+    const searchResponse = await stripe.customers.search({
+      query: `metadata['clerk_org_id']:'${orgId}'`,
+      limit: 1,
+    });
+    customer = searchResponse.data[0];
 
     if (!customer) {
-      // Create customer
+      // Fallback: check if any subscription has this org ID and get its customer
+      const subscriptions = await stripe.subscriptions.search({
+        query: `metadata['clerk_org_id']:'${orgId}'`,
+        limit: 1,
+      });
+      
+      if (subscriptions.data.length > 0) {
+        const sub = subscriptions.data[0];
+        customer = await stripe.customers.retrieve(sub.customer as string);
+        console.log('Found customer via subscription metadata:', customer.id);
+        
+        // Update customer metadata to include org ID for future lookups
+        await stripe.customers.update(customer.id, {
+          metadata: { ...customer.metadata, clerk_org_id: orgId }
+        });
+      }
+    }
+
+    if (!customer) {
+      // Create customer if still not found
       customer = await stripe.customers.create({
         metadata: { clerk_org_id: orgId }
       });

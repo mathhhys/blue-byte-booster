@@ -34,28 +34,54 @@ export default async function handler(req: any, res: any) {
     console.log('🔍 API: Getting subscription for organization:', finalOrgId, 'by user:', authResult.userId);
 
     try {
-      // Find Stripe customer for the organization
-      const customers = await stripe.customers.list({ limit: 100 });
-      const customer = customers.data.find(c => c.metadata?.clerk_org_id === finalOrgId);
-  
-      if (!customer) {
-        console.log('No Stripe customer found for org:', finalOrgId);
-        return res.status(200).json({ hasSubscription: false, subscription: null });
-      }
-  
-      // Get the organization's subscription from Stripe
-      const subscriptions = await stripe.subscriptions.list({
-        customer: customer.id,
-        status: 'all',
-        limit: 1
+      // Find Stripe customer for the organization using search
+      let customer;
+      let subscription;
+
+      // First try to find customer by metadata
+      const searchResponse = await stripe.customers.search({
+        query: `metadata['clerk_org_id']:'${finalOrgId}'`,
+        limit: 1,
       });
-  
-      if (subscriptions.data.length === 0) {
-        console.log('No subscription found for customer:', customer.id);
-        return res.status(200).json({ hasSubscription: false, subscription: null });
+      
+      if (searchResponse.data.length > 0) {
+        customer = searchResponse.data[0];
+        // Get the organization's subscription from Stripe
+        const subscriptions = await stripe.subscriptions.list({
+          customer: customer.id,
+          status: 'all',
+          limit: 1
+        });
+        if (subscriptions.data.length > 0) {
+          subscription = subscriptions.data[0];
+        }
+      }
+
+      // If no customer found or no subscription found, try searching subscriptions directly
+      if (!subscription) {
+        const subSearchResponse = await stripe.subscriptions.search({
+          query: `metadata['clerk_org_id']:'${finalOrgId}'`,
+          limit: 1,
+        });
+
+        if (subSearchResponse.data.length > 0) {
+          subscription = subSearchResponse.data[0];
+          // Also get the customer if we found it this way
+          if (!customer) {
+            customer = await stripe.customers.retrieve(subscription.customer as string);
+            
+            // Update customer metadata to include org ID for future lookups
+            await stripe.customers.update(customer.id, {
+              metadata: { ...customer.metadata, clerk_org_id: finalOrgId }
+            });
+          }
+        }
       }
   
-      const subscription = subscriptions.data[0];
+      if (!subscription || !customer) {
+        console.log('No subscription or customer found for org:', finalOrgId);
+        return res.status(200).json({ hasSubscription: false, subscription: null });
+      }
       const price = await stripe.prices.retrieve(subscription.items.data[0].price.id);
   
       // Get seats_total from quantity
