@@ -38,16 +38,65 @@ export default async function handler(req: any, res: any) {
     }
     const return_url = `${origin}/organizations`;
 
-    // Find or create Stripe customer using search for better reliability
+    // Find or create Stripe customer
     let customer;
-    const searchResponse = await stripe.customers.search({
-      query: `metadata['clerk_org_id']:'${orgId}'`,
-      limit: 1,
-    });
-    customer = searchResponse.data[0];
 
+    // 1. Try to find customer in Supabase organization_subscriptions
+    const { data: orgSub, error: subError } = await supabase
+      .from('organization_subscriptions')
+      .select('stripe_customer_id')
+      .eq('clerk_org_id', orgId)
+      .single();
+
+    if (orgSub?.stripe_customer_id) {
+      console.log('✅ Found customer in organization_subscriptions:', orgSub.stripe_customer_id);
+      try {
+        customer = await stripe.customers.retrieve(orgSub.stripe_customer_id);
+        if ((customer as any).deleted) {
+          console.log('⚠️ Customer found in DB is deleted in Stripe');
+          customer = null;
+        }
+      } catch (e) {
+        console.error('Error retrieving customer from Stripe:', e);
+        customer = null;
+      }
+    }
+
+    // 2. If not found, try organizations table
     if (!customer) {
-      // Fallback: check if any subscription has this org ID and get its customer
+      const { data: org, error: orgError } = await supabase
+        .from('organizations')
+        .select('stripe_customer_id')
+        .eq('clerk_org_id', orgId)
+        .single();
+
+      if (org?.stripe_customer_id) {
+        console.log('✅ Found customer in organizations table:', org.stripe_customer_id);
+        try {
+          customer = await stripe.customers.retrieve(org.stripe_customer_id);
+          if ((customer as any).deleted) {
+            console.log('⚠️ Customer found in DB is deleted in Stripe');
+            customer = null;
+          }
+        } catch (e) {
+          console.error('Error retrieving customer from Stripe:', e);
+          customer = null;
+        }
+      }
+    }
+
+    // 3. Fallback: Search Stripe directly using metadata
+    if (!customer) {
+      console.log('⚠️ Customer not found in DB, searching Stripe metadata...');
+      const searchResponse = await stripe.customers.search({
+        query: `metadata['clerk_org_id']:'${orgId}'`,
+        limit: 1,
+      });
+      customer = searchResponse.data[0];
+    }
+
+    // 4. Fallback: check if any subscription has this org ID and get its customer
+    if (!customer) {
       const subscriptions = await stripe.subscriptions.search({
         query: `metadata['clerk_org_id']:'${orgId}'`,
         limit: 1,

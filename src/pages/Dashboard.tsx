@@ -798,19 +798,22 @@ const Dashboard = () => {
                 </SidebarMenuItem>
               )}
               
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  className="text-white/70 hover:text-white hover:bg-white/10"
-                  onClick={handleBillingPortalRedirect}
-                  disabled={isBillingPortalLoading}
-                >
-                  <CreditCard className="w-4 h-4" />
-                  <span>
-                    {isBillingPortalLoading ? 'Loading...' : 'Billing'}
-                  </span>
-                  <SidebarMenuBadge></SidebarMenuBadge>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
+              {/* Show Billing only if personal pool OR (org pool AND user is admin) */}
+              {(activePool === 'personal' || (activePool === 'organization' && isAdmin)) && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    className="text-white/70 hover:text-white hover:bg-white/10"
+                    onClick={handleBillingPortalRedirect}
+                    disabled={isBillingPortalLoading}
+                  >
+                    <CreditCard className="w-4 h-4" />
+                    <span>
+                      {isBillingPortalLoading ? 'Loading...' : 'Billing'}
+                    </span>
+                    <SidebarMenuBadge></SidebarMenuBadge>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
 
               <SidebarMenuItem>
                 <SidebarMenuButton
