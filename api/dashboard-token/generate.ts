@@ -49,7 +49,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const { data: userData, error } = await supabase
       .from('users')
-      .select('clerk_id, email, plan_type, credits, organization_id')
+      .select('clerk_id, email, plan_type, credits, clerk_org_id')
       .eq('clerk_id', clerkId)
       .single();
 

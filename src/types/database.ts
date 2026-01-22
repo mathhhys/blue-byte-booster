@@ -18,6 +18,7 @@ export interface Database {
           vscode_client_version: string | null;
           created_at: string;
           updated_at: string;
+          clerk_org_id: string | null;
         };
         Insert: {
           id?: string;
@@ -34,6 +35,7 @@ export interface Database {
           vscode_client_version?: string | null;
           created_at?: string;
           updated_at?: string;
+          clerk_org_id?: string | null;
         };
         Update: {
           id?: string;
@@ -50,6 +52,7 @@ export interface Database {
           vscode_client_version?: string | null;
           created_at?: string;
           updated_at?: string;
+          clerk_org_id?: string | null;
         };
       };
       subscriptions: {
@@ -194,6 +197,7 @@ export interface Database {
           role: 'admin' | 'member';
           created_at: string;
           updated_at: string;
+          clerk_org_id: string | null;
         };
         Insert: {
           id?: string;
@@ -202,6 +206,7 @@ export interface Database {
           role: 'admin' | 'member';
           created_at?: string;
           updated_at?: string;
+          clerk_org_id?: string | null;
         };
         Update: {
           id?: string;
@@ -210,6 +215,7 @@ export interface Database {
           role?: 'admin' | 'member';
           created_at?: string;
           updated_at?: string;
+          clerk_org_id?: string | null;
         };
       };
       organization_subscriptions: {
@@ -357,6 +363,7 @@ export interface Database {
         Row: {
           id: string;
           organization_id: string;
+          clerk_org_id: string | null;
           amount: number;
           transaction_type: 'grant' | 'usage' | 'refund' | 'bonus' | 'purchase';
           description: string | null;
@@ -366,7 +373,8 @@ export interface Database {
         };
         Insert: {
           id?: string;
-          organization_id: string;
+          organization_id?: string;
+          clerk_org_id?: string | null;
           amount: number;
           transaction_type: 'grant' | 'usage' | 'refund' | 'bonus' | 'purchase';
           description?: string | null;
@@ -377,6 +385,7 @@ export interface Database {
         Update: {
           id?: string;
           organization_id?: string;
+          clerk_org_id?: string | null;
           amount?: number;
           transaction_type?: 'grant' | 'usage' | 'refund' | 'bonus' | 'purchase';
           description?: string | null;

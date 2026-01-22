@@ -18,7 +18,7 @@ export function generateAccessToken(user: any, sessionId: string): string {
     email: user.email,
     username: user.username,
     session_id: sessionId,
-    organization_id: user.organization_id,
+    clerk_org_id: user.clerk_org_id || null,
     plan_type: user.plan_type,
     credits: user.credits,
     iat: Math.floor(Date.now() / 1000),

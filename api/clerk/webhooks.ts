@@ -323,6 +323,37 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           console.log(`✅ Seat claimed/created for user ${userId} in org ${orgId}`, claimedSeat);
         }
 
+        // Upsert organization_members for all memberships tracking
+        const { error: membersError } = await supabase
+          .from('organization_members')
+          .upsert({
+            clerk_user_id: userId,
+            clerk_org_id: orgId,
+            role: membership.role || 'member',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }, {
+            onConflict: '(clerk_user_id, clerk_org_id)'
+          });
+
+        if (membersError) {
+          console.error('Error upserting organization_members:', membersError);
+        } else {
+          console.log(`✅ Upserted organization_members for user ${userId} in org ${orgId}`);
+        }
+
+        // Update user's active org to this one
+        const { error: userOrgError } = await supabase
+          .from('users')
+          .update({ clerk_org_id: orgId })
+          .eq('clerk_id', userId);
+
+        if (userOrgError) {
+          console.error('Error updating user active org:', userOrgError);
+        } else {
+          console.log(`✅ Set active clerk_org_id for user ${userId} to ${orgId}`);
+        }
+
         // Increment member count
         const { error: countError } = await supabase.rpc('update_member_count', {
           p_clerk_org_id: orgId,
@@ -353,6 +384,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           // Don't fail webhook
         } else {
           console.log(`✅ Seat revoked for user ${userId} in org ${orgId}`, revokedSeat);
+        }
+
+        // Delete from organization_members
+        const { error: membersError } = await supabase
+          .from('organization_members')
+          .delete()
+          .eq('clerk_user_id', userId)
+          .eq('clerk_org_id', orgId);
+
+        if (membersError) {
+          console.error('Error deleting organization_members:', membersError);
+        } else {
+          console.log(`✅ Deleted organization_members for user ${userId} in org ${orgId}`);
+        }
+
+        // If this was the user's active org, clear it (or set to another if needed)
+        const { error: userOrgError } = await supabase
+          .from('users')
+          .update({ clerk_org_id: null })
+          .eq('clerk_id', userId)
+          .eq('clerk_org_id', orgId);
+
+        if (userOrgError && userOrgError.code !== 'PGRST116') { // Ignore no rows
+          console.error('Error clearing user active org:', userOrgError);
+        } else {
+          console.log(`✅ Cleared active clerk_org_id for user ${userId} if it was ${orgId}`);
         }
 
         // Decrement member count
