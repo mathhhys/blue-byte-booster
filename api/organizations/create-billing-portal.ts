@@ -41,17 +41,17 @@ export default async function handler(req: any, res: any) {
     // Find or create Stripe customer
     let customer;
 
-    // 1. Try to find customer in Supabase organization_subscriptions
-    const { data: orgSub, error: subError } = await supabase
-      .from('organization_subscriptions')
+    // 1. Try to find customer in organizations table (Primary source of truth)
+    const { data: org, error: orgError } = await supabase
+      .from('organizations')
       .select('stripe_customer_id')
       .eq('clerk_org_id', orgId)
       .single();
 
-    if (orgSub?.stripe_customer_id) {
-      console.log('✅ Found customer in organization_subscriptions:', orgSub.stripe_customer_id);
+    if (org?.stripe_customer_id) {
+      console.log('✅ Found customer in organizations table:', org.stripe_customer_id);
       try {
-        customer = await stripe.customers.retrieve(orgSub.stripe_customer_id);
+        customer = await stripe.customers.retrieve(org.stripe_customer_id);
         if ((customer as any).deleted) {
           console.log('⚠️ Customer found in DB is deleted in Stripe');
           customer = null;
@@ -62,18 +62,18 @@ export default async function handler(req: any, res: any) {
       }
     }
 
-    // 2. If not found, try organizations table
+    // 2. If not found, try organization_subscriptions table
     if (!customer) {
-      const { data: org, error: orgError } = await supabase
-        .from('organizations')
+      const { data: orgSub, error: subError } = await supabase
+        .from('organization_subscriptions')
         .select('stripe_customer_id')
         .eq('clerk_org_id', orgId)
         .single();
 
-      if (org?.stripe_customer_id) {
-        console.log('✅ Found customer in organizations table:', org.stripe_customer_id);
+      if (orgSub?.stripe_customer_id) {
+        console.log('✅ Found customer in organization_subscriptions:', orgSub.stripe_customer_id);
         try {
-          customer = await stripe.customers.retrieve(org.stripe_customer_id);
+          customer = await stripe.customers.retrieve(orgSub.stripe_customer_id);
           if ((customer as any).deleted) {
             console.log('⚠️ Customer found in DB is deleted in Stripe');
             customer = null;
