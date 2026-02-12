@@ -13,11 +13,16 @@ import {
 import { Check } from "lucide-react";
 import { createMultiCurrencyCheckoutSession, prepareMultiCurrencyCheckoutData } from '@/utils/stripe/checkout';
 import { CurrencyCode } from '@/types/database';
+import { useState } from "react";
+import { Slider } from "./ui/slider";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
 
 
 export default function PricingSection() {
   const { getToken } = useAuth();
   const { user, isSignedIn } = useUser();
+  const [seats, setSeats] = useState(3);
 
   const handleProCheckout = async () => {
     // Track Reddit Pixel SignUp Event (trial intent)
@@ -101,7 +106,7 @@ export default function PricingSection() {
     if (!isSignedIn) {
       // Small delay to ensure pixel event fires before navigation
       setTimeout(() => {
-        window.location.href = '/sign-up?plan=teams&billing=monthly&seats=3&currency=EUR';
+        window.location.href = `/sign-up?plan=teams&billing=monthly&seats=${seats}&currency=EUR`;
       }, 300);
       return;
     }
@@ -110,7 +115,7 @@ export default function PricingSection() {
     if (!organization) {
       // Redirect to create organization
       setTimeout(() => {
-        window.location.href = '/organization/new?plan=teams&billing=monthly&seats=3&currency=EUR';
+        window.location.href = `/organization/new?plan=teams&billing=monthly&seats=${seats}&currency=EUR`;
       }, 300);
       return;
     }
@@ -146,7 +151,7 @@ export default function PricingSection() {
         clerk_org_id: organization.id,
         plan_type: 'teams',
         billing_frequency: 'monthly',
-        seats_total: 3, // Minimum seats for teams
+        seats_total: seats,
       }, token);
   
       if (result.success && result.checkout_url) {
@@ -224,12 +229,34 @@ export default function PricingSection() {
           <CardHeader>
             <CardTitle className="text-2xl font-semibold text-white">TEAMS</CardTitle>
             <div className="mt-4 space-y-1">
-              <span className="text-3xl font-bold text-white block">€40</span>
-              <span className="text-sm text-gray-400">per user/month</span>
+              <span className="text-3xl font-bold text-white block">€{40 * seats}</span>
+              <span className="text-sm text-gray-400">per month ({seats} seats at €40/seat)</span>
             </div>
           </CardHeader>
 
           <CardContent className="space-y-4 flex-grow">
+            <div className="py-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="seats" className="text-white">Number of seats</Label>
+                <Input
+                  id="seats"
+                  type="number"
+                  min={3}
+                  value={seats}
+                  onChange={(e) => setSeats(Math.max(3, parseInt(e.target.value) || 3))}
+                  className="w-20 bg-white/10 border-white/20 text-white"
+                />
+              </div>
+              <Slider
+                value={[seats]}
+                onValueChange={(value) => setSeats(value[0])}
+                min={3}
+                max={100}
+                step={1}
+                className="py-2"
+              />
+            </div>
+
             <Button onClick={handleTeamsCheckout} className="w-full bg-blue-700 hover:bg-blue-600 text-white font-medium py-6">
               Start 14-day free trial
             </Button>
