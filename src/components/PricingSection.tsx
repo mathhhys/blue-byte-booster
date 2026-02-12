@@ -10,11 +10,10 @@ import {
   CardHeader,
   CardTitle,
 } from "./ui/card";
-import { Check } from "lucide-react";
+import { Check, Minus, Plus } from "lucide-react";
 import { createMultiCurrencyCheckoutSession, prepareMultiCurrencyCheckoutData } from '@/utils/stripe/checkout';
 import { CurrencyCode } from '@/types/database';
 import { useState } from "react";
-import { Slider } from "./ui/slider";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 
@@ -229,32 +228,46 @@ export default function PricingSection() {
           <CardHeader>
             <CardTitle className="text-2xl font-semibold text-white">TEAMS</CardTitle>
             <div className="mt-4 space-y-1">
-              <span className="text-3xl font-bold text-white block">€{40 * seats}</span>
-              <span className="text-sm text-gray-400">per month ({seats} seats at €40/seat)</span>
+              <span className="text-3xl font-bold text-white block">€40</span>
+              <span className="text-sm text-gray-400">per user/month</span>
             </div>
           </CardHeader>
 
           <CardContent className="space-y-4 flex-grow">
-            <div className="py-4 space-y-4">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="seats" className="text-white">Number of seats</Label>
+            <div className="py-4 flex items-center justify-between">
+              <Label htmlFor="seats" className="text-white">Number of seats</Label>
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8 bg-white/5 border-white/10 hover:bg-white/10 text-white"
+                  onClick={() => setSeats(Math.max(3, seats - 1))}
+                  disabled={seats <= 3}
+                >
+                  <Minus className="h-4 w-4" />
+                </Button>
                 <Input
                   id="seats"
                   type="number"
                   min={3}
+                  max={100}
                   value={seats}
-                  onChange={(e) => setSeats(Math.max(3, parseInt(e.target.value) || 3))}
-                  className="w-20 bg-white/10 border-white/20 text-white"
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value);
+                    if (!isNaN(val)) setSeats(Math.max(3, Math.min(100, val)));
+                  }}
+                  className="w-16 h-8 bg-white/10 border-white/20 text-white text-center p-0"
                 />
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8 bg-white/5 border-white/10 hover:bg-white/10 text-white"
+                  onClick={() => setSeats(Math.min(100, seats + 1))}
+                  disabled={seats >= 100}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
               </div>
-              <Slider
-                value={[seats]}
-                onValueChange={(value) => setSeats(value[0])}
-                min={3}
-                max={100}
-                step={1}
-                className="py-2"
-              />
             </div>
 
             <Button onClick={handleTeamsCheckout} className="w-full bg-blue-700 hover:bg-blue-600 text-white font-medium py-6">
