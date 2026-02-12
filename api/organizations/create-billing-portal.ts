@@ -41,17 +41,17 @@ export default async function handler(req: any, res: any) {
     // Find or create Stripe customer
     let customer;
 
-    // 1. Try to find customer in organizations table (Primary source of truth)
-    const { data: org, error: orgError } = await supabase
-      .from('organizations')
+    // 1. Try to find customer in organization_subscriptions table (Most reliable source for active billing)
+    const { data: orgSub, error: subError } = await supabase
+      .from('organization_subscriptions')
       .select('stripe_customer_id')
       .eq('clerk_org_id', orgId)
       .single();
 
-    if (org?.stripe_customer_id) {
-      console.log('✅ Found customer in organizations table:', org.stripe_customer_id);
+    if (orgSub?.stripe_customer_id) {
+      console.log('✅ Found customer in organization_subscriptions:', orgSub.stripe_customer_id);
       try {
-        customer = await stripe.customers.retrieve(org.stripe_customer_id);
+        customer = await stripe.customers.retrieve(orgSub.stripe_customer_id);
         if ((customer as any).deleted) {
           console.log('⚠️ Customer found in DB is deleted in Stripe');
           customer = null;
@@ -62,18 +62,18 @@ export default async function handler(req: any, res: any) {
       }
     }
 
-    // 2. If not found, try organization_subscriptions table
+    // 2. If not found, try organizations table
     if (!customer) {
-      const { data: orgSub, error: subError } = await supabase
-        .from('organization_subscriptions')
+      const { data: org, error: orgError } = await supabase
+        .from('organizations')
         .select('stripe_customer_id')
         .eq('clerk_org_id', orgId)
         .single();
 
-      if (orgSub?.stripe_customer_id) {
-        console.log('✅ Found customer in organization_subscriptions:', orgSub.stripe_customer_id);
+      if (org?.stripe_customer_id) {
+        console.log('✅ Found customer in organizations table:', org.stripe_customer_id);
         try {
-          customer = await stripe.customers.retrieve(orgSub.stripe_customer_id);
+          customer = await stripe.customers.retrieve(org.stripe_customer_id);
           if ((customer as any).deleted) {
             console.log('⚠️ Customer found in DB is deleted in Stripe');
             customer = null;
@@ -120,6 +120,20 @@ export default async function handler(req: any, res: any) {
         metadata: { clerk_org_id: orgId }
       });
       console.log('Created new Stripe customer:', customer.id);
+    }
+
+    // Ensure organization record has the correct customer ID
+    if (customer?.id) {
+      const { error: updateError } = await supabase
+        .from('organizations')
+        .update({ stripe_customer_id: customer.id })
+        .eq('clerk_org_id', orgId);
+        
+      if (updateError) {
+        console.error('Failed to update organization with customer ID:', updateError);
+      } else {
+        console.log('✅ Updated organization record with customer ID:', customer.id);
+      }
     }
 
     // Create billing portal session
