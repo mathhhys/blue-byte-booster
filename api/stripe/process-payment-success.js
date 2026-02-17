@@ -232,68 +232,17 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'Failed to create subscription' });
     }
 
-    console.log('Step 7: Granting credits...');
-    // Grant credits based on billing frequency
-    try {
-      // Calculate credits based on billing frequency and seats
-      const baseCredits = billing_frequency === 'yearly' ? 6000 : 500;
-      const totalCredits = baseCredits * (parseInt(seats) || 1);
-      
-      // Get user ID first
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('id, credits')
-        .eq('clerk_id', clerkUserId)
-        .single();
-
-      if (userError || !userData) {
-        throw new Error(`User not found for clerk_id: ${clerkUserId}`);
-      }
-
-      const userId = userData.id;
-      const newCredits = (userData.credits || 0) + totalCredits;
-      
-      // Update credits directly
-      const { error: creditError } = await supabase
-        .from('users')
-        .update({
-          credits: newCredits,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', userId);
-
-      if (creditError) throw creditError;
-
-      // Record credit transaction
-      const { error: transactionError } = await supabase
-        .from('credit_transactions')
-        .insert({
-          user_id: userId,
-          amount: totalCredits,
-          description: `${plan_type} plan ${billing_frequency} credits (${seats || 1} seat${(seats || 1) > 1 ? 's' : ''})`,
-          transaction_type: 'purchase',
-          reference_id: session.subscription?.id
-        });
-
-      if (transactionError) {
-        console.error('Failed to record credit transaction:', transactionError);
-        // Don't fail the process if transaction recording fails
-      }
-
-      console.log('✅ Credits granted:', totalCredits);
-    } catch (error) {
-      console.error('❌ Error granting credits:', error);
-      return res.status(500).json({ error: 'Failed to grant credits' });
-    }
-
+    console.log('Step 7: Finalizing payment processing...');
+    // Credits are now handled by the Stripe webhook (invoice.payment_succeeded)
+    // to ensure they follow the billing cycle and prevent double-granting.
+    
     const response = {
       success: true,
-      message: 'Payment processed successfully',
+      message: 'Payment processed successfully. Credits will be granted shortly via webhook.',
       data: {
         planType: plan_type,
         billingFrequency: billing_frequency,
-        seats: parseInt(seats) || 1,
-        creditsGranted: (billing_frequency === 'yearly' ? 6000 : 500) * (parseInt(seats) || 1)
+        seats: parseInt(seats) || 1
       }
     };
 

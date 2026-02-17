@@ -51,7 +51,10 @@ function getSupabaseAdminClient() {
 
 // Helper function to calculate credits based on plan and billing frequency
 function calculateCreditsToGrant(planType: string, billingFrequency: string, seats: number = 1) {
-  const baseCredits = billingFrequency === 'yearly' ? 6000 : 500;
+  // Pro plan: 500 credits
+  // Teams plan: 1000 credits per seat
+  const monthlyBase = planType === 'teams' ? 1000 : 500;
+  const baseCredits = billingFrequency === 'yearly' ? (monthlyBase * 12) : monthlyBase;
   return baseCredits * seats;
 }
 
