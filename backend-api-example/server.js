@@ -1134,77 +1134,6 @@ async function handleCheckoutSessionCompleted(session) {
 
       console.log(`Successfully processed organization checkout for ${clerk_org_id}`);
 
-    } else if (type === 'personal' || type === 'individual') {
-      // Handle personal user subscription
-      if (!clerk_user_id || !plan_type || !billing_frequency) {
-        console.error('Missing required metadata for personal checkout:', session.metadata);
-        return;
-      }
-
-      console.log('Processing personal subscription checkout for:', clerk_user_id);
-
-      // Get user from database
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('id')
-        .eq('clerk_id', clerk_user_id)
-        .single();
-
-      if (userError || !userData) {
-        console.error('User not found for clerk_id:', clerk_user_id, userError);
-        return;
-      }
-
-      // Get subscription details from Stripe
-      let subscription;
-      try {
-        subscription = await stripe.subscriptions.retrieve(session.subscription);
-      } catch (stripeError) {
-        console.error('Error retrieving subscription from Stripe:', stripeError);
-      }
-
-      // Create user subscription record using RPC
-      const { data: subId, error: subError } = await supabase.rpc('upsert_user_subscription', {
-        p_clerk_user_id: clerk_user_id,
-        p_stripe_customer_id: session.customer,
-        p_stripe_subscription_id: session.subscription,
-        p_plan_type: plan_type,
-        p_billing_frequency: billing_frequency,
-        p_status: 'active',
-        p_total_credits: 500 * (parseInt(seats) || 1), // 500 credits per seat
-        p_current_period_start: subscription ? new Date(subscription.current_period_start * 1000).toISOString() : null,
-        p_current_period_end: subscription ? new Date(subscription.current_period_end * 1000).toISOString() : null
-      });
-
-      if (subError) {
-        console.error('Error creating user subscription:', subError);
-        return;
-      }
-
-      // Update user's stripe_customer_id
-      await supabase
-        .from('users')
-        .update({ stripe_customer_id: session.customer })
-        .eq('clerk_id', clerk_user_id);
-
-      // Grant credits
-      const creditsPerSeat = 500;
-      const totalCredits = creditsPerSeat * (parseInt(seats) || 1);
-
-      const { error: creditError } = await supabase.rpc('add_user_subscription_credits', {
-        p_clerk_user_id: clerk_user_id,
-        p_credits_amount: totalCredits,
-        p_description: `${plan_type} plan credits (${seats || 1} seat${(seats || 1) > 1 ? 's' : ''})`,
-        p_reference_id: session.subscription
-      });
-
-      if (creditError) {
-        console.error('Error granting credits to user:', creditError);
-        // Don't fail the request, just log the error
-      }
-
-      console.log(`Successfully processed personal subscription checkout for user ${clerk_user_id}`);
-
     } else if (session.metadata?.type === 'credit_topup') {
       // Handle one-time credit top-up
       const { clerk_user_id: clerkUserId, credits_amount: creditsAmountStr } = session.metadata;
@@ -1344,44 +1273,13 @@ async function rechargeIndividualCredits(subscription) {
 
   // Check if credits were already recharged this billing period
   const { data: subData, error: subError } = await supabase
-    .from('user_subscriptions')
-    .select('id, last_credit_recharge_at, current_period_start')
+    .from('subscriptions')
+    .select('last_credit_recharge_at, current_period_start')
     .eq('stripe_subscription_id', subscription.id)
     .single();
 
   if (subError) {
-    console.error('Error fetching user subscription:', subError);
-    
-    // Try to create the subscription record if it doesn't exist
-    console.log('Attempting to create user subscription record...');
-    
-    // Get user id
-    const { data: userData } = await supabase
-      .from('users')
-      .select('id')
-      .eq('clerk_id', clerkUserId)
-      .single();
-      
-    if (userData) {
-      const { error: insertError } = await supabase
-        .from('user_subscriptions')
-        .insert({
-          user_id: userData.id,
-          clerk_user_id: clerkUserId,
-          stripe_customer_id: subscription.customer,
-          stripe_subscription_id: subscription.id,
-          plan_type: planType,
-          billing_frequency: subscription.items.data[0]?.price?.recurring?.interval === 'year' ? 'yearly' : 'monthly',
-          status: subscription.status,
-          current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
-          current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
-        });
-        
-      if (insertError) {
-        console.error('Error creating user subscription record:', insertError);
-        return;
-      }
-    }
+    console.error('Error fetching subscription:', subError);
     return;
   }
 
@@ -1392,40 +1290,28 @@ async function rechargeIndividualCredits(subscription) {
     return;
   }
 
-  // Add 500 credits per seat using the new RPC function
+  // Add 500 credits per seat
   const creditsToAdd = 500 * seats;
   
-  const { error: creditError } = await supabase.rpc('add_user_subscription_credits', {
-    p_clerk_user_id: clerkUserId,
-    p_credits_amount: creditsToAdd,
+  const { error: creditError } = await supabase.rpc('grant_credits', {
+    p_clerk_id: clerkUserId,
+    p_amount: creditsToAdd,
     p_description: `Monthly ${planType} plan recharge (${seats} seat${seats > 1 ? 's' : ''})`,
     p_reference_id: subscription.id,
   });
 
   if (creditError) {
     console.error('Error granting credits:', creditError);
-    
-    // Fallback to old method if RPC fails
-    const { error: fallbackError } = await supabase.rpc('grant_credits', {
-      p_clerk_id: clerkUserId,
-      p_amount: creditsToAdd,
-      p_description: `Monthly ${planType} plan recharge (${seats} seat${seats > 1 ? 's' : ''})`,
-      p_reference_id: subscription.id,
-    });
-    
-    if (fallbackError) {
-      console.error('Fallback credit grant also failed:', fallbackError);
-      return;
-    }
+    return;
   }
 
   // Update last recharge timestamp
   const { error: updateError } = await supabase
-    .from('user_subscriptions')
+    .from('subscriptions')
     .update({
       last_credit_recharge_at: new Date().toISOString()
     })
-    .eq('id', subData.id);
+    .eq('stripe_subscription_id', subscription.id);
 
   if (updateError) {
     console.error('Error updating last_credit_recharge_at:', updateError);
@@ -1501,7 +1387,7 @@ async function handleSubscriptionUpdated(subscription) {
   try {
     const metadata = subscription.metadata || {};
 
-    if (metadata.type === 'organization' || metadata.clerk_org_id) {
+    if (metadata.type === 'organization') {
       // Update organization subscription
       const { error } = await supabase
         .from('organization_subscriptions')
@@ -1517,9 +1403,9 @@ async function handleSubscriptionUpdated(subscription) {
         console.error('Error updating organization subscription:', error);
       }
     } else {
-      // Update personal user subscription
+      // Update individual subscription
       const { error } = await supabase
-        .from('user_subscriptions')
+        .from('subscriptions')
         .update({
           status: subscription.status,
           current_period_start: new Date(subscription.current_period_start * 1000),
@@ -1529,26 +1415,7 @@ async function handleSubscriptionUpdated(subscription) {
         .eq('stripe_subscription_id', subscription.id);
 
       if (error) {
-        console.error('Error updating user subscription:', error);
-        
-        // Fallback: try to update by clerk_user_id from metadata
-        if (metadata.clerk_user_id) {
-          const { error: fallbackError } = await supabase
-            .from('user_subscriptions')
-            .update({
-              status: subscription.status,
-              current_period_start: new Date(subscription.current_period_start * 1000),
-              current_period_end: new Date(subscription.current_period_end * 1000),
-              stripe_subscription_id: subscription.id,
-              updated_at: new Date()
-            })
-            .eq('clerk_user_id', metadata.clerk_user_id)
-            .in('status', ['active', 'trialing', 'past_due', 'incomplete']);
-
-          if (fallbackError) {
-            console.error('Error in fallback user subscription update:', fallbackError);
-          }
-        }
+        console.error('Error updating individual subscription:', error);
       }
     }
   } catch (error) {
@@ -1562,7 +1429,7 @@ async function handleSubscriptionDeleted(subscription) {
   try {
     const metadata = subscription.metadata || {};
 
-    if (metadata.type === 'organization' || metadata.clerk_org_id) {
+    if (metadata.type === 'organization') {
       // Mark organization subscription as canceled
       const { error } = await supabase
         .from('organization_subscriptions')
@@ -1576,9 +1443,9 @@ async function handleSubscriptionDeleted(subscription) {
         console.error('Error canceling organization subscription:', error);
       }
     } else {
-      // Mark personal user subscription as canceled
+      // Mark individual subscription as canceled
       const { error } = await supabase
-        .from('user_subscriptions')
+        .from('subscriptions')
         .update({
           status: 'canceled',
           updated_at: new Date()
@@ -1586,23 +1453,7 @@ async function handleSubscriptionDeleted(subscription) {
         .eq('stripe_subscription_id', subscription.id);
 
       if (error) {
-        console.error('Error canceling user subscription:', error);
-        
-        // Fallback: try to update by clerk_user_id from metadata
-        if (metadata.clerk_user_id) {
-          const { error: fallbackError } = await supabase
-            .from('user_subscriptions')
-            .update({
-              status: 'canceled',
-              updated_at: new Date()
-            })
-            .eq('clerk_user_id', metadata.clerk_user_id)
-            .in('status', ['active', 'trialing', 'past_due', 'incomplete']);
-
-          if (fallbackError) {
-            console.error('Error in fallback user subscription cancel:', fallbackError);
-          }
-        }
+        console.error('Error canceling individual subscription:', error);
       }
     }
   } catch (error) {

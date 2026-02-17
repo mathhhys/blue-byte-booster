@@ -1,8 +1,11 @@
-import { useUser, UserButton, useAuth, useOrganization, OrganizationSwitcher } from '@clerk/clerk-react';
+import { useUser, UserButton, useAuth, useOrganization, OrganizationSwitcher, OrganizationProfile } from '@clerk/clerk-react';
+import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import {
+  Settings,
   Search,
   Bell,
   Users,
@@ -11,6 +14,17 @@ import {
   CreditCard,
   FileText,
   Mail,
+  Building,
+  DollarSign,
+  Receipt,
+  TrendingUp,
+  AlertTriangle,
+  Download,
+  Plus,
+  Minus,
+  History,
+  BarChart3,
+  Loader2,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
@@ -30,9 +44,6 @@ import {
   SidebarTrigger,
 } from '@/components/ui/sidebar';
 import { BillingDashboard } from '@/components/organizations/BillingDashboard';
-import { PersonalBilling } from '@/components/billing/PersonalBilling';
-import { createStripeCustomerPortalSession } from '@/api/stripe';
-import { createOrganizationBillingPortal } from '@/utils/organization/billing';
 
 // Dark theme appearance configuration for Clerk components
 const clerkAppearance = {
@@ -49,7 +60,7 @@ const clerkAppearance = {
     dividerText: "text-gray-400",
     modalContent: "bg-[#2a2a2a]",
     modalCloseButton: "text-gray-400 hover:text-white",
-    organizationSwitcherTrigger: "bg-transparent border-white/10 text-white hover:bg-white/10 p-2 rounded-md",
+    organizationSwitcherTrigger: "bg-transparent border-white/10 text-white hover:bg-white/10",
     organizationSwitcherTriggerIcon: "text-gray-400",
     organizationPreview: "text-white",
     organizationPreviewAvatarBox: "border-white/10"
@@ -64,71 +75,121 @@ const clerkAppearance = {
   }
 };
 
+// Mock data for credit transactions
+const mockCreditTransactions = [
+  {
+    id: '1',
+    amount: 500,
+    type: 'grant',
+    description: 'Credit purchase',
+    created_at: '2024-01-15T10:30:00Z',
+    reference_id: 'pi_1234567890'
+  },
+  {
+    id: '2',
+    amount: -50,
+    type: 'usage',
+    description: 'VSCode extension usage',
+    created_at: '2024-01-14T15:45:00Z',
+    reference_id: null
+  },
+  {
+    id: '3',
+    amount: 1000,
+    type: 'grant',
+    description: 'Welcome bonus',
+    created_at: '2024-01-10T09:00:00Z',
+    reference_id: null
+  }
+];
+
 const Billing = () => {
   const { user } = useUser();
-  const { organization, isLoaded: orgLoaded } = useOrganization();
+  const { organization, isLoaded: orgLoaded, membership } = useOrganization();
   const { getToken } = useAuth();
   const { toast } = useToast();
-  const [isBillingPortalLoading, setIsBillingPortalLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState('overview');
+  const [currentBalance, setCurrentBalance] = useState(1250);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const isAdmin = membership?.role === 'org:admin';
 
   useEffect(() => {
     setAuthPageMeta('billing');
   }, []);
 
-  // Billing portal redirect function
-  const handleBillingPortalRedirect = async () => {
+  // Set default tab based on admin status and organization
+  useEffect(() => {
+    if (organization && isAdmin) {
+      setActiveTab('organization');
+    } else {
+      setActiveTab('overview');
+    }
+  }, [organization, isAdmin]);
+
+  const formatCurrency = (amount: number, currency = 'EUR') => {
+    return new Intl.NumberFormat('en-EU', {
+      style: 'currency',
+      currency: currency,
+    }).format(amount);
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
+  const handleCreditTopup = async (creditsAmount: number) => {
     if (!user?.id) {
       toast({
-        title: "Authentication Required",
-        description: "Please sign in to access billing information",
+        title: "Error",
+        description: "User not authenticated",
         variant: "destructive",
       });
       return;
     }
 
-    setIsBillingPortalLoading(true);
-
     try {
-      let result;
-      
-      if (organization?.id) {
-        const token = await getToken();
-        result = await createOrganizationBillingPortal(organization.id, token);
-      } else {
-        result = await createStripeCustomerPortalSession(user.id);
+      setIsLoading(true);
+      const token = await getToken({ template: "supabase" });
+      const baseUrl = window.location.origin;
+      const response = await fetch('/api/stripe/create-credit-topup-session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
+        body: JSON.stringify({
+          creditsAmount,
+          clerkUserId: user.id,
+          successUrl: `${baseUrl}/payment/success`,
+          cancelUrl: `${baseUrl}/billing`,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create top-up session');
       }
 
-      if (result.success) {
-        if (result.url) {
-          window.location.href = result.url;
-        } else if ('mock' in result && result.mock && import.meta.env.DEV) {
-          toast({
-            title: "Development Mode",
-            description: "Billing portal would redirect in production. Using mock implementation.",
-          });
-        } else {
-          toast({
-            title: "Billing Portal Error",
-            description: "Failed to access billing portal. Please try again.",
-            variant: "destructive",
-          });
-        }
+      const data = await response.json();
+      if (data.url) {
+        window.location.href = data.url;
       } else {
-        toast({
-          title: "Billing Portal Error",
-          description: ('error' in result ? result.error : null) || "Failed to access billing portal. Please try again.",
-          variant: "destructive",
-        });
+        throw new Error('No checkout URL received');
       }
     } catch (error) {
-      console.error('❌ Error accessing billing portal:', error);
+      console.error('Error creating credit top-up:', error);
       toast({
-        title: "Billing Portal Error",
-        description: "An unexpected error occurred. Please try again later.",
+        title: "Error",
+        description: error instanceof Error ? error.message : 'Failed to create top-up session',
         variant: "destructive",
       });
     } finally {
-      setIsBillingPortalLoading(false);
+      setIsLoading(false);
     }
   };
 
@@ -200,14 +261,11 @@ const Billing = () => {
 
               <SidebarMenuItem>
                 <SidebarMenuButton
+                  isActive
                   className="bg-blue-600/20 text-white"
-                  onClick={handleBillingPortalRedirect}
-                  disabled={isBillingPortalLoading}
                 >
                   <CreditCard className="w-4 h-4" />
-                  <span>
-                    {isBillingPortalLoading ? 'Loading...' : 'Billing'}
-                  </span>
+                  <span>Billing</span>
                   <SidebarMenuBadge></SidebarMenuBadge>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -291,6 +349,15 @@ const Billing = () => {
                   />
                 </div>
 
+                {/* Credits Balance */}
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-400 hidden sm:inline">{currentBalance.toLocaleString()} credits</span>
+                  <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white">
+                    <span className="hidden sm:inline">Top up</span>
+                    <span className="sm:hidden">+</span>
+                  </Button>
+                </div>
+
                 {/* Notifications */}
                 <Button variant="ghost" size="icon" className="text-gray-400 hover:text-white relative">
                   <Bell className="w-4 h-4" />
@@ -316,23 +383,292 @@ const Billing = () => {
             <div className="max-w-6xl mx-auto">
               {/* Page Header */}
               <div className="mb-8">
-                <h1 className="text-3xl font-bold text-white mb-2">
-                  {organization ? `${organization.name} Billing` : 'Personal Billing'}
-                </h1>
+                <h1 className="text-3xl font-bold text-white mb-2">Billing & Payments</h1>
                 <p className="text-gray-400">
-                  {organization 
-                    ? 'Manage your organization subscription, seats, and billing settings.'
-                    : 'Manage your personal credits, view transaction history, and handle billing settings.'
-                  }
+                  Manage your credits, view transaction history, and handle billing settings.
                 </p>
               </div>
 
-              {/* Context-Aware Billing Content */}
-              {organization ? (
-                <BillingDashboard />
-              ) : (
-                <PersonalBilling />
-              )}
+              {/* Billing Content */}
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                <TabsList className="grid w-full grid-cols-4 bg-[#2a2a2a] border-white/10">
+                  <TabsTrigger
+                    value="overview"
+                    className="data-[state=active]:bg-blue-600 data-[state=active]:text-white text-gray-400"
+                  >
+                    <BarChart3 className="w-4 h-4 mr-2" />
+                    Overview
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="credits"
+                    className="data-[state=active]:bg-blue-600 data-[state=active]:text-white text-gray-400"
+                  >
+                    <DollarSign className="w-4 h-4 mr-2" />
+                    Credits
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="invoices"
+                    className="data-[state=active]:bg-blue-600 data-[state=active]:text-white text-gray-400"
+                  >
+                    <Receipt className="w-4 h-4 mr-2" />
+                    Invoices
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="organization"
+                    className="data-[state=active]:bg-blue-600 data-[state=active]:text-white text-gray-400"
+                    disabled={!organization || !isAdmin}
+                  >
+                    <Building className="w-4 h-4 mr-2" />
+                    Organization
+                    {!organization && <span className="ml-1 text-xs">(No Org)</span>}
+                    {organization && !isAdmin && <span className="ml-1 text-xs">(Admin Only)</span>}
+                  </TabsTrigger>
+                </TabsList>
+
+                {/* Overview Tab */}
+                <TabsContent value="overview" className="mt-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                    {/* Credit Balance Card */}
+                    <Card className="bg-[#2a2a2a] border-white/10 p-6">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm text-gray-400">Credit Balance</span>
+                        <DollarSign className="w-4 h-4 text-green-400" />
+                      </div>
+                      <div className="text-2xl font-bold text-white mb-1">
+                        {currentBalance.toLocaleString()}
+                      </div>
+                      <div className="text-xs text-gray-400">
+                        credits available
+                      </div>
+                      {currentBalance < 100 && (
+                        <div className="mt-2 flex items-center gap-2 text-yellow-400 text-xs">
+                          <AlertTriangle className="w-3 h-3" />
+                          Low balance warning
+                        </div>
+                      )}
+                    </Card>
+
+                    {/* Monthly Usage Card */}
+                    <Card className="bg-[#2a2a2a] border-white/10 p-6">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm text-gray-400">This Month</span>
+                        <TrendingUp className="w-4 h-4 text-blue-400" />
+                      </div>
+                      <div className="text-2xl font-bold text-white mb-1">
+                        -450
+                      </div>
+                      <div className="text-xs text-gray-400">
+                        credits used
+                      </div>
+                    </Card>
+
+                    {/* Next Payment Card */}
+                    <Card className="bg-[#2a2a2a] border-white/10 p-6">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm text-gray-400">Next Payment</span>
+                        <CreditCard className="w-4 h-4 text-gray-400" />
+                      </div>
+                      <div className="text-2xl font-bold text-white mb-1">
+                        {formatCurrency(7.00)}
+                      </div>
+                      <div className="text-xs text-gray-400">
+                        Jan 15, 2024
+                      </div>
+                    </Card>
+                  </div>
+
+                  {/* Quick Actions */}
+                  <Card className="bg-[#2a2a2a] border-white/10 p-6">
+                    <h3 className="text-lg font-semibold text-white mb-4">Quick Actions</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+                        <Plus className="w-4 h-4 mr-2" />
+                        Buy Credits
+                      </Button>
+                      <Button variant="outline" className="border-white/20 text-white hover:bg-white/10">
+                        <Download className="w-4 h-4 mr-2" />
+                        Download Invoice
+                      </Button>
+                      <Button variant="outline" className="border-white/20 text-white hover:bg-white/10">
+                        <History className="w-4 h-4 mr-2" />
+                        View History
+                      </Button>
+                    </div>
+                  </Card>
+                </TabsContent>
+
+                {/* Credits Tab */}
+                <TabsContent value="credits" className="mt-6">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Credit Purchase Form */}
+                    <Card className="bg-[#2a2a2a] border-white/10 p-6">
+                      <div className="flex items-center gap-2 mb-4">
+                        <DollarSign className="w-5 h-5 text-blue-500" />
+                        <h3 className="text-lg font-semibold text-white">Buy Credits</h3>
+                      </div>
+
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <Button
+                            variant="outline"
+                            className="border-white/20 text-white hover:bg-blue-600/20 hover:border-blue-500 p-4 h-auto flex flex-col items-center gap-1"
+                            onClick={() => handleCreditTopup(500)}
+                            disabled={isLoading}
+                          >
+                            <div className="text-sm font-medium">500 credits</div>
+                            <div className="text-lg font-bold text-green-400">€7.00</div>
+                          </Button>
+                          <Button
+                            variant="outline"
+                            className="border-white/20 text-white hover:bg-blue-600/20 hover:border-blue-500 p-4 h-auto flex flex-col items-center gap-1"
+                            onClick={() => handleCreditTopup(1000)}
+                            disabled={isLoading}
+                          >
+                            <div className="text-sm font-medium">1,000 credits</div>
+                            <div className="text-lg font-bold text-green-400">€14.00</div>
+                          </Button>
+                          <Button
+                            variant="outline"
+                            className="border-white/20 text-white hover:bg-blue-600/20 hover:border-blue-500 p-4 h-auto flex flex-col items-center gap-1"
+                            onClick={() => handleCreditTopup(2500)}
+                            disabled={isLoading}
+                          >
+                            <div className="text-sm font-medium">2,500 credits</div>
+                            <div className="text-lg font-bold text-green-400">€35.00</div>
+                          </Button>
+                        </div>
+
+                        <div className="pt-4 border-t border-white/10 space-y-2">
+                          <div className="flex gap-2">
+                            <Input
+                              type="number"
+                              placeholder="Custom amount (credits)"
+                              className="bg-[#2a2a2a] border-white/10 text-white placeholder-gray-500 flex-1"
+                              disabled={isLoading}
+                            />
+                            <Button
+                              onClick={() => {
+                                const customAmount = prompt('Enter number of credits to purchase:');
+                                if (customAmount && !isNaN(Number(customAmount)) && Number(customAmount) > 0) {
+                                  handleCreditTopup(Number(customAmount));
+                                }
+                              }}
+                              disabled={isLoading}
+                              className="bg-blue-600 hover:bg-blue-700 text-white flex-0"
+                            >
+                              {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Plus className="w-4 h-4 mr-2" />}
+                              Buy Custom
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </Card>
+
+                    {/* Credit Usage Summary */}
+                    <Card className="bg-[#2a2a2a] border-white/10 p-6">
+                      <div className="flex items-center gap-2 mb-4">
+                        <BarChart3 className="w-5 h-5 text-green-500" />
+                        <h3 className="text-lg font-semibold text-white">Usage Summary</h3>
+                      </div>
+
+                      <div className="space-y-4">
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-400">This month</span>
+                          <span className="text-white font-medium">-450 credits</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-400">Last month</span>
+                          <span className="text-white font-medium">-320 credits</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-400">Average daily</span>
+                          <span className="text-white font-medium">-15 credits</span>
+                        </div>
+
+                        <div className="pt-4 border-t border-white/10">
+                          <div className="text-sm text-gray-400">
+                            Rate: 1 credit = $0.014
+                          </div>
+                        </div>
+                      </div>
+                    </Card>
+                  </div>
+                </TabsContent>
+
+                {/* Invoices Tab */}
+                <TabsContent value="invoices" className="mt-6">
+                  <Card className="bg-[#2a2a2a] border-white/10 p-6">
+                    <div className="flex items-center justify-between mb-6">
+                      <h3 className="text-lg font-semibold text-white">Transaction History</h3>
+                      <Button variant="outline" className="border-white/20 text-white hover:bg-white/10">
+                        <Download className="w-4 h-4 mr-2" />
+                        Export
+                      </Button>
+                    </div>
+
+                    <div className="space-y-3">
+                      {mockCreditTransactions.map((transaction) => (
+                        <div
+                          key={transaction.id}
+                          className="flex items-center justify-between p-4 bg-[#1a1a1a] rounded-lg"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                              transaction.amount > 0 ? 'bg-green-600' : 'bg-red-600'
+                            }`}>
+                              {transaction.amount > 0 ? (
+                                <Plus className="w-4 h-4 text-white" />
+                              ) : (
+                                <Minus className="w-4 h-4 text-white" />
+                              )}
+                            </div>
+                            <div>
+                              <div className="text-white font-medium">{transaction.description}</div>
+                              <div className="text-gray-400 text-sm">{formatDate(transaction.created_at)}</div>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className={`font-medium ${
+                              transaction.amount > 0 ? 'text-green-400' : 'text-red-400'
+                            }`}>
+                              {transaction.amount > 0 ? '+' : ''}{transaction.amount} credits
+                            </div>
+                            {transaction.reference_id && (
+                              <div className="text-gray-400 text-xs">ID: {transaction.reference_id}</div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                </TabsContent>
+
+                {/* Organization Tab */}
+                <TabsContent value="organization" className="mt-6">
+                  {organization && isAdmin ? (
+                    <BillingDashboard />
+                  ) : (
+                    <Card className="bg-[#2a2a2a] border-white/10 p-8">
+                      <div className="text-center space-y-4">
+                        <div className="w-16 h-16 bg-gray-600 rounded-full flex items-center justify-center mx-auto">
+                          <Building className="w-8 h-8 text-gray-400" />
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-semibold text-white mb-2">
+                            {!organization ? 'No Organization Selected' : 'Admin Access Required'}
+                          </h3>
+                          <p className="text-gray-400">
+                            {!organization
+                              ? 'Create or join an organization to manage billing settings.'
+                              : 'Only organization administrators can view billing settings.'
+                            }
+                          </p>
+                        </div>
+                      </div>
+                    </Card>
+                  )}
+                </TabsContent>
+              </Tabs>
             </div>
           </main>
         </SidebarInset>

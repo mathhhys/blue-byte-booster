@@ -78,12 +78,10 @@ export default async function handler(req, res) {
 
       // If user already has a stripe_customer_id, use it
       if (userData.stripe_customer_id) {
-        console.log('🔍 DEBUG: Found existing stripe_customer_id in DB:', userData.stripe_customer_id);
+        console.log('✅ Found existing stripe_customer_id:', userData.stripe_customer_id);
         try {
           customer = await stripe.customers.retrieve(userData.stripe_customer_id);
-          console.log('✅ DEBUG: Customer retrieved from Stripe:', customer.id);
-          console.log('🔍 DEBUG: Customer email in Stripe:', customer.email);
-          console.log('🔍 DEBUG: Customer metadata:', customer.metadata);
+          console.log('✅ Customer retrieved from Stripe');
         } catch (stripeError) {
           console.log('⚠️ Customer not found in Stripe, will create new one');
           userData.stripe_customer_id = null; // Reset to trigger creation
@@ -134,7 +132,6 @@ export default async function handler(req, res) {
 
     console.log('Step 5: Creating customer portal session...');
     // Create customer portal session
-    console.log('🔍 DEBUG: Creating portal session for customer:', customer.id);
     const portalSession = await stripe.billingPortal.sessions.create({
       customer: customer.id,
       return_url: `${req.headers.origin || 'https://www.softcodes.ai'}/dashboard`,

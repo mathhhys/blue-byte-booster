@@ -152,8 +152,15 @@ async function handleInvoicePaymentSucceeded(invoice, supabase) {
     if (orgSubscription) {
       console.log('🏢 Processing organization subscription payment for org:', orgSubscription.clerk_org_id);
       
-      // We no longer skip initial payments here, as we've removed credit granting from the checkout flow.
-      // This ensures a single, unified path for credit allocation.
+      // Determine if this is initial or recurring payment
+      const paymentType = await determinePaymentType(invoice, subscription);
+      console.log('Payment type determined:', paymentType);
+
+      // Skip initial payments as they're handled by checkout.session.completed
+      if (paymentType === 'initial') {
+        console.log('Skipping initial payment - handled by checkout flow');
+        return;
+      }
 
       // Check for idempotency
       const alreadyProcessed = await checkIdempotency(invoice.id, supabase);
@@ -248,7 +255,15 @@ async function handleInvoicePaymentSucceeded(invoice, supabase) {
       return;
     }
 
-    // We no longer skip initial payments here, as we've removed credit granting from the checkout flow.
+    // Determine if this is initial or recurring payment
+    const paymentType = await determinePaymentType(invoice, subscription);
+    console.log('Payment type determined:', paymentType);
+
+    // Skip initial payments as they're handled by checkout.session.completed
+    if (paymentType === 'initial') {
+      console.log('Skipping initial payment - handled by checkout flow');
+      return;
+    }
 
     // Check for idempotency to prevent duplicate processing
     const alreadyProcessed = await checkIdempotency(invoice.id, supabase);
@@ -392,9 +407,25 @@ async function handleCheckoutSessionCompleted(session, supabase) {
           onConflict: 'clerk_org_id'
         });
 
-      // Initial credits are now handled by invoice.payment_succeeded
-      // This ensures credits are only granted once the payment is actually confirmed
-      // and follows the same logic for both initial and recurring payments.
+      // Grant initial credits to the organization (add to existing if any)
+      if (!subError) {
+        const { data: orgData } = await supabase
+          .from('organizations')
+          .select('total_credits')
+          .eq('clerk_org_id', metadata.clerk_org_id)
+          .single();
+
+        const currentCredits = orgData?.total_credits || 0;
+        const newCredits = currentCredits + creditsToGrant;
+
+        await supabase
+          .from('organizations')
+          .update({
+            total_credits: newCredits,
+            updated_at: new Date().toISOString()
+          })
+          .eq('clerk_org_id', metadata.clerk_org_id);
+      }
 
       if (subError) {
         console.error('Error creating organization subscription:', subError);
@@ -520,7 +551,23 @@ async function handleSubscriptionCreated(subscription, supabase) {
       updated_at: new Date().toISOString()
     };
 
-    // Credits are now handled by invoice.payment_succeeded
+    // Update organization credits (add to existing if any)
+    const { data: orgData } = await supabase
+      .from('organizations')
+      .select('total_credits')
+      .eq('clerk_org_id', clerkOrgId)
+      .single();
+
+    const currentCredits = orgData?.total_credits || 0;
+    const newCredits = currentCredits + totalCredits;
+
+    await supabase
+      .from('organizations')
+      .update({
+        total_credits: newCredits,
+        updated_at: new Date().toISOString()
+      })
+      .eq('clerk_org_id', clerkOrgId);
 
     if (organizationId) {
       subscriptionData.organization_id = organizationId;
@@ -608,8 +655,29 @@ async function handleSubscriptionUpdated(subscription, supabase) {
         orgSubscription.overage_seats
     };
 
-    // Bonus credits for seat additions are now handled by invoice.payment_succeeded
-    // when the proration invoice is paid. This prevents double-granting.
+    // If seats were added, grant bonus credits (500 per seat)
+    if (seatDelta > 0) {
+      const bonusCredits = calculateCreditsToGrant(orgSubscription.plan_type, orgSubscription.billing_frequency, seatDelta);
+      
+      // Update organization credits in the organizations table
+      const { data: orgData } = await supabase
+        .from('organizations')
+        .select('total_credits')
+        .eq('clerk_org_id', orgSubscription.clerk_org_id)
+        .single();
+
+      const newTotalCredits = (orgData?.total_credits || 0) + bonusCredits;
+      
+      await supabase
+        .from('organizations')
+        .update({
+          total_credits: newTotalCredits,
+          updated_at: new Date().toISOString()
+        })
+        .eq('clerk_org_id', orgSubscription.clerk_org_id);
+
+      console.log(`🎁 Granting ${bonusCredits} bonus credits for ${seatDelta} new seats`);
+    }
 
     const { error: updateError } = await supabase
       .from('organization_subscriptions')
@@ -1144,10 +1212,7 @@ async function determinePaymentType(invoice, subscription) {
 
 // Helper function to calculate credits based on plan and billing frequency
 function calculateCreditsToGrant(planType, billingFrequency, seats = 1) {
-  // Pro plan: 500 credits
-  // Teams plan: 1000 credits per seat
-  const monthlyBase = planType === 'teams' ? 1000 : 500;
-  const baseCredits = billingFrequency === 'yearly' ? (monthlyBase * 12) : monthlyBase;
+  const baseCredits = billingFrequency === 'yearly' ? 6000 : 500;
   return baseCredits * seats;
 }
 
