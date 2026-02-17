@@ -131,8 +131,8 @@ export default async function handler(req, res) {
         },
       ],
       mode: 'subscription',
-      success_url: successUrl || `${req.headers.origin || 'https://www.softcodes.ai'}/teams/dashboard?seats_added=true`,
-      cancel_url: cancelUrl || `${req.headers.origin || 'https://www.softcodes.ai'}/teams/dashboard`,
+      success_url: successUrl || `${req.headers.origin || 'https://www.softcodes.ai'}/dashboard?seats_added=true`,
+      cancel_url: cancelUrl || `${req.headers.origin || 'https://www.softcodes.ai'}/dashboard`,
       subscription_data: {
         metadata: {
           kinde_org_code: orgCode,

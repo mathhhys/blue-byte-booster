@@ -55,7 +55,7 @@ export default async function handler(req, res) {
     // Create billing portal session
     const session = await stripe.billingPortal.sessions.create({
       customer: customer.stripe_customer_id,
-      return_url: `${req.headers.origin || 'https://www.softcodes.ai'}/teams/dashboard`,
+      return_url: `${req.headers.origin || 'https://www.softcodes.ai'}/dashboard`,
     });
 
     return res.status(200).json({

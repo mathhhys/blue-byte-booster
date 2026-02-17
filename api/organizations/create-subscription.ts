@@ -133,7 +133,7 @@ export default async function handler(req: any, res: any) {
         },
       ],
       mode: 'subscription',
-      success_url: `${req.headers.origin || 'https://www.softcodes.ai'}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${req.headers.origin || 'https://www.softcodes.ai'}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${req.headers.origin || 'https://www.softcodes.ai'}/payment-cancelled`,
       metadata: {
         clerk_org_id: clerk_org_id,

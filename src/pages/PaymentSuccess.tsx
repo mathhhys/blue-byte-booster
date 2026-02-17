@@ -93,6 +93,11 @@ export default function PaymentSuccess() {
       if (finalPlanType === 'teams' && finalSeats > 1) {
         setSubscriptionId(sessionStatus.data.subscription_id || `sub_demo_${Date.now()}`);
         setShowInvitations(true);
+      } else {
+        // Automatically redirect to dashboard for other plans after a short delay
+        setTimeout(() => {
+          navigate('/dashboard');
+        }, 3000);
       }
 
     } catch (error) {
@@ -181,6 +186,11 @@ export default function PaymentSuccess() {
             <p className="text-gray-300">
               Welcome to Softcodes {planConfig?.name} plan
             </p>
+            {(!showInvitations || !subscriptionId) && (
+              <p className="text-blue-400 text-sm mt-2 animate-pulse">
+                Redirecting to dashboard in 3 seconds...
+              </p>
+            )}
           </CardHeader>
 
           <CardContent className="space-y-6">

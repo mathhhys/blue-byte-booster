@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams, Link, useNavigate } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, ArrowRight, CreditCard, Home } from 'lucide-react';
@@ -7,6 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 
 const BillingSuccess = () => {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const { toast } = useToast();
   const [isVerifying, setIsVerifying] = useState(true);
   const [verificationData, setVerificationData] = useState<{
@@ -46,6 +47,10 @@ const BillingSuccess = () => {
         });
       } finally {
         setIsVerifying(false);
+        // Automatically redirect to dashboard after a short delay
+        setTimeout(() => {
+          navigate('/dashboard');
+        }, 3000);
       }
     };
 
@@ -72,8 +77,11 @@ const BillingSuccess = () => {
         </div>
 
         <h1 className="text-2xl font-bold text-white mb-2">Payment Successful!</h1>
-        <p className="text-gray-400 mb-6">
+        <p className="text-gray-400 mb-2">
           Your credit purchase has been processed successfully.
+        </p>
+        <p className="text-blue-400 text-sm mb-6 animate-pulse">
+          Redirecting to dashboard in 3 seconds...
         </p>
 
         {verificationData && (

@@ -56,7 +56,7 @@ export default async function handler(req, res) {
     if (existingSub) {
       return res.status(400).json({ 
         error: 'Organization already has an active subscription',
-        redirect_url: '/teams/dashboard'
+        redirect_url: '/dashboard'
       });
     }
 
@@ -127,7 +127,7 @@ export default async function handler(req, res) {
         },
       ],
       mode: 'subscription',
-      success_url: successUrl || `${req.headers.origin || 'https://www.softcodes.ai'}/teams/dashboard?subscription=success`,
+      success_url: successUrl || `${req.headers.origin || 'https://www.softcodes.ai'}/dashboard?subscription=success`,
       cancel_url: cancelUrl || `${req.headers.origin || 'https://www.softcodes.ai'}/teams/subscribe`,
       subscription_data: {
         metadata: {
