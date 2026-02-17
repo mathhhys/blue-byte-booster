@@ -141,13 +141,13 @@ export default async function handler(req: any, res: any) {
 
     // If we have a stripe customer ID, fetch their subscriptions
     if (stripeCustomerId) {
-      console.log('Fetching Stripe subscriptions for customer:', stripeCustomerId);
+      console.log('🔍 DEBUG: Fetching Stripe subscriptions for customer:', stripeCustomerId);
       
       const subscriptions = await stripe.subscriptions.list({
         customer: stripeCustomerId,
-        status: 'all',
-        limit: 5,
-        expand: ['data.default_payment_method', 'data.latest_invoice'],
+        status: 'active', // Prioritize active subscriptions
+        limit: 10,
+        expand: ['data.default_payment_method', 'data.latest_invoice', 'data.items.data.price.product'],
       });
 
       if (subscriptions.data.length > 0) {
@@ -156,11 +156,30 @@ export default async function handler(req: any, res: any) {
           sub => ['active', 'trialing', 'past_due'].includes(sub.status)
         ) || subscriptions.data[0];
 
-        console.log('✅ Found Stripe subscription:', activeSub.id);
+        console.log('✅ DEBUG: Found Stripe subscription:', activeSub.id);
+        console.log('🔍 DEBUG: Subscription status:', activeSub.status);
+        console.log('🔍 DEBUG: Subscription metadata:', activeSub.metadata);
+        console.log('🔍 DEBUG: Subscription items product:', activeSub.items.data[0]?.price?.product);
 
         // Extract plan type from metadata or product
-        const planType = activeSub.metadata?.plan_type || 
-          (activeSub.items.data[0]?.price?.product as string)?.includes('pro') ? 'pro' : 'basic';
+        let planType = activeSub.metadata?.plan_type;
+        
+        if (!planType) {
+          const product = activeSub.items.data[0]?.price?.product;
+          const productName = typeof product === 'string' ? product.toLowerCase() : '';
+          
+          if (productName.includes('pro')) {
+            planType = 'pro';
+          } else if (productName.includes('teams')) {
+            planType = 'teams';
+          } else if (productName.includes('enterprise')) {
+            planType = 'enterprise';
+          } else {
+            planType = 'basic';
+          }
+        }
+        
+        console.log('🔍 DEBUG: Detected planType:', planType);
 
         // Extract billing frequency
         const billingFrequency = activeSub.items.data[0]?.price?.recurring?.interval === 'year' 
