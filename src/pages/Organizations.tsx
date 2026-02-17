@@ -43,6 +43,7 @@ import {
 } from '@/components/ui/sidebar';
 import { BillingDashboard } from '@/components/organizations/BillingDashboard';
 import { createStripeCustomerPortalSession } from '@/api/stripe';
+import { createOrganizationBillingPortal } from '@/utils/organization/billing';
 
 // Dark theme appearance configuration for Clerk components
 const clerkAppearance = {
@@ -77,6 +78,7 @@ const clerkAppearance = {
 const Organizations = () => {
   const { user } = useUser();
   const { organization, isLoaded: orgLoaded, membership } = useOrganization();
+  const { getToken } = useAuth();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('settings');
   const [isBillingPortalLoading, setIsBillingPortalLoading] = useState(false);
@@ -167,7 +169,14 @@ const Organizations = () => {
     setIsBillingPortalLoading(true);
 
     try {
-      const result = await createStripeCustomerPortalSession(user.id);
+      let result;
+      
+      if (organization?.id) {
+        const token = await getToken();
+        result = await createOrganizationBillingPortal(organization.id, token);
+      } else {
+        result = await createStripeCustomerPortalSession(user.id);
+      }
 
       if (result.success) {
         if (result.url) {
