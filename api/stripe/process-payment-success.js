@@ -236,7 +236,15 @@ export default async function handler(req, res) {
     // Grant credits based on billing frequency
     try {
       // Calculate credits based on billing frequency and seats
-      const baseCredits = billing_frequency === 'yearly' ? 6000 : 500;
+      let baseCredits = 500;
+      if (plan_type === 'teams') {
+        baseCredits = 1000;
+      }
+      
+      if (billing_frequency === 'yearly') {
+        baseCredits *= 12;
+      }
+      
       const totalCredits = baseCredits * (parseInt(seats) || 1);
       
       // Get user ID first
@@ -293,7 +301,7 @@ export default async function handler(req, res) {
         planType: plan_type,
         billingFrequency: billing_frequency,
         seats: parseInt(seats) || 1,
-        creditsGranted: (billing_frequency === 'yearly' ? 6000 : 500) * (parseInt(seats) || 1)
+        creditsGranted: totalCredits
       }
     };
 

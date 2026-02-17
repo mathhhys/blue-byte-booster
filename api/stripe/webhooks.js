@@ -1212,7 +1212,17 @@ async function determinePaymentType(invoice, subscription) {
 
 // Helper function to calculate credits based on plan and billing frequency
 function calculateCreditsToGrant(planType, billingFrequency, seats = 1) {
-  const baseCredits = billingFrequency === 'yearly' ? 6000 : 500;
+  let baseCredits = 500;
+  
+  // Teams plan gets 1000 credits per user/month
+  if (planType === 'teams') {
+    baseCredits = 1000;
+  }
+  
+  if (billingFrequency === 'yearly') {
+    baseCredits *= 12;
+  }
+  
   return baseCredits * seats;
 }
 

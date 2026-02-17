@@ -35,7 +35,7 @@ export const PLAN_CONFIGS: Record<'pro' | 'teams', PlanConfig> = {
       'Admin dashboard with analytics',
       'Priority support',
     ],
-    credits: 500,
+    credits: 1000,
     maxSeats: 100,
     isContactSales: true,
     isPopular: false,
@@ -74,7 +74,7 @@ export const PLAN_CONFIGS_MULTI_CURRENCY: Record<'pro' | 'teams', MultiCurrencyP
       'User-Role Assignment and User Management',
       'Pooled Credit Base'
     ],
-    credits: 500,
+    credits: 1000,
     maxSeats: 100,
     isContactSales: true,
     isPopular: false,

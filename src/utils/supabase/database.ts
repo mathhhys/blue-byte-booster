@@ -563,7 +563,7 @@ export const databaseHelpers = {
       });
 
       // Grant credits based on plan and seats
-      const creditsPerSeat = 500;
+      const creditsPerSeat = planType === 'teams' ? 1000 : 500;
       const totalCredits = creditsPerSeat * seats;
       
       await creditOperations.grantCredits(
