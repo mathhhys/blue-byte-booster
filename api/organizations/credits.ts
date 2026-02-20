@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { orgAdminMiddleware } from '../../src/utils/clerk/token-verification.js';
+import { orgMemberMiddleware } from '../../src/utils/clerk/token-verification.js';
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'GET') {
@@ -13,17 +13,8 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    // Verify organization admin access (or at least member access to view credits?)
-    // For now, let's allow any member to view credits, but maybe restrict top-up to admins.
-    // The middleware checks if the user is a member of the org.
-    // If we want to restrict to admins, we'd need to check the role.
-    // Let's assume any member can view the credit balance.
-    // Wait, orgAdminMiddleware enforces admin role. Let's stick with that for now as per other endpoints.
-    // Actually, BillingDashboard calls this, and it might be visible to members too?
-    // The dashboard code says "Admin Access Required" for the whole component if not admin.
-    // So orgAdminMiddleware is appropriate.
-    
-    await orgAdminMiddleware(req, org_id);
+    // Allow any member of the organization to view the credit balance
+    const authResult = await orgMemberMiddleware(req, org_id);
 
     const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -57,10 +48,21 @@ export default async function handler(req: any, res: any) {
     const used = organization.used_credits || 0;
     const remaining = Math.max(0, total - used);
 
+    // Also fetch the individual user's credit usage
+    const { data: memberData } = await supabase
+      .from('organization_members')
+      .select('used_credits')
+      .eq('clerk_org_id', org_id)
+      .eq('clerk_user_id', authResult.userId)
+      .single();
+
+    const user_used_credits = memberData?.used_credits || 0;
+
     return res.status(200).json({
       total_credits: total,
       used_credits: used,
-      remaining_credits: remaining
+      remaining_credits: remaining,
+      user_used_credits: user_used_credits
     });
 
   } catch (error: any) {

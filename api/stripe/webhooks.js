@@ -175,8 +175,8 @@ async function handleInvoicePaymentSucceeded(invoice, supabase) {
       let seatsToGrantFor = 0;
       let reason = 'renewal';
 
-      if (invoice.billing_reason === 'subscription_create' || invoice.billing_reason === 'subscription_cycle') {
-        // For new subscriptions or renewals, grant for all seats
+      if (invoice.billing_reason === 'subscription_cycle') {
+        // Only grant credits on recurring renewals; initial credits are handled by checkout.session.completed
         seatsToGrantFor = orgSubscription.seats_total || 1;
         reason = invoice.billing_reason;
       } else if (invoice.billing_reason === 'subscription_update') {
@@ -407,24 +407,38 @@ async function handleCheckoutSessionCompleted(session, supabase) {
           onConflict: 'clerk_org_id'
         });
 
-      // Grant initial credits to the organization (add to existing if any)
+      // Grant initial credits ONLY if not already granted (idempotency guard)
       if (!subError) {
-        const { data: orgData } = await supabase
-          .from('organizations')
-          .select('total_credits')
-          .eq('clerk_org_id', metadata.clerk_org_id)
-          .single();
+        const alreadyGranted = await supabase
+          .from('webhook_events')
+          .select('id')
+          .eq('event_type', 'checkout.session.completed')
+          .filter('payload->>clerk_org_id', 'eq', metadata.clerk_org_id)
+          .eq('status', 'success')
+          .maybeSingle();
 
-        const currentCredits = orgData?.total_credits || 0;
-        const newCredits = currentCredits + creditsToGrant;
+        if (alreadyGranted.data) {
+          console.log('✅ Initial credits already granted for org, skipping duplicate grant');
+        } else {
+          const { data: orgData } = await supabase
+            .from('organizations')
+            .select('total_credits')
+            .eq('clerk_org_id', metadata.clerk_org_id)
+            .single();
 
-        await supabase
-          .from('organizations')
-          .update({
-            total_credits: newCredits,
-            updated_at: new Date().toISOString()
-          })
-          .eq('clerk_org_id', metadata.clerk_org_id);
+          const currentCredits = orgData?.total_credits || 0;
+          const newCredits = currentCredits + creditsToGrant;
+
+          await supabase
+            .from('organizations')
+            .update({
+              total_credits: newCredits,
+              updated_at: new Date().toISOString()
+            })
+            .eq('clerk_org_id', metadata.clerk_org_id);
+
+          console.log(`✅ Initial credits granted: ${creditsToGrant} for org ${metadata.clerk_org_id}`);
+        }
       }
 
       if (subError) {
@@ -533,9 +547,8 @@ async function handleSubscriptionCreated(subscription, supabase) {
     const planType = metadata.plan_type || 'teams';
     const billingFrequency = metadata.billing_frequency || 'monthly';
 
-    // Calculate initial credits
-    const baseCredits = billingFrequency === 'yearly' ? 6000 : 500;
-    const totalCredits = baseCredits * seatsTotal;
+    // NOTE: Credits are NOT granted here. checkout.session.completed is the single source of truth
+    // for initial credit grants. This handler only creates org/subscription records.
 
     const subscriptionData = {
       clerk_org_id: clerkOrgId,
@@ -550,24 +563,6 @@ async function handleSubscriptionCreated(subscription, supabase) {
       current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
       updated_at: new Date().toISOString()
     };
-
-    // Update organization credits (add to existing if any)
-    const { data: orgData } = await supabase
-      .from('organizations')
-      .select('total_credits')
-      .eq('clerk_org_id', clerkOrgId)
-      .single();
-
-    const currentCredits = orgData?.total_credits || 0;
-    const newCredits = currentCredits + totalCredits;
-
-    await supabase
-      .from('organizations')
-      .update({
-        total_credits: newCredits,
-        updated_at: new Date().toISOString()
-      })
-      .eq('clerk_org_id', clerkOrgId);
 
     if (organizationId) {
       subscriptionData.organization_id = organizationId;
@@ -588,7 +583,7 @@ async function handleSubscriptionCreated(subscription, supabase) {
     console.log('  - Seats:', seatsTotal);
     console.log('  - Plan:', planType);
     console.log('  - Billing:', billingFrequency);
-    console.log('  - Credits:', totalCredits);
+    console.log('  - Credits: (handled by checkout.session.completed)');
 
     await recordWebhookProcessing(subscription.id, 'customer.subscription.created', {
       clerk_org_id: clerkOrgId,
