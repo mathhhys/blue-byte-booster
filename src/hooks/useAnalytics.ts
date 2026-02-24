@@ -30,6 +30,7 @@ export function useAnalytics(organizationId: string, yearMonth: string) {
           .single();
 
         if (orgError && orgError.code !== 'PGRST116') throw orgError;
+        console.log('📊 Fetched Org Analytics:', orgData);
         setOrgAnalytics(orgData);
 
         // 2. Fetch Seat Usage (with user details)
@@ -46,6 +47,7 @@ export function useAnalytics(organizationId: string, yearMonth: string) {
           .order('total_credits_used', { ascending: false });
 
         if (seatError) throw seatError;
+        console.log('👥 Fetched Seat Analytics:', seatData);
         setSeatAnalytics(seatData as any);
 
         // 3. Fetch Model Usage
@@ -57,6 +59,7 @@ export function useAnalytics(organizationId: string, yearMonth: string) {
           .order('total_credits_used', { ascending: false });
 
         if (modelError) throw modelError;
+        console.log('🤖 Fetched Model Usage:', modelData);
         setModelUsage(modelData);
 
       } catch (err: any) {
