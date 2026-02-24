@@ -132,7 +132,7 @@ export const MULTI_CURRENCY_PRICING: Record<'pro' | 'teams', MultiCurrencyPrice>
       monthly: 30,
       yearly: 288,
       priceIds: {
-        monthly: 'price_1RwN6oH6gWxKcaTXgmKllDYt',
+        monthly: 'price_1SaINqH6gWxKcaTXAKZ5CoWW',
         yearly: 'price_1RwN8QH6gWxKcaTX7thDBBm7'
       }
     },

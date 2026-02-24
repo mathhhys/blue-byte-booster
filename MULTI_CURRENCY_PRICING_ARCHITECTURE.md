@@ -39,7 +39,7 @@ Complete pricing matrix with all provided Stripe price IDs:
 - GBP: £16/month (price_1RvK8KH6gWxKcaTXQvGGVCNI), £150/year (price_1RvK8KH6gWxKcaTXYTeJ18no)
 
 **Teams Plan:**
-- EUR: €30/month (price_1RwN6oH6gWxKcaTXgmKllDYt), €288/year (price_1RwN8QH6gWxKcaTX7thDBBm7)
+- EUR: €30/month (price_1SaINqH6gWxKcaTXAKZ5CoWW), €288/year (price_1RwN8QH6gWxKcaTX7thDBBm7)
 - USD: $30/month (price_1RwN7VH6gWxKcaTXHVkwwT60), $288/year (price_1RwN8hH6gWxKcaTXEaGbVvhz)
 - GBP: £24/month (price_1RwN7uH6gWxKcaTX0jJCR7uU), £225/year (price_1RwN9FH6gWxKcaTXQBUURC9T)
 

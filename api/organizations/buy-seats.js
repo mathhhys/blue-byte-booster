@@ -53,7 +53,7 @@ export default async function handler(req, res) {
     const priceIds = {
       monthly: {
         USD: 'price_1RwN7VH6gWxKcaTXHVkwwT60',
-        EUR: 'price_1RwN6oH6gWxKcaTXgmKllDYt',
+        EUR: 'price_1SaINqH6gWxKcaTXAKZ5CoWW',
         GBP: 'price_1RwN7uH6gWxKcaTX0jJCR7uU'
       },
       yearly: {
