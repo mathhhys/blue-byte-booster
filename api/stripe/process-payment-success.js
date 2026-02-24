@@ -247,48 +247,99 @@ export default async function handler(req, res) {
       
       const totalCredits = baseCredits * (parseInt(seats) || 1);
       
-      // Get user ID first
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('id, credits')
-        .eq('clerk_id', clerkUserId)
-        .single();
+      if (plan_type === 'teams' && org_id) {
+        // Grant credits to organization
+        console.log('Granting credits to organization:', org_id);
+        
+        // Get organization ID first
+        const { data: orgData, error: orgError } = await supabase
+          .from('organizations')
+          .select('id, total_credits')
+          .eq('clerk_org_id', org_id)
+          .single();
 
-      if (userError || !userData) {
-        throw new Error(`User not found for clerk_id: ${clerkUserId}`);
+        if (orgError || !orgData) {
+          throw new Error(`Organization not found for clerk_org_id: ${org_id}`);
+        }
+
+        const organizationId = orgData.id;
+        const newCredits = (orgData.total_credits || 0) + totalCredits;
+        
+        // Update credits directly
+        const { error: creditError } = await supabase
+          .from('organizations')
+          .update({
+            total_credits: newCredits,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', organizationId);
+
+        if (creditError) throw creditError;
+
+        // Record credit transaction
+        const { error: transactionError } = await supabase
+          .from('organization_credit_transactions')
+          .insert({
+            organization_id: organizationId,
+            amount: totalCredits,
+            description: `${plan_type} plan ${billing_frequency} credits (${seats || 1} seat${(seats || 1) > 1 ? 's' : ''})`,
+            transaction_type: 'purchase',
+            reference_id: session.subscription?.id
+          });
+
+        if (transactionError) {
+          console.error('Failed to record organization credit transaction:', transactionError);
+          // Don't fail the process if transaction recording fails
+        }
+
+        console.log('✅ Organization credits granted:', totalCredits);
+      } else {
+        // Grant credits to user
+        console.log('Granting credits to user:', clerkUserId);
+        
+        // Get user ID first
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('id, credits')
+          .eq('clerk_id', clerkUserId)
+          .single();
+
+        if (userError || !userData) {
+          throw new Error(`User not found for clerk_id: ${clerkUserId}`);
+        }
+
+        const userId = userData.id;
+        const newCredits = (userData.credits || 0) + totalCredits;
+        
+        // Update credits directly
+        const { error: creditError } = await supabase
+          .from('users')
+          .update({
+            credits: newCredits,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', userId);
+
+        if (creditError) throw creditError;
+
+        // Record credit transaction
+        const { error: transactionError } = await supabase
+          .from('credit_transactions')
+          .insert({
+            user_id: userId,
+            amount: totalCredits,
+            description: `${plan_type} plan ${billing_frequency} credits (${seats || 1} seat${(seats || 1) > 1 ? 's' : ''})`,
+            transaction_type: 'purchase',
+            reference_id: session.subscription?.id
+          });
+
+        if (transactionError) {
+          console.error('Failed to record credit transaction:', transactionError);
+          // Don't fail the process if transaction recording fails
+        }
+
+        console.log('✅ User credits granted:', totalCredits);
       }
-
-      const userId = userData.id;
-      const newCredits = (userData.credits || 0) + totalCredits;
-      
-      // Update credits directly
-      const { error: creditError } = await supabase
-        .from('users')
-        .update({
-          credits: newCredits,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', userId);
-
-      if (creditError) throw creditError;
-
-      // Record credit transaction
-      const { error: transactionError } = await supabase
-        .from('credit_transactions')
-        .insert({
-          user_id: userId,
-          amount: totalCredits,
-          description: `${plan_type} plan ${billing_frequency} credits (${seats || 1} seat${(seats || 1) > 1 ? 's' : ''})`,
-          transaction_type: 'purchase',
-          reference_id: session.subscription?.id
-        });
-
-      if (transactionError) {
-        console.error('Failed to record credit transaction:', transactionError);
-        // Don't fail the process if transaction recording fails
-      }
-
-      console.log('✅ Credits granted:', totalCredits);
     } catch (error) {
       console.error('❌ Error granting credits:', error);
       return res.status(500).json({ error: 'Failed to grant credits' });
