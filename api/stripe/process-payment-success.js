@@ -14,7 +14,7 @@ export default async function handler(req, res) {
     }
 
     console.log('Step 1: Parsing request body...');
-    const { sessionId, clerkUserId } = req.body;
+    const { sessionId, clerkUserId, clerkOrgId } = req.body;
     console.log('Request body:', req.body);
 
     if (!sessionId || !clerkUserId) {
@@ -95,6 +95,9 @@ export default async function handler(req, res) {
     }
 
     const { plan_type, billing_frequency, seats = 1, type, org_id, quantity } = metadata;
+    
+    // Use clerkOrgId from request body if available, otherwise fallback to metadata
+    const finalOrgId = clerkOrgId || org_id || metadata.clerk_org_id;
 
     // Handle additional seats purchase
     if (type === 'additional_seats') {
@@ -212,86 +215,210 @@ export default async function handler(req, res) {
     }
 
     console.log('Step 6: Creating subscription record...');
-    // Create subscription record
-    try {
-      const { error: subError } = await supabase
-        .from('subscriptions')
-        .insert({
-          user_id: user.id,
+    
+    let totalCredits = 0;
+    
+    if (plan_type === 'teams' && finalOrgId) {
+      console.log('🏢 Processing Teams plan for organization:', finalOrgId);
+      
+      // Ensure organization exists
+      const { data: existingOrg, error: orgCheckError } = await supabase
+        .from('organizations')
+        .select('id, total_credits')
+        .eq('clerk_org_id', finalOrgId)
+        .maybeSingle();
+        
+      let organizationId = existingOrg?.id;
+      
+      if (!existingOrg) {
+        console.log('Creating organization record for:', finalOrgId);
+        const orgName = metadata.organization_name || `Organization ${finalOrgId.slice(-8)}`;
+        
+        const { data: newOrg, error: orgError } = await supabase
+          .rpc('upsert_organization', {
+            p_clerk_org_id: finalOrgId,
+            p_name: orgName
+          });
+          
+        if (orgError) {
+          console.error('Failed to create organization:', orgError);
+          // Try direct insert as fallback
+          const { data: insertedOrg, error: insertError } = await supabase
+            .from('organizations')
+            .insert({
+              clerk_org_id: finalOrgId,
+              name: orgName
+            })
+            .select('id')
+            .single();
+            
+          if (insertError) throw insertError;
+          organizationId = insertedOrg.id;
+        } else {
+          const { data: org } = await supabase
+            .from('organizations')
+            .select('id')
+            .eq('clerk_org_id', finalOrgId)
+            .single();
+          organizationId = org?.id;
+        }
+      }
+      
+      // Create organization subscription
+      try {
+        const subscriptionData = {
+          clerk_org_id: finalOrgId,
+          organization_id: organizationId,
           stripe_subscription_id: session.subscription?.id,
+          stripe_customer_id: session.customer,
           plan_type,
           billing_frequency,
-          seats: parseInt(seats) || 1,
+          seats_total: parseInt(seats) || 1,
+          seats_used: 0,
           status: 'active',
-        });
-
-      if (subError) throw subError;
-      console.log('✅ Subscription record created');
-    } catch (error) {
-      console.error('❌ Error creating subscription:', error);
-      return res.status(500).json({ error: 'Failed to create subscription' });
-    }
-
-    console.log('Step 7: Granting credits...');
-    // Grant credits based on billing frequency
-    try {
-      // Calculate credits based on billing frequency and seats
-      let baseCredits = 500;
-      if (plan_type === 'teams') {
-        baseCredits = 1000;
-      }
-      
-      if (billing_frequency === 'yearly') {
-        baseCredits *= 12;
-      }
-      
-      const totalCredits = baseCredits * (parseInt(seats) || 1);
-      
-      // Get user ID first
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('id, credits')
-        .eq('clerk_id', clerkUserId)
-        .single();
-
-      if (userError || !userData) {
-        throw new Error(`User not found for clerk_id: ${clerkUserId}`);
-      }
-
-      const userId = userData.id;
-      const newCredits = (userData.credits || 0) + totalCredits;
-      
-      // Update credits directly
-      const { error: creditError } = await supabase
-        .from('users')
-        .update({
-          credits: newCredits,
           updated_at: new Date().toISOString()
-        })
-        .eq('id', userId);
+        };
+        
+        const { error: subError } = await supabase
+          .from('organization_subscriptions')
+          .upsert(subscriptionData, { onConflict: 'clerk_org_id' });
+          
+        if (subError) throw subError;
+        console.log('✅ Organization subscription record created');
+      } catch (error) {
+        console.error('❌ Error creating organization subscription:', error);
+        return res.status(500).json({ error: 'Failed to create organization subscription' });
+      }
+      
+      // Grant organization credits
+      try {
+        let baseCredits = 1000;
+        if (billing_frequency === 'yearly') {
+          baseCredits *= 12;
+        }
+        totalCredits = baseCredits * (parseInt(seats) || 1);
+        
+        const { data: orgData } = await supabase
+          .from('organizations')
+          .select('total_credits')
+          .eq('clerk_org_id', finalOrgId)
+          .single();
+          
+        const newCredits = (orgData?.total_credits || 0) + totalCredits;
+        
+        const { error: creditError } = await supabase
+          .from('organizations')
+          .update({
+            total_credits: newCredits,
+            updated_at: new Date().toISOString()
+          })
+          .eq('clerk_org_id', finalOrgId);
+          
+        if (creditError) throw creditError;
+        
+        // Record credit transaction
+        const { error: transactionError } = await supabase
+          .from('organization_credit_transactions')
+          .insert({
+            organization_id: organizationId,
+            amount: totalCredits,
+            description: `Initial ${plan_type} plan ${billing_frequency} credits (${seats || 1} seat${(seats || 1) > 1 ? 's' : ''})`,
+            transaction_type: 'recurring',
+            reference_id: session.subscription?.id
+          });
+          
+        if (transactionError) {
+          console.error('Failed to record org credit transaction:', transactionError);
+        }
+        
+        console.log('✅ Organization credits granted:', totalCredits);
+      } catch (error) {
+        console.error('❌ Error granting organization credits:', error);
+        return res.status(500).json({ error: 'Failed to grant organization credits' });
+      }
+      
+    } else {
+      // Create regular subscription record
+      try {
+        const { error: subError } = await supabase
+          .from('subscriptions')
+          .insert({
+            user_id: user.id,
+            stripe_subscription_id: session.subscription?.id,
+            plan_type,
+            billing_frequency,
+            seats: parseInt(seats) || 1,
+            status: 'active',
+          });
 
-      if (creditError) throw creditError;
-
-      // Record credit transaction
-      const { error: transactionError } = await supabase
-        .from('credit_transactions')
-        .insert({
-          user_id: userId,
-          amount: totalCredits,
-          description: `${plan_type} plan ${billing_frequency} credits (${seats || 1} seat${(seats || 1) > 1 ? 's' : ''})`,
-          transaction_type: 'purchase',
-          reference_id: session.subscription?.id
-        });
-
-      if (transactionError) {
-        console.error('Failed to record credit transaction:', transactionError);
-        // Don't fail the process if transaction recording fails
+        if (subError) throw subError;
+        console.log('✅ Subscription record created');
+      } catch (error) {
+        console.error('❌ Error creating subscription:', error);
+        return res.status(500).json({ error: 'Failed to create subscription' });
       }
 
-      console.log('✅ Credits granted:', totalCredits);
-    } catch (error) {
-      console.error('❌ Error granting credits:', error);
-      return res.status(500).json({ error: 'Failed to grant credits' });
+      console.log('Step 7: Granting credits...');
+      // Grant credits based on billing frequency
+      try {
+        // Calculate credits based on billing frequency and seats
+        let baseCredits = 500;
+        if (plan_type === 'teams') {
+          baseCredits = 1000;
+        }
+        
+        if (billing_frequency === 'yearly') {
+          baseCredits *= 12;
+        }
+        
+        totalCredits = baseCredits * (parseInt(seats) || 1);
+        
+        // Get user ID first
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('id, credits')
+          .eq('clerk_id', clerkUserId)
+          .single();
+
+        if (userError || !userData) {
+          throw new Error(`User not found for clerk_id: ${clerkUserId}`);
+        }
+
+        const userId = userData.id;
+        const newCredits = (userData.credits || 0) + totalCredits;
+        
+        // Update credits directly
+        const { error: creditError } = await supabase
+          .from('users')
+          .update({
+            credits: newCredits,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', userId);
+
+        if (creditError) throw creditError;
+
+        // Record credit transaction
+        const { error: transactionError } = await supabase
+          .from('credit_transactions')
+          .insert({
+            user_id: userId,
+            amount: totalCredits,
+            description: `${plan_type} plan ${billing_frequency} credits (${seats || 1} seat${(seats || 1) > 1 ? 's' : ''})`,
+            transaction_type: 'purchase',
+            reference_id: session.subscription?.id
+          });
+
+        if (transactionError) {
+          console.error('Failed to record credit transaction:', transactionError);
+          // Don't fail the process if transaction recording fails
+        }
+
+        console.log('✅ Credits granted:', totalCredits);
+      } catch (error) {
+        console.error('❌ Error granting credits:', error);
+        return res.status(500).json({ error: 'Failed to grant credits' });
+      }
     }
 
     const response = {

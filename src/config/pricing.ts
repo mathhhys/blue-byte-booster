@@ -17,7 +17,7 @@ export const MULTI_CURRENCY_PRICING: Record<'pro' | 'teams', MultiCurrencyPrice>
       yearly: 288,
       priceIds: {
         monthly: 'price_1SaINqH6gWxKcaTXAKZ5CoWW',
-        yearly: 'price_1RwN8QH6gWxKcaTX7thDBBm7'
+        yearly: 'price_After checkout from Teams plans, the user will need to create an organization via Clerk where the subscriptions they have just purchased will become seats for the organization. They can then invite their colleagues via the Clerk elements already present on the site. Everything must be well coordinated with the current implementation.1RwN8QH6gWxKcaTX7thDBBm7'
       }
     }
   }
