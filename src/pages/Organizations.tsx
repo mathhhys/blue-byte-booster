@@ -78,6 +78,7 @@ const Organizations = () => {
   const { user } = useUser();
   const { organization, isLoaded: orgLoaded, membership } = useOrganization();
   const { toast } = useToast();
+  const { getToken } = useAuth();
   const [activeTab, setActiveTab] = useState('settings');
   const [isBillingPortalLoading, setIsBillingPortalLoading] = useState(false);
 
@@ -167,35 +168,54 @@ const Organizations = () => {
     setIsBillingPortalLoading(true);
 
     try {
-      const result = await createStripeCustomerPortalSession(user.id);
+      const token = await getToken();
 
-      if (result.success) {
-        if (result.url) {
+      if (organization?.id) {
+        console.log('🔧 Initiating billing portal redirect for organization:', organization.id);
+        const { createOrganizationBillingPortal } = await import('@/utils/organization/billing');
+        const result = await createOrganizationBillingPortal(organization.id, token);
+
+        if (result.success && result.url) {
+          console.log('✅ Organization billing portal session created, redirecting to:', result.url);
           window.location.href = result.url;
-        } else if ('mock' in result && result.mock && import.meta.env.DEV) {
-          toast({
-            title: "Development Mode",
-            description: "Billing portal would redirect in production. Using mock implementation.",
-          });
         } else {
+          throw new Error(result.error || 'Failed to create organization billing portal session');
+        }
+      } else {
+        console.log('🔧 Initiating billing portal redirect for user:', user.id);
+        const result = await createStripeCustomerPortalSession(user.id);
+
+        if (result.success) {
+          if (result.url) {
+            console.log('✅ Billing portal session created, redirecting to:', result.url);
+            window.location.href = result.url;
+          } else if ('mock' in result && result.mock && import.meta.env.DEV) {
+            toast({
+              title: "Development Mode",
+              description: "Billing portal would redirect in production. Using mock implementation.",
+            });
+          } else {
+            console.error('❌ Failed to create billing portal session: No URL provided');
+            toast({
+              title: "Billing Portal Error",
+              description: "Failed to access billing portal. Please try again.",
+              variant: "destructive",
+            });
+          }
+        } else {
+          console.error('❌ Failed to create billing portal session:', 'error' in result ? result.error : 'Unknown error');
           toast({
             title: "Billing Portal Error",
-            description: "Failed to access billing portal. Please try again.",
+            description: ('error' in result ? result.error : null) || "Failed to access billing portal. Please try again.",
             variant: "destructive",
           });
         }
-      } else {
-        toast({
-          title: "Billing Portal Error",
-          description: ('error' in result ? result.error : null) || "Failed to access billing portal. Please try again.",
-          variant: "destructive",
-        });
       }
     } catch (error) {
       console.error('❌ Error accessing billing portal:', error);
       toast({
         title: "Billing Portal Error",
-        description: "An unexpected error occurred. Please try again later.",
+        description: error instanceof Error ? error.message : "An unexpected error occurred. Please try again later.",
         variant: "destructive",
       });
     } finally {
