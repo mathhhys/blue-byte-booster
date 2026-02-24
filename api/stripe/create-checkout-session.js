@@ -277,9 +277,7 @@ export default async function handler(req, res) {
           seats: seats.toString(),
           currency: currency || 'USD',
         },
-        // Configure trial periods based on plan type
-        ...(planType === 'pro' && !clerkOrgId && { trial_period_days: 7 }), // 7-day trial for individual Pro
-        ...(planType === 'teams' && { trial_period_days: 14 }), // 14-day trial for Teams (individual or organization)
+        ...(planType === 'pro' && !clerkOrgId && { trial_period_days: 7 }), // Only trial for individual pro? Or maybe teams too? Assuming individual for now.
       },
     };
     

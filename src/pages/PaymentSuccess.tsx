@@ -17,13 +17,11 @@ import { getStripeSessionStatus, processPaymentSuccess as processPaymentSuccessA
 import { databaseHelpers } from '@/utils/supabase/database';
 import { InvitationManager } from '@/components/teams/InvitationManager';
 import { PLAN_CONFIGS } from '@/config/plans';
-import { useOrganization } from '@clerk/clerk-react';
 
 export default function PaymentSuccess() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user, isLoaded } = useUser();
-  const { organization } = useOrganization();
 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -77,7 +75,7 @@ export default function PaymentSuccess() {
 
       // Process payment via backend API (handles user creation, credits, etc.)
       try {
-        const result = await processPaymentSuccessAPI(sessionId, user.id, organization?.id);
+        const result = await processPaymentSuccessAPI(sessionId, user.id);
         
         if (!result.success) {
           console.error('Backend payment processing failed:', result.error);
@@ -93,11 +91,6 @@ export default function PaymentSuccess() {
 
       // For Teams plan, show invitation interface
       if (finalPlanType === 'teams' && finalSeats > 1) {
-        if (!organization) {
-          // Redirect to create organization if they don't have one
-          navigate(`/organization/new?plan=teams&billing=${finalBillingFrequency}&seats=${finalSeats}&currency=EUR`);
-          return;
-        }
         setSubscriptionId(sessionStatus.data.subscription_id || `sub_demo_${Date.now()}`);
         setShowInvitations(true);
       } else {

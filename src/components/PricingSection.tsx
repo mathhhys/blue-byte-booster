@@ -21,7 +21,6 @@ import { Label } from "./ui/label";
 export default function PricingSection() {
   const { getToken } = useAuth();
   const { user, isSignedIn } = useUser();
-  const { organization, memberships } = useOrganization();
   const [seats, setSeats] = useState(3);
 
   const handleProCheckout = async () => {
@@ -111,22 +110,30 @@ export default function PricingSection() {
       return;
     }
   
-    if (organization) {
-      // Check if user is admin
-      const currentMembership = memberships?.data?.find(m => m.publicUserData?.userId === user?.id);
-      if (currentMembership?.role !== 'org:admin') {
-        alert('Only organization admins can manage subscriptions. Please contact your admin.');
-        return;
-      }
+    const { organization } = useOrganization();
+    if (!organization) {
+      // Redirect to create organization
+      setTimeout(() => {
+        window.location.href = `/organization/new?plan=teams&billing=monthly&seats=${seats}&currency=EUR`;
+      }, 300);
+      return;
     }
   
-    if (!user?.id) {
-      console.error('User not available');
+    // Check if user is admin
+    const { memberships } = useOrganization();
+    const currentMembership = memberships?.data?.find(m => m.publicUserData?.userId === user.id);
+    if (currentMembership?.role !== 'org:admin') {
+      alert('Only organization admins can manage subscriptions. Please contact your admin.');
+      return;
+    }
+  
+    if (!user?.id || !organization.id) {
+      console.error('User or organization not available');
       return;
     }
   
     try {
-      // Initialize user/org if needed
+      // Initialize user/org if needed (optional for teams)
       const token = await getToken();
       await fetch('/api/user/initialize', {
         method: 'POST',
@@ -139,47 +146,18 @@ export default function PricingSection() {
         }),
       });
   
-      let result;
-      
-      if (organization) {
-        result = await createOrganizationSubscription({
-          clerk_org_id: organization.id,
-          plan_type: 'teams',
-          billing_frequency: 'monthly',
-          seats_total: seats,
-        }, token);
-      } else {
-        const checkoutData = prepareMultiCurrencyCheckoutData(
-          'teams',
-          'monthly',
-          'EUR' as CurrencyCode,
-          user.id,
-          seats
-        );
-        result = await createMultiCurrencyCheckoutSession(checkoutData);
-      }
+      const result = await createOrganizationSubscription({
+        clerk_org_id: organization.id,
+        plan_type: 'teams',
+        billing_frequency: 'monthly',
+        seats_total: seats,
+      }, token);
   
-      if (result.success) {
-        const url = (result as any).checkout_url || (result as any).url;
-        if (url) {
-          // Small delay to ensure pixel event fires before navigation
-          setTimeout(() => {
-            window.location.href = url;
-          }, 300);
-        } else if ((result as any).sessionId) {
-          // Fallback for mock or sessionId-only responses
-          const stripeResult = await fetch('/api/stripe/session-status', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ sessionId: (result as any).sessionId }),
-          });
-          const sessionData = await stripeResult.json();
-          if (sessionData.url) {
-            setTimeout(() => {
-              window.location.href = sessionData.url;
-            }, 300);
-          }
-        }
+      if (result.success && result.checkout_url) {
+        // Small delay to ensure pixel event fires before navigation
+        setTimeout(() => {
+          window.location.href = result.checkout_url!;
+        }, 300);
       } else {
         console.error('Failed to create teams checkout session');
       }

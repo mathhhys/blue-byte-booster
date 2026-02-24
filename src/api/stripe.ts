@@ -208,7 +208,7 @@ export const getStripeSessionStatus = async (sessionId: string) => {
 };
 
 // Process payment success via backend API
-export const processPaymentSuccess = async (sessionId: string, clerkUserId: string, clerkOrgId?: string) => {
+export const processPaymentSuccess = async (sessionId: string, clerkUserId: string) => {
   try {
     const response = await fetch(`${API_BASE_URL}/api/stripe/process-payment-success`, {
       method: 'POST',
@@ -218,7 +218,6 @@ export const processPaymentSuccess = async (sessionId: string, clerkUserId: stri
       body: JSON.stringify({
         sessionId,
         clerkUserId,
-        clerkOrgId,
       }),
     });
 
@@ -314,7 +313,7 @@ export const mockCreateMultiCurrencyCheckoutSession = async (checkoutData: Strip
     }
 
     // Enterprise plans should not reach this point as they are contact sales
-    if ((checkoutData.planType as string) === 'enterprise') {
+    if (checkoutData.planType === 'enterprise') {
       throw new Error('Enterprise plans require direct contact with sales');
     }
 
