@@ -94,12 +94,13 @@ export default async function handler(req, res) {
       Object.assign(metadata, session.subscription.metadata);
     }
 
-    const { plan_type, billing_frequency, seats = 1, type, org_id, quantity } = metadata;
+    const { plan_type, billing_frequency, seats = 1, type, org_id, clerk_org_id, quantity } = metadata;
+    const actualOrgId = org_id || clerk_org_id;
 
     // Handle additional seats purchase
     if (type === 'additional_seats') {
       console.log('Processing additional seats purchase...');
-      if (!org_id || !quantity) {
+      if (!actualOrgId || !quantity) {
         return res.status(400).json({ error: 'Missing org_id or quantity for additional seats' });
       }
 
@@ -108,7 +109,7 @@ export default async function handler(req, res) {
         const { data: orgSub, error: fetchError } = await supabase
           .from('organization_subscriptions')
           .select('seats_total, stripe_subscription_id')
-          .eq('clerk_org_id', org_id)
+          .eq('clerk_org_id', actualOrgId)
           .eq('status', 'active')
           .single();
 
@@ -121,7 +122,7 @@ export default async function handler(req, res) {
         const { error: updateError } = await supabase
           .from('organization_subscriptions')
           .update({ seats_total: newSeatsTotal, updated_at: new Date().toISOString() })
-          .eq('clerk_org_id', org_id);
+          .eq('clerk_org_id', actualOrgId);
 
         if (updateError) throw updateError;
 
@@ -247,15 +248,18 @@ export default async function handler(req, res) {
       
       const totalCredits = baseCredits * (parseInt(seats) || 1);
       
-      if (plan_type === 'teams' && org_id) {
+      if (plan_type === 'teams') {
+        if (!actualOrgId) {
+          throw new Error('Organization ID is missing for teams plan');
+        }
         // Grant credits to organization
-        console.log('Granting credits to organization:', org_id);
+        console.log('Granting credits to organization:', actualOrgId);
         
         // Get organization ID first
         const { data: orgData, error: orgError } = await supabase
           .from('organizations')
           .select('id, total_credits')
-          .eq('clerk_org_id', org_id)
+          .eq('clerk_org_id', actualOrgId)
           .single();
 
         if (orgError || !orgData) {
