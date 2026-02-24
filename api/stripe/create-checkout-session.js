@@ -277,7 +277,8 @@ export default async function handler(req, res) {
           seats: seats.toString(),
           currency: currency || 'USD',
         },
-        ...(planType === 'pro' && !clerkOrgId && { trial_period_days: 7 }), // Only trial for individual pro? Or maybe teams too? Assuming individual for now.
+        ...(planType === 'pro' && !clerkOrgId && { trial_period_days: 7 }),
+        ...(planType === 'teams' && { trial_period_days: 14 }),
       },
     };
     
