@@ -10,6 +10,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
+import { useAnalytics } from '@/hooks/useAnalytics';
+import { OrganizationOverview } from '@/components/analytics/OrganizationOverview';
+import { SeatUsageTable } from '@/components/analytics/SeatUsageTable';
+import { ModelUsageBreakdown } from '@/components/analytics/ModelUsageBreakdown';
 import {
   Settings,
   Users,
@@ -87,6 +91,20 @@ const Organizations = () => {
   const [orgAnalytics, setOrgAnalytics] = useState<OrgAnalytics | null>(null);
   const [usersAnalytics, setUsersAnalytics] = useState<UserAnalytics[]>([]);
   const [isLoadingAnalytics, setIsLoadingAnalytics] = useState(false);
+
+  // New Analytics state
+  const [yearMonth, setYearMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
+
+  const {
+    orgAnalytics: newOrgAnalytics,
+    seatAnalytics,
+    modelUsage,
+    isLoading: isNewAnalyticsLoading,
+    error: newAnalyticsError
+  } = useAnalytics(organization?.id || '', yearMonth);
 
   const userColumns: ColumnDef<UserAnalytics>[] = [
     {
@@ -469,128 +487,28 @@ const Organizations = () => {
                       <div className="mb-8">
                         <div className="flex items-center justify-between mb-6">
                           <h2 className="text-2xl font-bold text-white">Analytics</h2>
-                          <DateRangePicker onChange={setDateRange} />
+                          <input
+                            type="month"
+                            value={yearMonth}
+                            onChange={(e) => setYearMonth(e.target.value)}
+                            className="border border-white/10 bg-[#1a1a1a] text-white rounded-md px-3 py-2"
+                          />
                         </div>
 
-                        <Tabs defaultValue="org" className="space-y-4">
-                          <TabsList className="bg-[#1a1a1a] border border-white/10">
-                            <TabsTrigger value="org" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white text-gray-400">Organization Overview</TabsTrigger>
-                            <TabsTrigger value="per-seat" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white text-gray-400">Per-Seat Usage</TabsTrigger>
-                          </TabsList>
-                          
-                          <TabsContent value="org" className="space-y-4">
-                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                              <Card className="bg-[#2a2a2a] border-white/10">
-                                <CardHeader className="pb-2">
-                                  <CardTitle className="text-sm font-medium text-gray-400">Total Requests</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                  <div className="text-2xl font-bold text-white">
-                                    {isLoadingAnalytics ? (
-                                      <div className="h-8 w-24 bg-gray-600/20 rounded animate-pulse" />
-                                    ) : (
-                                      orgAnalytics?.total_requests.toLocaleString() || 0
-                                    )}
-                                  </div>
-                                </CardContent>
-                              </Card>
-                              <Card className="bg-[#2a2a2a] border-white/10">
-                                <CardHeader className="pb-2">
-                                  <CardTitle className="text-sm font-medium text-gray-400">Credits Spent</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                  <div className="text-2xl font-bold text-white">
-                                    {isLoadingAnalytics ? (
-                                      <div className="h-8 w-24 bg-gray-600/20 rounded animate-pulse" />
-                                    ) : (
-                                      orgAnalytics?.total_credits.toLocaleString() || 0
-                                    )}
-                                  </div>
-                                </CardContent>
-                              </Card>
-                              <Card className="bg-[#2a2a2a] border-white/10">
-                                <CardHeader className="pb-2">
-                                  <CardTitle className="text-sm font-medium text-gray-400">Input Tokens</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                  <div className="text-2xl font-bold text-white">
-                                    {isLoadingAnalytics ? (
-                                      <div className="h-8 w-24 bg-gray-600/20 rounded animate-pulse" />
-                                    ) : (
-                                      orgAnalytics?.total_input_tokens.toLocaleString() || 0
-                                    )}
-                                  </div>
-                                </CardContent>
-                              </Card>
-                              <Card className="bg-[#2a2a2a] border-white/10">
-                                <CardHeader className="pb-2">
-                                  <CardTitle className="text-sm font-medium text-gray-400">Output Tokens</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                  <div className="text-2xl font-bold text-white">
-                                    {isLoadingAnalytics ? (
-                                      <div className="h-8 w-24 bg-gray-600/20 rounded animate-pulse" />
-                                    ) : (
-                                      orgAnalytics?.total_output_tokens.toLocaleString() || 0
-                                    )}
-                                  </div>
-                                </CardContent>
-                              </Card>
+                        {isNewAnalyticsLoading ? (
+                          <div className="p-8 text-center text-gray-400">Loading analytics...</div>
+                        ) : newAnalyticsError ? (
+                          <div className="p-8 text-red-500">Error: {newAnalyticsError}</div>
+                        ) : (
+                          <>
+                            <OrganizationOverview data={newOrgAnalytics} />
+                            
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                              <SeatUsageTable data={seatAnalytics} />
+                              <ModelUsageBreakdown data={modelUsage} />
                             </div>
-
-                            {/* Top Models */}
-                            <Card className="bg-[#2a2a2a] border-white/10">
-                              <CardHeader>
-                                <CardTitle className="text-lg font-medium text-white">Top Models</CardTitle>
-                              </CardHeader>
-                              <CardContent>
-                                {isLoadingAnalytics ? (
-                                  <div className="space-y-2">
-                                    {[1, 2, 3].map((i) => (
-                                      <div key={i} className="h-12 bg-gray-600/20 rounded animate-pulse" />
-                                    ))}
-                                  </div>
-                                ) : (
-                                  <div className="space-y-4">
-                                    {orgAnalytics?.top_models?.map((model) => (
-                                      <div key={model.model_id} className="flex items-center justify-between p-3 bg-[#1a1a1a] rounded-lg border border-white/5">
-                                        <div>
-                                          <div className="font-medium text-white">{model.model_id}</div>
-                                          <div className="text-xs text-gray-500">{model.requests} requests</div>
-                                        </div>
-                                        <div className="text-right">
-                                          <div className="font-bold text-white">€{model.cost.toFixed(4)}</div>
-                                        </div>
-                                      </div>
-                                    ))}
-                                    {(!orgAnalytics?.top_models || orgAnalytics.top_models.length === 0) && (
-                                      <div className="text-center text-gray-500 py-4">No usage data available</div>
-                                    )}
-                                  </div>
-                                )}
-                              </CardContent>
-                            </Card>
-                          </TabsContent>
-
-                          <TabsContent value="per-seat">
-                            <Card className="bg-[#2a2a2a] border-white/10">
-                              <CardHeader>
-                                <CardTitle className="text-lg font-medium text-white">Per-Seat Usage</CardTitle>
-                              </CardHeader>
-                              <CardContent>
-                                {isLoadingAnalytics ? (
-                                  <div className="space-y-2">
-                                    {[1, 2, 3].map((i) => (
-                                      <div key={i} className="h-12 bg-gray-600/20 rounded animate-pulse" />
-                                    ))}
-                                  </div>
-                                ) : (
-                                  <DataTable columns={userColumns} data={usersAnalytics} />
-                                )}
-                              </CardContent>
-                            </Card>
-                          </TabsContent>
-                        </Tabs>
+                          </>
+                        )}
                       </div>
                     </TabsContent>
 
