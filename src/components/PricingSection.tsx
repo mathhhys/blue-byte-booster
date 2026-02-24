@@ -114,7 +114,7 @@ export default function PricingSection() {
     if (!organization) {
       // Redirect to create organization
       setTimeout(() => {
-        window.location.href = `/organization/new?plan=teams&billing=monthly&seats=${seats}&currency=EUR`;
+        window.location.href = `/auth/create-organization?plan=teams&billing=monthly&seats=${seats}&currency=EUR`;
       }, 300);
       return;
     }

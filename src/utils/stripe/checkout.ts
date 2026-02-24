@@ -114,7 +114,8 @@ export const prepareMultiCurrencyCheckoutData = (
   billingFrequency: 'monthly' | 'yearly',
   currency: CurrencyCode,
   clerkUserId: string,
-  seats: number = 1
+  seats: number = 1,
+  clerkOrgId?: string
 ): StripeCheckoutDataWithCurrency => {
   const priceId = getPriceId(planType, billingFrequency, currency);
   const baseUrl = window.location.origin;
@@ -126,6 +127,7 @@ export const prepareMultiCurrencyCheckoutData = (
     priceId,
     seats,
     clerkUserId,
+    clerkOrgId,
     successUrl: `${baseUrl}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
     cancelUrl: `${baseUrl}/payment/cancelled`,
   };
@@ -136,7 +138,8 @@ export const prepareCheckoutData = (
   planType: 'pro' | 'teams',
   billingFrequency: 'monthly' | 'yearly',
   clerkUserId: string,
-  seats: number = 1
+  seats: number = 1,
+  clerkOrgId?: string
 ): StripeCheckoutData => {
   const baseUrl = window.location.origin;
   
@@ -145,6 +148,7 @@ export const prepareCheckoutData = (
     billingFrequency,
     seats,
     clerkUserId,
+    clerkOrgId,
     successUrl: `${baseUrl}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
     cancelUrl: `${baseUrl}/payment/cancelled`,
   };

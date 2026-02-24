@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { useUser } from '@clerk/clerk-react';
+import { useUser, useOrganization } from '@clerk/clerk-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Loader2, CheckCircle, XCircle } from 'lucide-react';
@@ -14,6 +14,7 @@ const PostSignup = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user, isLoaded } = useUser();
+  const { organization, isLoaded: orgLoaded } = useOrganization();
   
   const [status, setStatus] = useState<'loading' | 'processing' | 'success' | 'error'>('loading');
   const [error, setError] = useState<string>('');
@@ -26,16 +27,16 @@ const PostSignup = () => {
   const originalRedirect = searchParams.get('original_redirect');
 
   useEffect(() => {
-    if (isLoaded && user && plan) {
+    if (isLoaded && orgLoaded && user && plan) {
       processPlanSelection();
-    } else if (isLoaded && !user) {
+    } else if (isLoaded && orgLoaded && !user) {
       // User not authenticated, redirect to sign-up
       navigate('/sign-up');
-    } else if (isLoaded && user && !plan) {
+    } else if (isLoaded && orgLoaded && user && !plan) {
       // No plan selected, redirect to dashboard
       navigate('/dashboard');
     }
-  }, [isLoaded, user, plan]);
+  }, [isLoaded, orgLoaded, user, plan, organization]);
 
   const processPlanSelection = async () => {
     if (!user || !plan) return;
@@ -72,6 +73,19 @@ const PostSignup = () => {
         return;
       }
 
+      // For teams plan, ensure user has an organization
+      if (plan === 'teams' && !organization) {
+        const params = new URLSearchParams();
+        params.set('plan', plan);
+        if (billing) params.set('billing', billing);
+        if (currency) params.set('currency', currency);
+        if (seats) params.set('seats', seats.toString());
+        if (originalRedirect) params.set('redirect_url', originalRedirect);
+        
+        navigate(`/auth/create-organization?${params.toString()}`);
+        return;
+      }
+
       // Initialize user via API route to avoid RLS issues
       const initResponse = await fetch('/api/user/initialize', {
         method: 'POST',
@@ -100,7 +114,8 @@ const PostSignup = () => {
         billing,
         currency,
         user.id,
-        seats
+        seats,
+        plan === 'teams' ? organization?.id : undefined
       );
 
       const result = await createMultiCurrencyCheckoutSession(checkoutData);

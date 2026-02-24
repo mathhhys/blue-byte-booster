@@ -16,6 +16,7 @@ import NotFound from "./pages/NotFound";
 import SignUp from "./pages/SignUp";
 import SignIn from "./pages/SignIn";
 import PostSignup from "./pages/PostSignup";
+import CreateOrganization from "./pages/CreateOrganization";
 import Dashboard from "./pages/Dashboard";
 import Organizations from "./pages/Organizations";
 import Profile from "./pages/Profile";
@@ -52,6 +53,19 @@ const App = () => {
         <Route path="/sign-up/*" element={<SignUp />} />
         <Route path="/sign-in/*" element={<SignIn />} />
         <Route path="/auth/post-signup" element={<PostSignup />} />
+        <Route
+          path="/auth/create-organization"
+          element={
+            <>
+              <SignedIn>
+                <CreateOrganization />
+              </SignedIn>
+              <SignedOut>
+                <RedirectToSignIn />
+              </SignedOut>
+            </>
+          }
+        />
         <Route path="/auth/vscode-initiate" element={<VscodeInitiateAuth />} />
         <Route path="/auth/vscode-callback" element={<VscodeAuthCallback />} />
         <Route path="/extension-signin" element={<ExtensionSignIn />} />

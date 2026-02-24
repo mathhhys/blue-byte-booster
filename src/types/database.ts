@@ -450,6 +450,7 @@ export interface StripeCheckoutData {
   billingFrequency: 'monthly' | 'yearly';
   seats?: number;
   clerkUserId: string;
+  clerkOrgId?: string;
   successUrl: string;
   cancelUrl: string;
 }
