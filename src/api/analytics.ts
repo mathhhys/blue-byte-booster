@@ -14,7 +14,12 @@ export async function getOrgAnalytics(orgId: string, startDate: string, endDate:
   });
 
   if (error) {
-    console.error('Error fetching org analytics:', error);
+    console.error('[Analytics Error] getOrgAnalytics failed:', {
+      code: error.code,
+      message: error.message,
+      hint: error.hint,
+      details: error.details,
+    });
     throw error;
   }
 
@@ -39,7 +44,12 @@ export async function getOrgUsersAnalytics(orgId: string, startDate: string, end
   });
 
   if (error) {
-    console.error('Error fetching org users analytics:', error);
+    console.error('[Analytics Error] getOrgUsersAnalytics failed:', {
+      code: error.code,
+      message: error.message,
+      hint: error.hint,
+      details: error.details,
+    });
     throw error;
   }
 
