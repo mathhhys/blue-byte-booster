@@ -8,7 +8,7 @@ export async function getOrgAnalytics(orgId: string, startDate: string, endDate:
   // Pass clerk_org_id directly to RPC function - it handles the lookup internally
   // and returns empty results gracefully if organization doesn't exist
   const { data, error } = await supabase.rpc('get_org_analytics', {
-    p_clerk_org_id: orgId,
+    p_org_id: orgId,
     p_start_date: startDate,
     p_end_date: endDate
   });
@@ -32,8 +32,8 @@ export async function getOrgUsersAnalytics(orgId: string, startDate: string, end
   console.log('[Analytics Debug] getOrgUsersAnalytics called with:', { orgId, startDate, endDate });
   
   // Use the RPC function that accepts clerk_org_id directly
-  const { data, error } = await supabase.rpc('get_org_users_analytics', {
-    p_clerk_org_id: orgId,
+  const { data, error } = await supabase.rpc('get_user_analytics', {
+    p_org_id: orgId,
     p_start_date: startDate,
     p_end_date: endDate
   });
