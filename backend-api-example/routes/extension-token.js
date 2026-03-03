@@ -38,7 +38,13 @@ async function generateLongLivedToken(clerkUserId) {
     throw new Error('User not found in database');
   }
 
-  const { id: userId, first_name: firstName, last_name: lastName, email: primaryEmail, plan_type: accountType } = userData;
+  const {
+    id: userId,
+    first_name: firstName,
+    last_name: lastName,
+    email: primaryEmail,
+    plan_type: accountType,
+  } = userData;
 
   // Revoke existing tokens
   const { error: revokeError } = await supabase.rpc('revoke_user_extension_tokens', {
@@ -49,18 +55,16 @@ async function generateLongLivedToken(clerkUserId) {
     throw new Error('Failed to revoke existing tokens');
   }
 
-  // Generate detailed Clerk-mimicking JWT payload
+  // Generate JWT timing fields
   const iat = getCurrentEpochTime();
   const lifetime = LONG_LIVED_EXPIRES_SECONDS;
   const exp = iat + lifetime;
   const nbf = iat - 5; // Not before: 5 seconds before issued time
-  const jti = crypto.randomBytes(10).toString('hex'); // Generate unique token ID
-  
-  // Generate or fetch session ID (using a generated one for now)
+  const jti = crypto.randomBytes(10).toString('hex'); // Unique token ID
   const sessionId = crypto.randomBytes(16).toString('hex');
 
+  // ✅ Clean payload — no 'algorithm' field inside
   const payload = {
-    algorithm: 'RS256',
     azp: 'https://www.softcodes.ai',
     claims: {
       accountType,
@@ -72,32 +76,33 @@ async function generateLongLivedToken(clerkUserId) {
       sessionId,
       sub: clerkUserId,
       userId: clerkUserId,
-      vscodeExtension: true
+      vscodeExtension: true,
     },
-    exp,
-    iat,
+    exp,      // Used by jsonwebtoken for expiry
+    iat,      // Issued at
     iss: 'https://clerk.softcodes.ai',
     jti,
     lifetime,
     name: 'vscode-extension',
     nbf,
-    sub: clerkUserId
+    sub: clerkUserId,
   };
 
+  // ✅ kid correctly placed inside header object
   const token = jwt.sign(payload, process.env.JWT_PRIVATE_KEY, {
     algorithm: 'RS256',
     header: {
       alg: 'RS256',
       typ: 'JWT',
-      kid: process.env.CLERK_KID || 'ins_2tlN6BLiprK2b0JkKSFrj7GoXU6', // Clerk Key ID
-      cat: process.env.CLERK_CAT || 'cl_B7d4PD222AAA' // Clerk category/client ID
-    }
+      kid: process.env.CLERK_KID || 'ins_2tlN6BLiprK2b0JkKSFrj7GoXU6',
+      cat: process.env.CLERK_CAT || 'cl_B7d4PD222AAA',
+    },
+    // ✅ No exp/iat/nbf here — already defined in payload above
   });
 
-  // Hash token
-  const tokenHash = bcrypt.hashSync(token, BCRYPT_SALT_ROUNDS);
+  // ✅ Async bcrypt to avoid blocking the event loop
+  const tokenHash = await bcrypt.hash(token, BCRYPT_SALT_ROUNDS);
 
-  // Expires at ISO
   const expiresAtISO = epochToISOString(exp);
 
   // Insert into extension_tokens
@@ -114,8 +119,9 @@ async function generateLongLivedToken(clerkUserId) {
     throw new Error('Failed to store token');
   }
 
-  // Log
-  console.log(`Long-lived token generated for user ${clerkUserId} (ID: ${userId}), expires at ${expiresAtISO}`);
+  console.log(
+    `Long-lived token generated for user ${clerkUserId} (ID: ${userId}), expires at ${expiresAtISO}`
+  );
 
   return { token, exp, expiresAtISO };
 }
@@ -137,7 +143,6 @@ router.post('/generate', authenticateClerkToken, rateLimitMiddleware, async (req
       type: 'long_lived',
       usage: 'vscode_extension',
     });
-
   } catch (error) {
     console.error('Long-lived token generation error:', error.message);
     res.status(500).json({ error: 'Failed to generate long-lived token' });
@@ -150,7 +155,6 @@ router.post('/revoke', authenticateClerkToken, rateLimitMiddleware, async (req, 
     const { clerkUserId } = req.auth;
     console.log('Revoking long-lived extension token for Clerk User ID:', clerkUserId);
 
-    // Fetch user ID
     const { data: userData, error: userError } = await supabase
       .from('users')
       .select('id')
@@ -163,7 +167,6 @@ router.post('/revoke', authenticateClerkToken, rateLimitMiddleware, async (req, 
 
     const userId = userData.id;
 
-    // Revoke tokens
     const { error: revokeError } = await supabase.rpc('revoke_user_extension_tokens', {
       p_user_id: userId,
     });
@@ -180,20 +183,18 @@ router.post('/revoke', authenticateClerkToken, rateLimitMiddleware, async (req, 
       revoked: true,
       message: 'Extension token revoked successfully',
     });
-
   } catch (error) {
     console.error('Token revocation error:', error.message);
     res.status(500).json({ error: 'Failed to revoke token' });
   }
 });
 
-// GET /api/extension-token/active - Check if user has an active long-lived token
+// GET /api/extension-token/active
 router.get('/active', authenticateClerkToken, rateLimitMiddleware, async (req, res) => {
   try {
     const { clerkUserId } = req.auth;
     console.log('Checking active long-lived token for Clerk User ID:', clerkUserId);
 
-    // Fetch user ID
     const { data: userData, error: userError } = await supabase
       .from('users')
       .select('id')
@@ -206,8 +207,6 @@ router.get('/active', authenticateClerkToken, rateLimitMiddleware, async (req, r
 
     const userId = userData.id;
 
-    // Check for active token (not revoked and not expired)
-    // Order by created_at descending to get the most recent token
     const { data: tokenData, error: tokenError } = await supabase
       .from('extension_tokens')
       .select('id, expires_at, revoked_at')
@@ -225,17 +224,18 @@ router.get('/active', authenticateClerkToken, rateLimitMiddleware, async (req, r
 
     const hasActive = !!tokenData;
 
-    console.log(`Active long-lived token check for user ${clerkUserId} (ID: ${userId}): ${hasActive}`);
+    console.log(
+      `Active long-lived token check for user ${clerkUserId} (ID: ${userId}): ${hasActive}`
+    );
 
     res.json({
       success: true,
-      hasActive: hasActive,
+      hasActive,
       ...(tokenData && {
         tokenId: tokenData.id,
         expiresAt: tokenData.expires_at,
       }),
     });
-
   } catch (error) {
     console.error('Active token check error:', error.message);
     res.status(500).json({ error: 'Failed to check active token' });
