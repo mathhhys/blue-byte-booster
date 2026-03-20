@@ -9,7 +9,7 @@ const Banner = () => {
     >
       <div className="container mx-auto px-4 text-center">
         <Link to="/pricing" className="text-sm font-medium hover:underline">
-          🚀 Now supporting Gemini 3 Pro and GPT 5.2 models!
+          🚀 Now supporting Claude 4.6 and GPT 5.4 models!
         </Link>
       </div>
     </section>
