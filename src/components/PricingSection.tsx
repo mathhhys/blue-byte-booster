@@ -110,7 +110,9 @@ export default function PricingSection() {
       return;
     }
   
+    console.log('DEBUG: About to call useOrganization() inside handleTeamsCheckout');
     const { organization } = useOrganization();
+    console.log('DEBUG: useOrganization() called successfully');
     if (!organization) {
       // Redirect to create organization
       setTimeout(() => {
